@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -596,7 +596,7 @@ public class ContextCompressionLayerService
             .Replace("{{CREATION_DATE}}", DateTime.Now.ToString("yyyy-MM-dd"));
     }
 
-    private const string ProjectSummaryTemplate = """
+    internal const string ProjectSummaryTemplate = """
 # Project Summary
 
 ## Overview
@@ -613,7 +613,6 @@ public class ContextCompressionLayerService
 | Language | |
 | DB | |
 | Infrastructure | |
-| Other | |
 
 ## Architecture
 
@@ -626,18 +625,18 @@ public class ContextCompressionLayerService
 - 
 """;
 
-    private const string CurrentFocusTemplate = """
+    internal const string CurrentFocusTemplate = """
 # Focus
 
-## What I am working on
+## Currently Doing
 
 - 
 
-## Recent updates
+## Recent Updates
 
 - 
 
-## Next actions
+## Next Actions
 
 - 
 
@@ -646,7 +645,8 @@ public class ContextCompressionLayerService
 - 
 
 ---
-Updated:
+
+Last Updated: YYYY-MM-DD
 """;
 
     private const string TensionsTemplate = """

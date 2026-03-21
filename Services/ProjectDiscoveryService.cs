@@ -388,66 +388,12 @@ public class ProjectDiscoveryService
     {
         WriteIfMissing(
             Path.Combine(obsidianAiContext, "project_summary.md"),
-            """
-            # Project Summary
-
-            ## What this project is
-
-            - 
-
-            ## Goal
-
-            - 
-
-            ## Current phase
-
-            - 
-
-            ## Tech stack
-
-            | Category | Technology |
-            |---------|------------|
-            | Language | |
-            | DB | |
-            | Infrastructure | |
-            | Other | |
-
-            ## Architecture
-
-            ```
-            (Text architecture sketch)
-            ```
-
-            ## Notes
-
-            - 
-            """,
+            ContextCompressionLayerService.ProjectSummaryTemplate,
             logs);
 
         WriteIfMissing(
             Path.Combine(obsidianAiContext, "current_focus.md"),
-            """
-            # Focus
-
-            ## What I am working on
-
-            - 
-
-            ## Recent updates
-
-            - 
-
-            ## Next actions
-
-            - 
-
-            ## Notes
-
-            - 
-
-            ---
-            Updated:
-            """,
+            ContextCompressionLayerService.CurrentFocusTemplate,
             logs);
 
         WriteIfMissing(

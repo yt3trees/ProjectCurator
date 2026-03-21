@@ -374,8 +374,7 @@ public partial class SetupViewModel : ObservableObject
             var focusFile = Path.Combine(wsDir, "current_focus.md");
             if (!File.Exists(focusFile))
             {
-                var template = BuildWorkstreamFocusTemplate();
-                await File.WriteAllTextAsync(focusFile, template, Encoding.UTF8, _cts!.Token);
+                await File.WriteAllTextAsync(focusFile, ContextCompressionLayerService.CurrentFocusTemplate, Encoding.UTF8, _cts!.Token);
             }
 
             var sharedWorkDir = Path.Combine(project.Path, "shared", "_work", normalizedId);
@@ -609,30 +608,6 @@ public partial class SetupViewModel : ObservableObject
         normalized = Regex.Replace(normalized, "-{2,}", "-").Trim('-');
         return normalized;
     }
-
-    private static string BuildWorkstreamFocusTemplate()
-        => """
-# Focus
-
-## What I am working on
-
-- 
-
-## Recent updates
-
-- 
-
-## Next actions
-
-- 
-
-## Notes
-
-- 
-
----
-Updated:
-""";
 
     private sealed class WorkstreamLabelSetting
     {
