@@ -12,6 +12,7 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly ConfigService _configService;
     private readonly HotkeyService _hotkeyService;
+    private readonly TrayService _trayService;
     private bool _loading;
 
     // ホットキー
@@ -73,13 +74,20 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string asanaGlobalStatus = "";
 
+    // About
+    public string AppVersion { get; } =
+        "v" + (System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0");
+
+    public System.Windows.Media.Imaging.BitmapSource? AppIcon => _trayService.DiamondBitmapSource;
+
     // ホットキー表示更新コールバック (TrayService.UpdateHotkeyDisplay を呼ぶ)
     public Action<string>? OnHotkeyDisplayChanged;
 
-    public SettingsViewModel(ConfigService configService, HotkeyService hotkeyService)
+    public SettingsViewModel(ConfigService configService, HotkeyService hotkeyService, TrayService trayService)
     {
         _configService = configService;
         _hotkeyService = hotkeyService;
+        _trayService = trayService;
     }
 
     /// <summary>ディスクから設定を読み込む。ページ表示時に呼ぶ。</summary>
