@@ -50,10 +50,9 @@ flowchart TD
 
 ### 1. Download the app from GitHub Releases
 
-- Open the latest GitHub Release
-- Download the Windows build (`.exe` or `.zip`)
-- Place it in any folder you want (for example, `C:\Tools\ProjectCurator\`)
-- If you downloaded a `.zip`, extract it first
+- Open the [latest GitHub Release](https://github.com/yt3trees/ProjectCurator/releases)
+- Download the `.zip` file
+- Extract it to any folder you want (for example, `C:\Tools\ProjectCurator\`)
 
 ### 2. Launch `ProjectCurator.exe`
 
@@ -167,6 +166,60 @@ The generated sections are:
 - `Today` (high-priority queue items)
 - `This Week` (upcoming queue items)
 
+## AI Agent Collaboration (Claude Code / Codex CLI)
+
+ProjectCurator is designed to work alongside AI coding agents such as Claude Code and Codex CLI.
+
+### How It Works
+
+Each project managed by ProjectCurator contains an `AGENTS.md` at the project root and a set of embedded skills under `.claude/skills/` (and `.codex/skills/`). When you open a terminal inside a date-based work folder like:
+
+```
+shared/_work/2026/202603/20260321_fix-login-bug/
+```
+
+Claude Code or Codex CLI automatically reads the `AGENTS.md` and skill definitions above this directory. This gives the agent full awareness of:
+
+- Project structure and key paths
+- AI context files (`current_focus.md`, `decision_log`, `tensions.md`)
+- Obsidian Knowledge Layer notes
+- Active Asana tasks (if synced)
+
+### What the Agent Does Autonomously
+
+The embedded skills enable the agent to act without explicit commands:
+
+| Skill | Behavior |
+|---|---|
+| context-session-end | Detects natural work boundaries and proposes updates to `current_focus.md` with `[AI]` prefix |
+| context-decision-log | Monitors conversation for implicit decisions and proposes structured logging to `decision_log/` |
+| obsidian-knowledge | Proposes writing session summaries, technical notes, or meeting records to Obsidian vault |
+| update-focus-from-asana | Slash command to sync Asana task status into `current_focus.md` |
+
+All proposals require user confirmation before writing. The agent never modifies existing human-written content.
+
+### Typical Agent Session Flow
+
+```mermaid
+flowchart TD
+    A["Open terminal in work folder"] --> B["Agent reads AGENTS.md + skills"]
+    B --> C["Agent reads current_focus.md, project_summary.md"]
+    C --> D["Work together (code, design, debug)"]
+    D --> E["Agent detects session end"]
+    E --> F["Proposes current_focus.md update"]
+    E --> G["Proposes decision_log entry (if decisions made)"]
+    E --> H["Proposes Obsidian note (if knowledge worth saving)"]
+```
+
+### Skill Deployment
+
+ProjectCurator automatically deploys skill files when creating or checking a project from the Setup page:
+
+- `.claude/skills/` for Claude Code
+- `.codex/skills/` for Codex CLI
+
+Skills are sourced from the app's embedded `Assets/ContextCompressionLayer/skills/` and kept in sync with the shared folder via junctions.
+
 ## Core Features
 
 | Page | What You Can Do |
@@ -187,11 +240,37 @@ Overview of all projects with health indicators, update freshness, and Today Que
 
 ![](_assets/Dashboard.png)
 
+<details>
+<summary>Dashboard details</summary>
+
+- Project cards are displayed in a grid layout
+- Each card shows: project name, tier badge (FULL / MINI), category badge (DOMAIN), health indicator dots (green / yellow / red), update freshness (Since / Summary in days), and uncommitted changes count
+- Workstreams can be expanded per card
+- Action icons at the bottom of each card open folders, jump to Editor, and more
+- Pinned Folders section in the middle area provides quick access to frequently used work folders
+- Today Queue at the bottom lists prioritized tasks with due dates and descriptions
+- Auto-refresh toggle with configurable interval (e.g. 10 min), manual refresh, and sort buttons in the toolbar
+- Filter bar supports filtering by project and workstream
+
+</details>
+
 ### Editor
 
 Tree-based file browser for AI context files (`current_focus.md`, `decision_log`, etc.) with syntax-highlighted Markdown editing.
 
 ![](_assets/Editor.png)
+
+<details>
+<summary>Editor details</summary>
+
+- Project selector dropdown at the top left to switch between projects
+- Tree view on the left lists AI context files: `current_focus.md`, `file_map.md`, `project_summary.md`, `tensions.md`, `decision_log/`, `focus_history/`, `obsidian_notes/`, `workstreams/`, `CLAUDE.md`, `AGENTS.md`
+- Syntax-highlighted Markdown editor on the right with section-based coloring
+- Toolbar buttons: Refresh, Dec Log (quick decision log entry), P (pin folder), Save
+- Full file path displayed in the header bar
+- Status bar at the bottom shows the current project and file name
+
+</details>
 
 ### Timeline
 
@@ -199,11 +278,33 @@ Chronological view of project activity filtered by project and time period.
 
 ![](_assets/Timeline.png)
 
+<details>
+<summary>Timeline details</summary>
+
+- Project dropdown to filter by a specific project (e.g. `GenAi [Domain]`)
+- Period dropdown to set the time range (e.g. 30 days)
+- Graph scope selector to choose between single project and all projects
+- Entries tab shows a list of timeline entries with dates (including day of week) and focus labels
+- Graph tab visualizes activity trends over the selected period
+
+</details>
+
 ### Git Repos
 
 Scans workspace roots and lists repositories with remote URLs, branches, and last commit dates.
 
 ![](_assets/GitRepos.png)
+
+<details>
+<summary>Git Repos details</summary>
+
+- Project dropdown to filter repositories by project
+- Scan button to trigger a recursive repository search under workspace roots
+- Save to BOX / Load from BOX buttons to back up or restore clone metadata
+- Copy Clone Script button generates a shell script to re-clone all listed repositories
+- Table columns: Project, Repository, Remote URL, Branch, Last Commit date
+
+</details>
 
 ### Asana Sync
 
@@ -211,21 +312,29 @@ Configure per-project Asana sync with scheduling, workstream mapping, and sectio
 
 ![](_assets/AsanaSync.png)
 
-## Keyboard Shortcuts (Most Used)
-
-| Shortcut | Action |
-|---|---|
-| `Ctrl+K` | Open Command Palette |
-| `Ctrl+1` - `Ctrl+7` | Navigate pages |
-| `Ctrl+S` | Save in Editor |
-| `Ctrl+F` / `F3` / `Shift+F3` | Search in Editor |
-| `Ctrl+Shift+P` | Toggle app visibility (default) |
-
-## Asana Integration (Optional)
+<details>
+<summary>Asana Sync details and setup</summary>
 
 Use this only if your workflow includes Asana.
 
-### Asana Sync Tab Setup
+Left panel (sync controls):
+
+- Auto Sync checkbox and interval setting (in hours)
+- Save Schedule to persist the schedule
+- Run Sync Now to execute a one-time sync immediately
+- Clear button to reset sync state
+- Last sync timestamp displayed for reference
+
+Right panel (per-project config):
+
+- Project selector dropdown (e.g. `GenAi [Domain]`) with Load button
+- Asana Project GIDs: one GID per line to specify which Asana projects to sync
+- Workstream Map: maps `gid` to `workstream-id` for routing tasks to the correct workstream folder
+- Workstream Field: the custom field name in Asana used to identify the workstream
+- Hidden Aliases: aliases to exclude from sync output (one per line)
+- Save button to persist the per-project `asana_config.json`
+
+Setup steps:
 
 1. Enable Asana integration in `Settings` and save the required fields
 2. Open `Asana Sync` and choose the target project
@@ -245,6 +354,71 @@ If tasks do not appear:
 Reference (you usually do not edit these directly):
 - Global Asana values are stored in `Documents\Projects\_config\asana_global.json`
 - Per-project advanced settings are stored in `{BoxProject}\asana_config.json`
+
+</details>
+
+### Setup - New Project
+
+Create new projects, check existing structures, archive, and convert tiers from a single page.
+
+![](_assets/Setup-NewProject.png)
+
+<details>
+<summary>Setup details (New Project / Check / Archive / Convert Tier)</summary>
+
+New Project tab:
+
+- Project Name: select an existing project to auto-fill Tier/Category, add ExternalSharePath, or run AI Context Setup on it
+- Tier: `full (standard)` or `mini`
+- Category: `project (time-bound)` or `domain`
+- ExternalSharePath (optional): custom path per files for shared data
+- Also run AI Context Setup: when checked, junctions for `_ai-context/context/` and `_ai-context/obsidian_notes/` are created automatically
+- Overwrite existing skills (-Force): re-deploys `.claude/skills/` and `.codex/skills/` even if they already exist
+- Setup Project button creates the folder structure, junctions, and skill files
+- Output area shows the log of operations performed
+
+Check tab:
+
+- Validates an existing project's folder structure, junctions, and skill files
+- Reports missing or broken items so you can fix them
+
+Archive tab:
+
+- Moves a project to an archive location and cleans up junctions
+
+Convert Tier tab:
+
+- Converts a project between `full` and `mini` tiers, adjusting folder structure accordingly
+
+</details>
+
+### Setup - Workstreams
+
+Manage workstreams within a project: create, rename labels, and close/reopen.
+
+![](_assets/Setup-Workstreams.png)
+
+<details>
+<summary>Workstreams details</summary>
+
+- Project selector dropdown with Reload button
+- Add Workstream section: enter a Workstream ID (kebab-case), an optional label, and an optional display label, then click Create Workstream
+- Existing Workstreams list shows each workstream's ID, label, and status (Active / Closed)
+- Close button marks a workstream as Closed; Reopen restores it to Active
+- Save Labels persists any label changes
+- Output area shows the log of operations performed
+
+</details>
+
+## Keyboard Shortcuts (Most Used)
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+K` | Open Command Palette |
+| `Ctrl+1` - `Ctrl+7` | Navigate pages |
+| `Ctrl+S` | Save in Editor |
+| `Ctrl+F` / `F3` / `Shift+F3` | Search in Editor |
+| `Ctrl+Shift+P` | Toggle app visibility (default) |
 
 ## Configuration Files
 
