@@ -218,6 +218,45 @@
                 </TabItem>
 
                 <!-- ===== Convert ===== -->
+                <TabItem Header="Convert Tier">
+                    <StackPanel Margin="0,12">
+                        <TextBlock Text="Tier Conversion (mini &#x27F7; full)"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppSubtext0}"
+                                   Margin="0,0,0,10"/>
+
+                        <TextBlock Text="Project" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
+                        <ComboBox IsEditable="True"
+                                  ItemsSource="{Binding ProjectNames}"
+                                  Text="{Binding ConvertProjectName, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                  MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
+                                  Margin="0,0,0,10"/>
+
+                        <TextBlock Text="Target Tier" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
+                        <ComboBox SelectedValue="{Binding ConvertTargetTier}"
+                                  SelectedValuePath="Tag"
+                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                  Width="130" HorizontalAlignment="Left"
+                                  Margin="0,0,0,10">
+                            <ComboBoxItem Content="full" Tag="full"/>
+                            <ComboBoxItem Content="mini" Tag="mini"/>
+                        </ComboBox>
+
+                        <CheckBox Content="Dry Run (no actual changes)"
+                                  IsChecked="{Binding ConvertDryRun}"
+                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                  Margin="0,0,0,10"/>
+
+                        <ui:Button Content="Run Convert"
+                                   Command="{Binding RunConvertCommand}"
+                                   Appearance="Primary"
+                                   IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                   HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- ===== Workstreams ===== -->
                 <TabItem Header="Workstreams">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,12">
                         <StackPanel>
@@ -359,45 +398,6 @@
                             </TextBlock>
                         </StackPanel>
                     </ScrollViewer>
-                </TabItem>
-
-                <!-- ===== Convert ===== -->
-                <TabItem Header="Convert Tier">
-                    <StackPanel Margin="0,12">
-                        <TextBlock Text="Tier Conversion (mini &#x27F7; full)"
-                                   FontSize="13" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource AppSubtext0}"
-                                   Margin="0,0,0,10"/>
-
-                        <TextBlock Text="Project" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
-                        <ComboBox IsEditable="True"
-                                  ItemsSource="{Binding ProjectNames}"
-                                  Text="{Binding ConvertProjectName, UpdateSourceTrigger=PropertyChanged}"
-                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
-                                  MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
-                                  Margin="0,0,0,10"/>
-
-                        <TextBlock Text="Target Tier" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
-                        <ComboBox SelectedValue="{Binding ConvertTargetTier}"
-                                  SelectedValuePath="Tag"
-                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
-                                  Width="130" HorizontalAlignment="Left"
-                                  Margin="0,0,0,10">
-                            <ComboBoxItem Content="full" Tag="full"/>
-                            <ComboBoxItem Content="mini" Tag="mini"/>
-                        </ComboBox>
-
-                        <CheckBox Content="Dry Run (no actual changes)"
-                                  IsChecked="{Binding ConvertDryRun}"
-                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
-                                  Margin="0,0,0,10"/>
-
-                        <ui:Button Content="Run Convert"
-                                   Command="{Binding RunConvertCommand}"
-                                   Appearance="Primary"
-                                   IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
-                                   HorizontalAlignment="Left"/>
-                    </StackPanel>
                 </TabItem>
             </TabControl>
 
