@@ -414,7 +414,7 @@ Convert Tier タブ:
 | `Ctrl+K` | Command Paletteを開く |
 | `Ctrl+1` - `Ctrl+7` | 各ページへ移動 |
 | `Ctrl+S` | Editorで保存 |
-| `Ctrl+F` / `F3` / `Shift+F3` | Editor検索 |
+| `Ctrl+F` | Editor検索 |
 | `Ctrl+Shift+P` | アプリ表示/非表示(既定) |
 
 ## 設定ファイル

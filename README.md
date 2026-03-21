@@ -417,7 +417,7 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 | `Ctrl+K` | Open Command Palette |
 | `Ctrl+1` - `Ctrl+7` | Navigate pages |
 | `Ctrl+S` | Save in Editor |
-| `Ctrl+F` / `F3` / `Shift+F3` | Search in Editor |
+| `Ctrl+F` | Search in Editor |
 | `Ctrl+Shift+P` | Toggle app visibility (default) |
 
 ## Configuration Files

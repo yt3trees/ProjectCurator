@@ -10,6 +10,7 @@ using ICSharpCode.AvalonEdit.Highlighting;
 using Wpf.Ui.Controls;
 using ProjectCurator.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
+using WpfKeyEventHandler = System.Windows.Input.KeyEventHandler;
 using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
 
 namespace ProjectCurator.Views.Pages;
@@ -60,8 +61,9 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         // decision_log 新規入力ダイアログ
         ViewModel.RequestNewDecisionLogName = ShowNewDecisionLogDialog;
 
-        // キーバインド
-        KeyDown += OnPageKeyDown;
+        // キーバインド:
+        // handledEventsToo=true で子コントロールが処理済みのキーも捕捉する。
+        AddHandler(Keyboard.PreviewKeyDownEvent, new WpfKeyEventHandler(OnPageKeyDown), handledEventsToo: true);
 
         // CurrentFile が変わったら必ずエディタ同期 + ハイライト適用
         // (OpenFileAndSelectNodeAsync 経由で SelectedItemChanged が発火しないケースをカバー)
@@ -244,15 +246,18 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                     break;
                 case Key.F:
                     e.Handled = true;
-                    ViewModel.IsSearchBarVisible = true;
-                    SearchTextBox.Focus();
+                    if (ViewModel.IsSearchBarVisible)
+                    {
+                        ViewModel.IsSearchBarVisible = false;
+                        _editor.Focus();
+                    }
+                    else
+                    {
+                        ViewModel.IsSearchBarVisible = true;
+                        SearchTextBox.Focus();
+                    }
                     break;
             }
-        }
-        else if (e.Key == Key.F3)
-        {
-            e.Handled = true;
-            FindText(forward: Keyboard.Modifiers != ModifierKeys.Shift);
         }
         else if (e.Key == Key.Escape && ViewModel.IsSearchBarVisible)
         {
@@ -271,8 +276,15 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         else if (e.Key == Key.Escape) { ViewModel.IsSearchBarVisible = false; _editor.Focus(); e.Handled = true; }
     }
 
-    private void OnSearchNext(object sender, RoutedEventArgs e) => FindText(true);
-    private void OnSearchPrev(object sender, RoutedEventArgs e) => FindText(false);
+    private void OnSearchNext(object sender, RoutedEventArgs e)
+    {
+        FindText(true);
+    }
+
+    private void OnSearchPrev(object sender, RoutedEventArgs e)
+    {
+        FindText(false);
+    }
     private void OnSearchClose(object sender, RoutedEventArgs e) { ViewModel.IsSearchBarVisible = false; _editor.Focus(); }
 
     private void FindText(bool forward)
@@ -293,7 +305,6 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             _editor.CaretOffset = idx;
             _editor.ScrollToLine(_editor.Document.GetLineByOffset(idx).LineNumber);
         }
-        _editor.Focus();
     }
 
     // -------------------------------------------------------------------------
