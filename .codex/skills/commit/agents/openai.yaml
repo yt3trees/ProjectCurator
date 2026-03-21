@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit"
+  short_description: "Create and execute git commits with English commit messages."
+  default_prompt: "Prepare a commit with a clear English message based on the staged or unstaged changes."
