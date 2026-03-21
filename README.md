@@ -179,6 +179,38 @@ The generated sections are:
 | Setup | Create/check/archive projects, tier conversion, workstream management |
 | Settings | Theme, hotkey, workspace paths, refresh behavior |
 
+## UI Overview
+
+### Dashboard
+
+Overview of all projects with health indicators, update freshness, and Today Queue at the bottom.
+
+![](_assets/Dashboard.png)
+
+### Editor
+
+Tree-based file browser for AI context files (`current_focus.md`, `decision_log`, etc.) with syntax-highlighted Markdown editing.
+
+![](_assets/Editor.png)
+
+### Timeline
+
+Chronological view of project activity filtered by project and time period.
+
+![](_assets/Timeline.png)
+
+### Git Repos
+
+Scans workspace roots and lists repositories with remote URLs, branches, and last commit dates.
+
+![](_assets/GitRepos.png)
+
+### Asana Sync
+
+Configure per-project Asana sync with scheduling, workstream mapping, and section filters.
+
+![](_assets/AsanaSync.png)
+
 ## Keyboard Shortcuts (Most Used)
 
 | Shortcut | Action |

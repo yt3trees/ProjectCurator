@@ -176,6 +176,38 @@ ProjectCurator には、standup の自動生成機能があります。
 | Setup | プロジェクト作成、構成チェック、Tier変換、Workstream管理 |
 | Settings | テーマ、ホットキー、パス、自動更新設定 |
 
+## 画面イメージ
+
+### Dashboard
+
+全プロジェクトのヘルス状態、更新鮮度、Today Queueを一画面で確認できます。
+
+![](_assets/Dashboard.png)
+
+### Editor
+
+AI コンテキストファイル(`current_focus.md`、`decision_log` など)をツリーから選び、シンタックスハイライト付きで編集できます。
+
+![](_assets/Editor.png)
+
+### Timeline
+
+プロジェクトや期間でフィルタして、変更履歴を時系列で確認できます。
+
+![](_assets/Timeline.png)
+
+### Git Repos
+
+ワークスペース内のリポジトリを一覧表示し、リモートURL・ブランチ・最終コミット日を確認できます。
+
+![](_assets/GitRepos.png)
+
+### Asana Sync
+
+プロジェクトごとにAsana同期のスケジュール、Workstreamマッピング、セクションフィルタを設定できます。
+
+![](_assets/AsanaSync.png)
+
 ## キーボードショートカット(よく使うもの)
 
 | Shortcut | Action |
