@@ -1,0 +1,108 @@
+<ui:FluentWindow x:Class="ProjectCurator.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:pages="clr-namespace:ProjectCurator.Views.Pages"
+    xmlns:controls="clr-namespace:ProjectCurator.Views.Controls"
+    Title="Project Desk"
+    Width="1150" Height="850"
+    MinWidth="800" MinHeight="500"
+    WindowStartupLocation="CenterScreen"
+    ShowInTaskbar="False"
+    WindowBackdropType="None"
+    Background="{DynamicResource AppBackground}"
+    ExtendsContentIntoTitleBar="True">
+
+    <Grid Background="{DynamicResource AppBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- タイトルバー (移動・最小化・最大化・閉じる) -->
+        <ui:TitleBar x:Name="RootTitleBar" Title="Project Desk" Grid.Row="0" />
+
+        <ui:NavigationView x:Name="RootNavigation"
+            Grid.Row="1"
+            PaneDisplayMode="Left"
+            IsBackButtonVisible="Collapsed"
+            IsPaneToggleVisible="True"
+            OpenPaneLength="220"
+            Background="Transparent">
+            <ui:NavigationView.Resources>
+                <!-- サイドバーの背景色をアプリの背景色と一致させる -->
+                <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="{DynamicResource GitHubDarkBaseColor}" />
+                <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="{DynamicResource GitHubDarkBaseColor}" />
+            </ui:NavigationView.Resources>
+
+            <ui:NavigationView.MenuItems>
+                <ui:NavigationViewItem Content="Dashboard"
+                    Icon="{ui:SymbolIcon Symbol=Home24}"
+                    TargetPageType="{x:Type pages:DashboardPage}" />
+                <ui:NavigationViewItem Content="Editor"
+                    Icon="{ui:SymbolIcon Symbol=DocumentEdit24}"
+                    TargetPageType="{x:Type pages:EditorPage}" />
+                <ui:NavigationViewItem Content="Timeline"
+                    Icon="{ui:SymbolIcon Symbol=Timeline24}"
+                    TargetPageType="{x:Type pages:TimelinePage}" />
+                <ui:NavigationViewItem Content="Git Repos"
+                    Icon="{ui:SymbolIcon Symbol=BranchFork24}"
+                    TargetPageType="{x:Type pages:GitReposPage}" />
+                <ui:NavigationViewItem Content="Asana Sync"
+                    Icon="{ui:SymbolIcon Symbol=ArrowSync24}"
+                    TargetPageType="{x:Type pages:AsanaSyncPage}" />
+            </ui:NavigationView.MenuItems>
+
+            <ui:NavigationView.FooterMenuItems>
+                <ui:NavigationViewItem Content="Setup"
+                    Icon="{ui:SymbolIcon Symbol=Wrench24}"
+                    TargetPageType="{x:Type pages:SetupPage}" />
+                <ui:NavigationViewItem Content="Settings"
+                    Icon="{ui:SymbolIcon Symbol=Settings24}"
+                    TargetPageType="{x:Type pages:SettingsPage}" />
+            </ui:NavigationView.FooterMenuItems>
+
+            <!-- ステータスバー -->
+            <ui:NavigationView.ContentOverlay>
+                <Grid Height="32" VerticalAlignment="Bottom"
+                      Background="{DynamicResource AppMantle}">
+                    <StackPanel Orientation="Horizontal" Margin="8,0"
+                                Visibility="{Binding IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock x:Name="StatusProjectText"
+                                   Text="{Binding StatusProject}"
+                                   Foreground="{DynamicResource AppSubtext0}"
+                                   VerticalAlignment="Center" FontSize="12" Margin="0,0,12,0"/>
+                        <TextBlock x:Name="StatusFileText"
+                                   Text="{Binding StatusFile}"
+                                   Foreground="{DynamicResource AppSubtext1}"
+                                   VerticalAlignment="Center" FontSize="12" Margin="0,0,12,0"/>
+                        <TextBlock x:Name="StatusEncodingText"
+                                   Text="{Binding StatusEncoding}"
+                                   Foreground="{DynamicResource AppOverlay1}"
+                                   VerticalAlignment="Center" FontSize="12" Margin="0,0,8,0"/>
+                        <TextBlock x:Name="StatusDirtyText"
+                                   Text="{Binding StatusDirty, Converter={StaticResource DirtyConverter}}"
+                                   Foreground="{DynamicResource AppYellow}"
+                                   VerticalAlignment="Center" FontSize="12"/>
+                    </StackPanel>
+                </Grid>
+            </ui:NavigationView.ContentOverlay>
+
+        </ui:NavigationView>
+
+        <!-- コマンドパレット・オーバーレイ -->
+        <controls:CommandPaletteOverlay x:Name="CommandPalette" DataContext="{Binding CommandPaletteViewModel}" />
+
+        <!-- ContentDialog Host (overlay over entire window) -->
+        <ContentPresenter x:Name="RootContentDialogPresenter"
+                          Grid.RowSpan="2"
+                          Panel.ZIndex="900" />
+
+        <!-- フラッシュ防止オーバーレイ: 起動・表示時の初期化中にウィンドウ全体を覆う -->
+        <Grid x:Name="FlashBlocker"
+              Grid.RowSpan="2"
+              Background="{DynamicResource AppBackground}"
+              Panel.ZIndex="1000"
+              IsHitTestVisible="False" />
+    </Grid>
+</ui:FluentWindow>

@@ -1,0 +1,150 @@
+<UserControl x:Class="ProjectCurator.Views.Pages.GitReposPage"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignHeight="600" d:DesignWidth="900"
+        Loaded="OnLoaded">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- ツールバー -->
+            <RowDefinition Height="*"/>
+            <!-- DataGrid -->
+            <RowDefinition Height="Auto"/>
+            <!-- ステータス -->
+        </Grid.RowDefinitions>
+
+        <!-- ===== ツールバー ===== -->
+        <Border Grid.Row="0" Background="{DynamicResource AppSurface0}" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Git Repos"
+                           FontSize="14" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppText}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"/>
+
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding Projects}"
+                          SelectedItem="{Binding SelectedProject}"
+                          DisplayMemberPath="DisplayName"
+                          MinWidth="200" MaxWidth="320"
+                          HorizontalAlignment="Left"
+                          Background="{DynamicResource AppSurface1}"
+                          Foreground="{DynamicResource AppText}"/>
+
+                <!-- アクションボタン群 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <ui:Button Content="Scan"
+                               Command="{Binding ScanCommand}"
+                               Appearance="Primary"
+                               IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBoolConverter}}"
+                               Margin="6,0,0,0"/>
+                    <ui:Button Content="Save to BOX"
+                               Command="{Binding SaveToBoxCommand}"
+                               Appearance="Secondary"
+                               IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBoolConverter}}"
+                               Margin="6,0,0,0"/>
+                    <ui:Button Content="Load from BOX"
+                               Command="{Binding LoadFromBoxCommand}"
+                               Appearance="Secondary"
+                               IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBoolConverter}}"
+                               Margin="6,0,0,0"/>
+                    <ui:Button Content="Copy Clone Script"
+                               Command="{Binding CopyCloneScriptCommand}"
+                               Appearance="Secondary"
+                               IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBoolConverter}}"
+                               Margin="6,0,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ===== DataGrid ===== -->
+        <Grid Grid.Row="1">
+            <DataGrid ItemsSource="{Binding Repos}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      GridLinesVisibility="Horizontal"
+                      Background="Transparent"
+                      RowBackground="{DynamicResource AppSurface0}"
+                      AlternatingRowBackground="{DynamicResource AppBase}"
+                      BorderThickness="0"
+                      ColumnHeaderHeight="30"
+                      RowHeight="28"
+                      FontSize="12">
+                <DataGrid.ColumnHeaderStyle>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="{DynamicResource AppSurface1}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AppSubtext0}"/>
+                        <Setter Property="FontSize" Value="12"/>
+                        <Setter Property="Padding" Value="8,4"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource AppSurface2}"/>
+                        <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                    </Style>
+                </DataGrid.ColumnHeaderStyle>
+                <DataGrid.Resources>
+                    <!-- 全列共通のテキストスタイル (上下中央揃え) -->
+                    <Style x:Key="CenterTextColumnStyle" TargetType="TextBlock">
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="Padding" Value="6,0"/>
+                    </Style>
+                </DataGrid.Resources>
+                <DataGrid.CellStyle>
+                    <Style TargetType="DataGridCell">
+                        <Setter Property="Foreground" Value="{DynamicResource AppText}"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AppSurface2}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AppText}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.CellStyle>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Project" Binding="{Binding ProjectName}" Width="120" ElementStyle="{StaticResource CenterTextColumnStyle}"/>
+                    <DataGridTextColumn Header="Repository" Binding="{Binding RepoName}" Width="150" FontWeight="SemiBold" ElementStyle="{StaticResource CenterTextColumnStyle}"/>
+                    <DataGridTextColumn Header="Remote URL" Binding="{Binding RemoteOrigin}" Width="*" ElementStyle="{StaticResource CenterTextColumnStyle}"/>
+                    <DataGridTextColumn Header="Branch" Binding="{Binding Branch}" Width="90" ElementStyle="{StaticResource CenterTextColumnStyle}"/>
+                    <DataGridTextColumn Header="Last Commit" Binding="{Binding LastCommitDate}" Width="110" ElementStyle="{StaticResource CenterTextColumnStyle}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- ローディングオーバーレイ -->
+            <Grid Visibility="{Binding IsScanning, Converter={StaticResource BooleanToVisibilityConverter}}"
+                  Background="#40000000"
+                  IsHitTestVisible="False">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40"/>
+                    <TextBlock Text="Scanning..."
+                               Foreground="{DynamicResource AppText}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- ===== ステータスバー ===== -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource AppSurface0}"
+                BorderBrush="{DynamicResource AppSurface1}"
+                BorderThickness="0,1,0,0"
+                Padding="8,4">
+            <TextBlock Text="{Binding StatusText}"
+                       FontSize="11"
+                       Foreground="{DynamicResource AppSubtext0}"/>
+        </Border>
+    </Grid>
+</UserControl>

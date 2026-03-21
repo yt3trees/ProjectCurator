@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(xargs grep:*)",
+      "WebSearch",
+      "WebFetch(domain:stackoverflow.com)",
+      "Bash(wc -l /c/work/GenAI/convert/WpfManager/Views/Pages/*.xaml.cs)",
+      "Bash(ls -lhS /c/work/GenAI/convert/WpfManager/Views/Pages/*.xaml)",
+      "WebFetch(domain:github.com)",
+      "Bash(cmd.exe /c \"dir /AL \"\"C:\\\\Users\\\\yatfo\\\\私のBox\\\\Projects\\\\_INHOUSE\"\" 2>&1\")",
+      "Bash(cmd.exe /c \"dir \"\"C:\\\\Users\\\\yatfo\\\\私のBox\\\\Projects\\\\_INHOUSE\\\\.claude\"\" 2>&1\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem -Path 'C:\\\\Users\\\\yatfo\\\\私のBox\\\\Projects\\\\_INHOUSE' | Select-Object Name, Attributes, LinkType, Target\" 2>&1)",
+      "Bash(wc -l C:workGenAIProjectCurator/**/*.cs)"
+    ]
+  }
+}

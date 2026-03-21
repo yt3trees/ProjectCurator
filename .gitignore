@@ -1,0 +1,24 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userprefs
+
+# Sensitive config files (create from .example templates)
+_config/settings.json
+_config/hidden_projects.json
+_config/today_queue_snooze.json
+_globalScripts/config.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db

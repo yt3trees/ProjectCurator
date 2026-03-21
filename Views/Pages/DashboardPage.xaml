@@ -1,0 +1,945 @@
+<UserControl x:Class="ProjectCurator.Views.Pages.DashboardPage"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:vm="clr-namespace:ProjectCurator.ViewModels"
+        xmlns:models="clr-namespace:ProjectCurator.Models"
+        xmlns:svc="clr-namespace:ProjectCurator.Services"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignHeight="600" d:DesignWidth="900"
+        Loaded="OnLoaded">
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ===== ツールバー ===== -->
+        <Border Grid.Row="0" Background="{DynamicResource AppSurface0}" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Dashboard" FontSize="14" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppText}" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBlock Text="Auto:" VerticalAlignment="Center" Margin="0,0,4,0"
+                               Foreground="{DynamicResource AppSubtext0}" FontSize="12"/>
+                    <ComboBox x:Name="AutoRefreshComboBox"
+                              Width="110" Height="34" FontSize="12"
+                              SelectionChanged="OnAutoRefreshChanged"
+                              Background="{DynamicResource AppSurface1}"
+                              Foreground="{DynamicResource AppText}">
+                        <ComboBoxItem Tag="0" Content="Off"/>
+                        <ComboBoxItem Tag="10" Content="10 min"/>
+                        <ComboBoxItem Tag="15" Content="15 min"/>
+                        <ComboBoxItem Tag="30" Content="30 min"/>
+                        <ComboBoxItem Tag="60" Content="60 min"/>
+                    </ComboBox>
+                    <ui:Button Content="↻" Margin="6,0,0,0" Height="34" Padding="10,0" FontSize="13"
+                               ToolTip="Force Refresh" Click="OnRefreshClick"/>
+                    <ui:Button Margin="6,0,0,0" Height="34" Padding="8,0"
+                               ToolTip="Toggle hidden projects"
+                               Click="OnToggleShowHidden">
+                        <ui:Button.Style>
+                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                <Setter Property="Appearance" Value="Secondary"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowHidden}" Value="True">
+                                        <Setter Property="Appearance" Value="Primary"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:Button.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Width="14" Height="14" VerticalAlignment="Center">
+                                <ui:SymbolIcon.Style>
+                                    <Style TargetType="ui:SymbolIcon">
+                                        <Setter Property="Symbol" Value="EyeOff24"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowHidden}" Value="True">
+                                                <Setter Property="Symbol" Value="Eye24"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:SymbolIcon.Style>
+                            </ui:SymbolIcon>
+                            <TextBlock Text="{Binding HiddenCount}"
+                                       Margin="4,0,0,0" VerticalAlignment="Center" FontSize="12"/>
+                        </StackPanel>
+                    </ui:Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ===== カードエリア ===== -->
+        <Grid Grid.Row="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Projects}" Margin="8">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <!-- 横に3つ並べて、全体を中央寄せにする -->
+                            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ProjectCardViewModel}">
+                            <Border Background="{DynamicResource AppSurface0}"
+                                    BorderBrush="{DynamicResource AppSurface2}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Margin="4"
+                                    Width="270"
+                                    Padding="12,8">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                                                <Setter Property="Opacity" Value="0.45"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel>
+                                    <!-- ヘッダー: プロジェクト名 + Tierバッジ + 非表示ボタン -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding Info.Name}"
+                                                   FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AppText}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding DisplayName}"
+                                                   VerticalAlignment="Center"/>
+                                        <!-- Tier バッジ (FULL / MINI) -->
+                                        <Border Grid.Column="1" Margin="4,0,0,0" Padding="4,1"
+                                                CornerRadius="3" VerticalAlignment="Center">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{DynamicResource AppBlue}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Tier}" Value="mini">
+                                                            <Setter Property="Background" Value="{DynamicResource AppMauve}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock FontSize="9" FontWeight="Bold" Foreground="#11111b">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="FULL"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Tier}" Value="mini">
+                                                                <Setter Property="Text" Value="MINI"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                        <!-- Domain バッジ (domain カテゴリのみ表示) -->
+                                        <Border Grid.Column="2" Margin="3,0,0,0" Padding="4,1"
+                                                CornerRadius="3" VerticalAlignment="Center"
+                                                Background="{DynamicResource AppGreen}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Category}" Value="domain">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="DOMAIN" FontSize="9" FontWeight="Bold" Foreground="#11111b"/>
+                                        </Border>
+                                        <!-- 非表示 / 復元ボタン -->
+                                        <Grid Grid.Column="3">
+                                            <Button Content="×"
+                                                    FontSize="10" Width="18" Height="18"
+                                                    Padding="0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Foreground="{DynamicResource AppOverlay1}"
+                                                    ToolTip="このプロジェクトを非表示にする"
+                                                    Tag="{Binding}"
+                                                    Click="OnHideProject">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Button Content="↩"
+                                                    FontSize="10" Width="18" Height="18"
+                                                    Padding="0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Foreground="{DynamicResource AppGreen}"
+                                                    ToolTip="非表示を解除して再表示する"
+                                                    Tag="{Binding}"
+                                                    Click="OnUnhideProject">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </Grid>
+                                    </Grid>
+
+                                    <!-- ジャンクションステータス + DecisionLog数 -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                        <Ellipse Width="7" Height="7" Margin="0,0,2,0"
+                                                 VerticalAlignment="Center"
+                                                 ToolTip="Shared folder junction&#x0A;Symlink to the shared folder&#x0A;Green=OK  Red=Broken  Gray=Unknown">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Fill" Value="{DynamicResource AppOverlay0}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding JunctionShared}" Value="OK">
+                                                            <Setter Property="Fill" Value="{DynamicResource AppGreen}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding JunctionShared}" Value="Broken">
+                                                            <Setter Property="Fill" Value="{DynamicResource AppRed}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <Ellipse Width="7" Height="7" Margin="0,0,2,0"
+                                                 VerticalAlignment="Center"
+                                                 ToolTip="Obsidian vault junction&#x0A;Symlink to the Obsidian vault folder&#x0A;Green=OK  Red=Broken  Gray=Unknown">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Fill" Value="{DynamicResource AppOverlay0}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding JunctionObsidian}" Value="OK">
+                                                            <Setter Property="Fill" Value="{DynamicResource AppGreen}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding JunctionObsidian}" Value="Broken">
+                                                            <Setter Property="Fill" Value="{DynamicResource AppRed}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <Ellipse Width="7" Height="7" Margin="0,0,8,0"
+                                                 VerticalAlignment="Center"
+                                                 ToolTip="Context folder junction&#x0A;Symlink to the AI context folder&#x0A;Green=OK  Red=Broken  Gray=Unknown">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Fill" Value="{DynamicResource AppOverlay0}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding JunctionContext}" Value="OK">
+                                                            <Setter Property="Fill" Value="{DynamicResource AppGreen}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding JunctionContext}" Value="Broken">
+                                                            <Setter Property="Fill" Value="{DynamicResource AppRed}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <TextBlock FontSize="11" Foreground="{DynamicResource AppSubtext0}"
+                                                   VerticalAlignment="Center"
+                                                   ToolTip="Decision log count&#x0A;Number of decision log files recorded in this project"
+                                                   Text="{Binding DecisionLogCount, StringFormat=📝 {0}}"/>
+                                        <StackPanel Margin="8,0,0,0"
+                                                    Orientation="Horizontal"
+                                                    VerticalAlignment="Center"
+                                                    Cursor="Hand"
+                                                    MouseLeftButtonUp="OnUncommittedBadgeClick"
+                                                    ToolTip="{Binding UncommittedChangesTooltip}">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Setter Property="Opacity" Value="0.9"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasUncommittedChanges}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Opacity" Value="1.0"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+                                            <ui:SymbolIcon Margin="0,1,1,0"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource AppPeach}"
+                                                           Symbol="Branch16"
+                                                           RenderTransformOrigin="0.5,0.5">
+                                                <ui:SymbolIcon.RenderTransform>
+                                                    <ScaleTransform ScaleX="0.79" ScaleY="0.79"/>
+                                                </ui:SymbolIcon.RenderTransform>
+                                            </ui:SymbolIcon>
+                                            <TextBlock FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource AppPeach}"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding UncommittedBadgeText}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=StackPanel}}" Value="True">
+                                                                <Setter Property="TextDecorations" Value="Underline"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Focus / Summary 鮮度インジケータ -->
+                                    <Grid Margin="0,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <!-- Focus -->
+                                        <Border Grid.Column="0" Padding="3,2" CornerRadius="3" Margin="0,0,4,0">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#30F38BA8"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding FocusFreshness}" Value="fresh">
+                                                            <Setter Property="Background" Value="#30A6E3A1"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding FocusFreshness}" Value="ok">
+                                                            <Setter Property="Background" Value="#3094E2D5"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding FocusFreshness}" Value="aging">
+                                                            <Setter Property="Background" Value="#30F9E2AF"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding FocusFreshness}" Value="stale">
+                                                            <Setter Property="Background" Value="#30FAB387"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="Focus" FontSize="9" Margin="0,0,4,0"
+                                                           Foreground="{DynamicResource AppSubtext0}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding FocusAgeText}" FontSize="12"
+                                                           Foreground="{DynamicResource AppText}"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <!-- Summary -->
+                                        <Border Grid.Column="1" Padding="3,2" CornerRadius="3">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#30F38BA8"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SummaryFreshness}" Value="fresh">
+                                                            <Setter Property="Background" Value="#30A6E3A1"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SummaryFreshness}" Value="ok">
+                                                            <Setter Property="Background" Value="#3094E2D5"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SummaryFreshness}" Value="aging">
+                                                            <Setter Property="Background" Value="#30F9E2AF"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SummaryFreshness}" Value="stale">
+                                                            <Setter Property="Background" Value="#30FAB387"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="Summary" FontSize="9" Margin="0,0,4,0"
+                                                           Foreground="{DynamicResource AppSubtext0}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding SummaryAgeText}" FontSize="12"
+                                                           Foreground="{DynamicResource AppText}"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- アクティビティバー (過去30日) / クリックでTimelineへ -->
+                                    <Border Cursor="Hand"
+                                            ToolTip="Click to open Timeline"
+                                            Tag="{Binding}"
+                                            MouseLeftButtonUp="OnActivityBarClick"
+                                            Margin="0,5,0,0">
+                                        <ItemsControl ItemsSource="{Binding ActivityDays}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type vm:ActivityDay}">
+                                                    <Rectangle Width="7" Height="7" Margin="0.5,0"
+                                                               RadiusX="1" RadiusY="1">
+                                                        <Rectangle.Style>
+                                                            <Style TargetType="Rectangle">
+                                                                <Setter Property="Fill" Value="{DynamicResource AppSurface2}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                                        <Setter Property="Fill" Value="{DynamicResource AppGreen}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Rectangle.Style>
+                                                    </Rectangle>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+
+                                    <!-- Workstream セクション -->
+                                    <Border Margin="0,4,0,0"
+                                            Visibility="{Binding HasWorkstreams, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <StackPanel>
+                                            <!-- ヘッダー (クリックで展開/折りたたみ) -->
+                                            <Button Background="Transparent" BorderThickness="0"
+                                                    Padding="0" HorizontalContentAlignment="Left"
+                                                    Cursor="Hand"
+                                                    Tag="{Binding}" Click="OnToggleWorkstream">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock FontSize="10" Foreground="{DynamicResource AppSubtext0}" VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="▶ Workstreams "/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsWorkstreamExpanded}" Value="True">
+                                                                        <Setter Property="Text" Value="▼ Workstreams "/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding ActiveWorkstreamCount, StringFormat='({0})'}"
+                                                               FontSize="10" Foreground="{DynamicResource AppSubtext0}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+
+                                            <!-- 展開リスト -->
+                                            <ItemsControl ItemsSource="{Binding Workstreams}" Margin="4,2,0,0">
+                                                <ItemsControl.Style>
+                                                    <Style TargetType="ItemsControl">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsWorkstreamExpanded}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ItemsControl.Style>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type vm:WorkstreamCardItem}">
+                                                        <Grid Margin="0,1">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Button Grid.Column="0"
+                                                                    Background="Transparent"
+                                                                    BorderThickness="0"
+                                                                    Padding="0"
+                                                                    HorizontalContentAlignment="Left"
+                                                                    Cursor="Hand"
+                                                                    Click="OnOpenWorkstreamFocusClick"
+                                                                    ToolTip="Open current_focus.md in Editor">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <StackPanel.Style>
+                                                                        <Style TargetType="StackPanel">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsClosed}" Value="True">
+                                                                                    <Setter Property="Opacity" Value="0.4"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </StackPanel.Style>
+                                                                    <Ellipse Width="5" Height="5" Margin="0,0,5,0" VerticalAlignment="Center"
+                                                                             Fill="{DynamicResource AppText}"/>
+                                                                    <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center"
+                                                                               Foreground="{DynamicResource AppText}"
+                                                                               MaxWidth="105" TextTrimming="CharacterEllipsis"/>
+                                                                    <Border Margin="4,0,0,0" Padding="3,1" CornerRadius="2" VerticalAlignment="Center">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Setter Property="Background" Value="#30F38BA8"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding FocusFreshness}" Value="fresh">
+                                                                                        <Setter Property="Background" Value="#30A6E3A1"/>
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding FocusFreshness}" Value="ok">
+                                                                                        <Setter Property="Background" Value="#3094E2D5"/>
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding FocusFreshness}" Value="aging">
+                                                                                        <Setter Property="Background" Value="#30F9E2AF"/>
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding FocusFreshness}" Value="stale">
+                                                                                        <Setter Property="Background" Value="#30FAB387"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <TextBlock Text="{Binding FocusAgeText}" FontSize="9"
+                                                                                   Foreground="{DynamicResource AppSubtext0}"/>
+                                                                    </Border>
+                                                                    <TextBlock Text="{Binding DecisionLogCount, StringFormat='📝{0}'}"
+                                                                               FontSize="10" Margin="4,0,0,0" VerticalAlignment="Center"
+                                                                               Foreground="{DynamicResource AppSubtext0}"/>
+                                                                </StackPanel>
+                                                            </Button>
+
+                                                            <ui:Button Grid.Column="1"
+                                                                       Padding="6,2"
+                                                                       Margin="4,0,2,0"
+                                                                       Click="OnOpenWorkstreamWorkRootClick"
+                                                                       ToolTip="Open workstream _work root">
+                                                                <ui:SymbolIcon Symbol="FolderOpen20" FontSize="12"/>
+                                                            </ui:Button>
+
+                                                            <ui:Button Grid.Column="2"
+                                                                       Padding="6,2"
+                                                                       Click="OnCreateWorkstreamTodayFolderClick"
+                                                                       ToolTip="Create today folder in workstream _work">
+                                                                <ui:SymbolIcon Symbol="Add20" FontSize="12"/>
+                                                            </ui:Button>
+
+                                                            <ui:Button Grid.Column="3"
+                                                                       Padding="6,2"
+                                                                       Margin="2,0,0,0"
+                                                                       Click="OnPinWorkstreamFolderClick"
+                                                                       ToolTip="Pin a recent work folder">
+                                                                <ui:SymbolIcon Symbol="Pin24" FontSize="12"/>
+                                                            </ui:Button>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <!-- Closed Workstream の表示トグル -->
+                                            <Button Background="Transparent" BorderThickness="0" Padding="0,2,0,0"
+                                                    HorizontalContentAlignment="Left" Cursor="Hand"
+                                                    Tag="{Binding}" Click="OnToggleShowClosedWorkstreams">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasClosedWorkstreams}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsWorkstreamExpanded}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                                <TextBlock FontSize="9" Foreground="{DynamicResource AppOverlay1}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="Show closed..."/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding ShowClosedWorkstreams}" Value="True">
+                                                                    <Setter Property="Text" Value="Hide closed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- ボタン行 -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <ui:Button Padding="8,3" Margin="0,0,4,0"
+                                                   Tag="{Binding}" Click="OnOpenDirClick"
+                                                   ToolTip="Open folder (Explorer) / Right-click: more options">
+                                            <ui:SymbolIcon Symbol="FolderOpen24" FontSize="16"/>
+                                            <ui:Button.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Open in VS Code" Click="OnDirMenuVSCode"/>
+                                                    <MenuItem Header="Open _work Root" Click="OnDirMenuWorkRoot"/>
+                                                    <MenuItem Header="Create Today Work Folder (General)" Click="OnDirMenuCreateTodayGeneralWork"/>
+                                                    <Separator/>
+                                                    <MenuItem Header="Pin Work Folder..." Click="OnDirMenuPinGeneralWorkFolder"/>
+                                                </ContextMenu>
+                                            </ui:Button.ContextMenu>
+                                        </ui:Button>
+                                        <ui:Button Padding="8,3" Margin="0,0,4,0"
+                                                   Tag="{Binding}" Click="OnTermClick"
+                                                   ToolTip="Open terminal / Right-click: launch AI agent">
+                                            <ui:SymbolIcon Symbol="WindowConsole20" FontSize="16"/>
+                                            <ui:Button.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Claude" Tag="claude" Click="OnTermMenuAgent"/>
+                                                    <MenuItem Header="Gemini" Tag="gemini" Click="OnTermMenuAgent"/>
+                                                    <MenuItem Header="Codex"  Tag="codex"  Click="OnTermMenuAgent"/>
+                                                </ContextMenu>
+                                            </ui:Button.ContextMenu>
+                                        </ui:Button>
+                                        <ui:Button Padding="8,3" Margin="0,0,4,0"
+                                                   Tag="{Binding}" Click="OnOpenEditorClick"
+                                                   ToolTip="Open in Editor">
+                                            <ui:SymbolIcon Symbol="DocumentEdit24" FontSize="16"/>
+                                        </ui:Button>
+                                        <ui:Button Padding="8,3"
+                                                   Tag="{Binding}"
+                                                   Click="OnPinGeneralWorkFolderClick"
+                                                   ToolTip="Pin a general work folder">
+                                            <ui:SymbolIcon Symbol="Pin24" FontSize="16"/>
+                                        </ui:Button>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- ローディングオーバーレイ -->
+            <Grid Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
+                  Background="#80000000">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <ui:ProgressRing IsIndeterminate="True" Width="48" Height="48"/>
+                    <TextBlock Text="Loading projects..."
+                               Margin="0,12,0,0"
+                               Foreground="{DynamicResource AppSubtext1}"
+                               FontSize="13"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- ===== Pinned Folders セクション ===== -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource AppSurface0}"
+                BorderBrush="{DynamicResource AppSurface2}"
+                BorderThickness="0,0,0,1"
+                Padding="8,6">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasPinnedFolders}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel>
+                <!-- ヘッダー -->
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="📌 Pinned Folders"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AppSubtext0}"
+                               VerticalAlignment="Center"/>
+                    <Button Grid.Column="1"
+                            Content="Clear"
+                            FontSize="10"
+                            Padding="6,1"
+                            Background="Transparent"
+                            BorderBrush="{DynamicResource AppOverlay1}"
+                            BorderThickness="1"
+                            Foreground="{DynamicResource AppSubtext0}"
+                            Click="OnClearPinnedFolders"
+                            ToolTip="Remove all pinned folders"/>
+                </Grid>
+                <!-- チップ一覧 -->
+                <ItemsControl ItemsSource="{Binding PinnedFolders}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:PinnedFolder}">
+                            <Border Margin="0,0,4,2"
+                                    Padding="6,3"
+                                    CornerRadius="4"
+                                    Background="{DynamicResource AppSurface1}"
+                                    BorderBrush="{DynamicResource AppSurface2}"
+                                    BorderThickness="1"
+                                    AllowDrop="True"
+                                    Cursor="SizeAll"
+                                    PreviewMouseLeftButtonDown="OnPinnedChipMouseDown"
+                                    PreviewMouseMove="OnPinnedChipMouseMove"
+                                    Drop="OnPinnedChipDrop"
+                                    DragEnter="OnPinnedChipDragEnter"
+                                    DragLeave="OnPinnedChipDragLeave">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding FolderExists}" Value="False">
+                                                <Setter Property="Opacity" Value="0.4"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel Orientation="Horizontal">
+                                    <StackPanel Margin="0,0,6,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding ProjectLabel}"
+                                                   FontSize="9"
+                                                   Foreground="{DynamicResource AppSubtext0}"
+                                                   MaxWidth="140" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding Folder}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource AppText}"
+                                                   MaxWidth="140" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <ui:Button Padding="5,2"
+                                               Margin="0,0,3,0"
+                                               Cursor="Arrow"
+                                               Tag="{Binding}"
+                                               Click="OnOpenPinnedFolderClick"
+                                               ToolTip="Open folder in Explorer">
+                                        <ui:SymbolIcon Symbol="FolderOpen20" FontSize="12"/>
+                                    </ui:Button>
+                                    <Button Content="×"
+                                            FontSize="10"
+                                            Width="20" Height="20"
+                                            Padding="0"
+                                            Cursor="Arrow"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Foreground="{DynamicResource AppOverlay1}"
+                                            Tag="{Binding}"
+                                            Click="OnUnpinFolderClick"
+                                            ToolTip="Unpin this folder"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- ===== Splitter (リサイズモード時のみ表示) ===== -->
+        <Border x:Name="QueueSplitter"
+                Grid.Row="3"
+                Height="5"
+                HorizontalAlignment="Stretch"
+                Background="{DynamicResource AppSurface2}"
+                Visibility="Collapsed"
+                Cursor="SizeNS"
+                PreviewMouseLeftButtonDown="OnQueueSplitterMouseDown"
+                PreviewMouseMove="OnQueueSplitterMouseMove"
+                PreviewMouseLeftButtonUp="OnQueueSplitterMouseUp"/>
+
+        <!-- ===== Today Queue パネル ===== -->
+        <Border x:Name="TodayQueueBorder"
+                Grid.Row="4"
+                Background="{DynamicResource AppSurface0}"
+                BorderBrush="{DynamicResource AppSurface2}"
+                BorderThickness="0,1,0,0"
+                MinHeight="220"
+                MaxHeight="220">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- ヘッダー -->
+                <Border Grid.Row="0" Background="{DynamicResource AppSurface1}" Padding="8,4">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding TodayQueueStatus}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppSubtext0}"
+                                   VerticalAlignment="Center"/>
+
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding ProjectFilterItems}"
+                                  SelectedItem="{Binding SelectedProjectFilter}"
+                                  FontSize="11"
+                                  Height="34"
+                                  MinWidth="120"
+                                  MaxWidth="200"
+                                  Margin="8,0,6,0"
+                                  VerticalAlignment="Center"/>
+
+                        <ComboBox Grid.Column="2"
+                                  ItemsSource="{Binding WorkstreamFilterItems}"
+                                  SelectedItem="{Binding SelectedWorkstreamFilter}"
+                                  FontSize="11"
+                                  Height="34"
+                                  MinWidth="130"
+                                  MaxWidth="220"
+                                  Margin="0,0,6,0"
+                                  VerticalAlignment="Center"/>
+
+                        <ui:Button Grid.Column="3"
+                                   Content="{Binding ShowAllTasks, Converter={StaticResource ShowAllLabelConverter}}"
+                                   Command="{Binding ToggleShowAllCommand}"
+                                   Height="34" Padding="10,0" FontSize="11" Margin="0,0,6,0"
+                                   Appearance="Secondary"/>
+
+                        <!-- スヌーズ解除ボタン (スヌーズ中のタスクがある場合のみ表示) -->
+                        <ui:Button Grid.Column="4"
+                                   Content="{Binding SnoozeCount, StringFormat='↩ {0} snoozed'}"
+                                   Height="34" Padding="10,0" FontSize="11" Margin="0,0,6,0"
+                                   Appearance="Secondary"
+                                   ToolTip="Unsnooze all tasks"
+                                   Click="OnUnsnoozeAllClick"
+                                   Visibility="{Binding HasSnoozed, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                        <!-- 高さモード切り替えボタン -->
+                        <ui:Button x:Name="QueueResizeToggleBtn"
+                                   Grid.Column="5"
+                                   Content="↕"
+                                   Click="OnToggleQueueResize"
+                                   Height="34" Padding="10,0" FontSize="11" Margin="0,0,6,0"
+                                   Appearance="Secondary"
+                                   ToolTip="Switch to resizable mode"/>
+
+                        <ui:Button Grid.Column="6" Content="↻"
+                                   Height="34" Padding="10,0" FontSize="12"
+                                   ToolTip="Refresh Today Queue"
+                                   Click="OnTodayQueueRefreshClick"/>
+                    </Grid>
+                </Border>
+
+                <!-- タスクリスト -->
+                <!-- Padding右=20: オーバーレイスクロールバーがDoneボタンに被らないようにする -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding TodayQueueTasks}" Padding="6,2,20,2">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type svc:TodayQueueTask}">
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="72"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 優先度ラベル -->
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding DueLabel}"
+                                               FontSize="11"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource AppSubtext0}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DueBucket}" Value="overdue">
+                                                        <Setter Property="Foreground" Value="{DynamicResource AppRed}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding DueBucket}" Value="today">
+                                                        <Setter Property="Foreground" Value="{DynamicResource AppYellow}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding DueBucket}" Value="soon">
+                                                        <Setter Property="Foreground" Value="{DynamicResource AppPeach}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <!-- タスクタイトル -->
+                                    <TextBlock Grid.Column="1"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource AppText}"
+                                               ToolTip="{Binding DisplayTitle}">
+                                        <Run Text="{Binding DisplayMainTitle, Mode=OneWay}"/>
+                                        <Run Text="{Binding DisplayParentLabel, Mode=OneWay}"
+                                             Foreground="{DynamicResource AppSubtext0}"/>
+                                    </TextBlock>
+
+                                    <!-- Asana で開く -->
+                                    <Button Grid.Column="2"
+                                            Content="↗"
+                                            FontSize="10"
+                                            Padding="4,1" Margin="4,0,0,0"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Foreground="{DynamicResource AppBlue}"
+                                            Tag="{Binding}"
+                                            Click="OnTodayQueueOpenAsana"
+                                            Visibility="{Binding HasAsanaUrl, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                            ToolTip="Open in Asana"/>
+
+                                    <!-- Snooze (明日まで非表示) -->
+                                    <Button Grid.Column="3"
+                                            Content="z"
+                                            FontSize="11"
+                                            Width="26" Height="26"
+                                            Padding="0,0,0,1" Margin="4,0,0,0"
+                                            Background="Transparent"
+                                            BorderBrush="{DynamicResource AppOverlay1}"
+                                            BorderThickness="1"
+                                            Foreground="{DynamicResource AppSubtext0}"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            Tag="{Binding}"
+                                            Click="OnTodayQueueSnoozeClick"
+                                            ToolTip="Snooze until tomorrow"/>
+
+                                    <!-- Done -->
+                                    <Button Grid.Column="4"
+                                            Content="✓"
+                                            FontSize="10"
+                                            Width="26" Height="26"
+                                            Padding="0" Margin="4,0,0,0"
+                                            Background="Transparent"
+                                            BorderBrush="{DynamicResource AppGreen}"
+                                            BorderThickness="1"
+                                            Foreground="{DynamicResource AppGreen}"
+                                            FontWeight="Normal"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            Tag="{Binding}"
+                                            Click="OnTodayQueueDoneClick"
+                                            Visibility="{Binding CanComplete, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                            ToolTip="Mark as done in Asana"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

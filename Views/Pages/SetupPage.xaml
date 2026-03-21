@@ -1,0 +1,464 @@
+<UserControl x:Class="ProjectCurator.Views.Pages.SetupPage"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:vm="clr-namespace:ProjectCurator.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignHeight="700" d:DesignWidth="900"
+        Loaded="OnLoaded">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ヘッダー -->
+        <TextBlock Grid.Row="0"
+                   Text="Setup"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource AppText}"
+                   Margin="16,12,16,8"/>
+
+        <!-- メインコンテンツ -->
+        <Grid Grid.Row="1" Margin="12,0,12,44">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ===== サブタブ ===== -->
+            <TabControl Grid.Row="0"
+                        SelectedIndex="{Binding SelectedTabIndex}"
+                        Background="Transparent"
+                        BorderThickness="0">
+                <TabControl.Resources>
+                    <Style TargetType="TabItem">
+                        <Setter Property="Foreground" Value="{DynamicResource AppSubtext0}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="TabItem">
+                                    <Border x:Name="Bd"
+                                            Background="Transparent"
+                                            Padding="16,8"
+                                            CornerRadius="4,4,0,0"
+                                            Margin="0,0,2,0">
+                                        <ContentPresenter x:Name="ContentSite"
+                                                          VerticalAlignment="Center"
+                                                          HorizontalAlignment="Center"
+                                                          ContentSource="Header"
+                                                          RecognizesAccessKey="True"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppSurface1}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource AppText}"/>
+                                        </Trigger>
+                                        <MultiTrigger>
+                                            <MultiTrigger.Conditions>
+                                                <Condition Property="IsMouseOver" Value="True"/>
+                                                <Condition Property="IsSelected" Value="False"/>
+                                            </MultiTrigger.Conditions>
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppSurface0}"/>
+                                        </MultiTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </TabControl.Resources>
+
+                <!-- ===== New ===== -->
+                <TabItem Header="New Project">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,12">
+                        <StackPanel>
+                            <TextBlock Text="Create / Update Project"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppSubtext0}"
+                                       Margin="0,0,0,10"/>
+
+                            <!-- Project Name -->
+                            <TextBlock Text="Project Name *" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
+                            <ComboBox IsEditable="True"
+                                      ItemsSource="{Binding ProjectNames}"
+                                      Text="{Binding NewProjectName, UpdateSourceTrigger=PropertyChanged}"
+                                      IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                      MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
+                                      Margin="0,0,0,4"/>
+                            <TextBlock Text="Select an existing project to auto-fill Tier/Category, add ExternalSharedPaths, or run AI Context Setup on it."
+                                       FontSize="11" Foreground="{DynamicResource AppSubtext0}"
+                                       TextWrapping="Wrap" MaxWidth="600" HorizontalAlignment="Left"
+                                       Margin="0,0,0,10"/>
+
+                            <!-- Tier / Category -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <StackPanel Margin="0,0,24,0">
+                                    <TextBlock Text="Tier" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
+                                    <ComboBox SelectedValue="{Binding NewTier}"
+                                              SelectedValuePath="Tag"
+                                              IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                              Width="180">
+                                        <ComboBoxItem Content="full (standard)" Tag="full"/>
+                                        <ComboBoxItem Content="mini (lightweight)" Tag="mini"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="Category" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
+                                    <ComboBox SelectedValue="{Binding NewCategory}"
+                                              SelectedValuePath="Tag"
+                                              IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                              Width="200">
+                                        <ComboBoxItem Content="project (time-bound)" Tag="project"/>
+                                        <ComboBoxItem Content="domain (ongoing)" Tag="domain"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- External Shared Paths (optional) -->
+                            <TextBlock Text="ExternalSharedPaths (optional, one path per line)"
+                                       Foreground="{DynamicResource AppSubtext0}" FontSize="12"
+                                       Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding NewExternalSharedPaths, UpdateSourceTrigger=PropertyChanged}"
+                                     PlaceholderText="C:\Path\To\External\Shared"
+                                     AcceptsReturn="True"
+                                     MinHeight="80" MaxHeight="150"
+                                     VerticalScrollBarVisibility="Auto"
+                                     FontFamily="Cascadia Mono, Consolas, monospace"
+                                     FontSize="12"
+                                     IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                     MinWidth="400" MaxWidth="800" HorizontalAlignment="Left"
+                                     Margin="0,0,0,16"/>
+
+                            <!-- AI Context Setup -->
+                            <CheckBox Content="Also run AI Context Setup"
+                                      IsChecked="{Binding NewAlsoRunAiContext}"
+                                      IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                      Margin="0,0,0,6"/>
+
+                            <CheckBox Content="Overwrite existing skills (-Force)"
+                                      IsChecked="{Binding NewAiContextForce}"
+                                      IsEnabled="{Binding NewAiContextForceEnabled}"
+                                      Margin="16,0,0,16"/>
+
+                            <ui:Button Content="Setup Project"
+                                       Command="{Binding RunNewCommand}"
+                                       Appearance="Primary"
+                                       IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                       HorizontalAlignment="Left"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- ===== Check ===== -->
+                <TabItem Header="Check">
+                    <StackPanel Margin="0,12">
+                        <TextBlock Text="Project Structure Check"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppSubtext0}"
+                                   Margin="0,0,0,10"/>
+
+                        <TextBlock Text="Project" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
+                        <ComboBox IsEditable="True"
+                                  ItemsSource="{Binding ProjectNames}"
+                                  Text="{Binding CheckProjectName, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                  MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
+                                  Margin="0,0,0,8"/>
+
+                        <TextBlock Text="* Tier / Category is determined automatically from the project list"
+                                   FontSize="11" Foreground="{DynamicResource AppSubtext0}"
+                                   Margin="0,0,0,10"/>
+
+                        <ui:Button Content="Run Check"
+                                   Command="{Binding RunCheckCommand}"
+                                   Appearance="Primary"
+                                   IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                   HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- ===== Archive ===== -->
+                <TabItem Header="Archive">
+                    <StackPanel Margin="0,12">
+                        <TextBlock Text="Archive Project"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppSubtext0}"
+                                   Margin="0,0,0,10"/>
+
+                        <TextBlock Text="Project" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
+                        <ComboBox IsEditable="True"
+                                  ItemsSource="{Binding ProjectNames}"
+                                  Text="{Binding ArchiveProjectName, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                  MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
+                                  Margin="0,0,0,8"/>
+
+                        <CheckBox Content="Dry Run (no actual changes)"
+                                  IsChecked="{Binding ArchiveDryRun}"
+                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                  Margin="0,0,0,8"/>
+
+                        <Border Background="{DynamicResource AppSurface1}"
+                                CornerRadius="4" Padding="8,6" MaxWidth="600" HorizontalAlignment="Left"
+                                Margin="0,0,0,10">
+                            <TextBlock FontSize="11"
+                                       Foreground="{DynamicResource AppYellow}"
+                                       TextWrapping="Wrap"
+                                       Text="Warning: Disabling Dry Run will actually move the project to _archive/."/>
+                        </Border>
+
+                        <ui:Button Content="Run Archive"
+                                   Command="{Binding RunArchiveCommand}"
+                                   Appearance="Primary"
+                                   IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                   HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- ===== Convert ===== -->
+                <TabItem Header="Workstreams">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,12">
+                        <StackPanel>
+                            <TextBlock Text="Workstream Management"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppSubtext0}"
+                                       Margin="0,0,0,10"/>
+
+                            <TextBlock Text="Project" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <ComboBox IsEditable="True"
+                                          ItemsSource="{Binding ProjectNames}"
+                                          Text="{Binding ManageProjectName, UpdateSourceTrigger=PropertyChanged}"
+                                          IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                          MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"/>
+                                <ui:Button Content="Reload"
+                                           Command="{Binding ReloadWorkstreamsCommand}"
+                                           Appearance="Secondary"
+                                           Margin="8,0,0,0"
+                                           IsEnabled="{Binding CanManageWorkstreams}"/>
+                            </StackPanel>
+
+                            <Border Background="{DynamicResource AppSurface1}" Padding="10" CornerRadius="4" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="Add Workstream"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AppText}"
+                                               Margin="0,0,0,8"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <StackPanel Margin="0,0,12,0">
+                                            <TextBlock Text="Workstream ID (kebab-case)"
+                                                       Foreground="{DynamicResource AppSubtext0}" FontSize="11" Margin="0,0,0,4"/>
+                                            <ui:TextBox Text="{Binding NewWorkstreamId, UpdateSourceTrigger=PropertyChanged}"
+                                                        PlaceholderText="workstream-id"
+                                                        Width="240"
+                                                        IsEnabled="{Binding CanManageWorkstreams}"/>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="Label (optional)"
+                                                       Foreground="{DynamicResource AppSubtext0}" FontSize="11" Margin="0,0,0,4"/>
+                                            <ui:TextBox Text="{Binding NewWorkstreamLabel, UpdateSourceTrigger=PropertyChanged}"
+                                                        PlaceholderText="Display label (optional)"
+                                                        Width="280"
+                                                        IsEnabled="{Binding CanManageWorkstreams}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <ui:Button Content="Create Workstream"
+                                               Command="{Binding AddWorkstreamCommand}"
+                                               Appearance="Primary"
+                                               IsEnabled="{Binding CanManageWorkstreams}"
+                                               HorizontalAlignment="Left"/>
+                                </StackPanel>
+                            </Border>
+
+                            <DockPanel Margin="0,0,0,6">
+                                <TextBlock Text="Existing Workstreams"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AppText}"
+                                           VerticalAlignment="Center"/>
+                                <ui:Button DockPanel.Dock="Right"
+                                           Content="Save Labels"
+                                           Command="{Binding SaveWorkstreamLabelsCommand}"
+                                           Appearance="Secondary"
+                                           IsEnabled="{Binding CanManageWorkstreams}"/>
+                            </DockPanel>
+
+                            <Border Background="{DynamicResource AppSurface0}"
+                                    BorderBrush="{DynamicResource AppSurface2}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="8">
+                                <ItemsControl ItemsSource="{Binding ManageWorkstreams}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:WorkstreamManageItem}">
+                                            <Border BorderBrush="{DynamicResource AppSurface2}" BorderThickness="0,0,0,1" Padding="0,6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="220"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="80"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding Id}"
+                                                               FontFamily="Cascadia Mono, Consolas, monospace"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource AppText}"/>
+
+                                                    <ui:TextBox Grid.Column="1"
+                                                                Text="{Binding Label, UpdateSourceTrigger=PropertyChanged}"
+                                                                Margin="10,0,10,0"
+                                                                VerticalAlignment="Center"
+                                                                IsEnabled="{Binding DataContext.CanManageWorkstreams, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding StatusText}"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Center"
+                                                               Foreground="{DynamicResource AppSubtext0}"/>
+
+                                                    <ui:Button Grid.Column="3"
+                                                               Command="{Binding DataContext.ToggleWorkstreamClosedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                               CommandParameter="{Binding}"
+                                                               Padding="10,2">
+                                                        <ui:Button.Style>
+                                                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                                <Setter Property="Content" Value="Close"/>
+                                                                <Setter Property="Appearance" Value="Danger"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsClosed}" Value="True">
+                                                                        <Setter Property="Content" Value="Reopen"/>
+                                                                        <Setter Property="Appearance" Value="Primary"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </ui:Button.Style>
+                                                    </ui:Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+
+                            <TextBlock Text="No workstreams found for this project."
+                                       Foreground="{DynamicResource AppSubtext0}"
+                                       Margin="0,8,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasManageWorkstreams}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- ===== Convert ===== -->
+                <TabItem Header="Convert Tier">
+                    <StackPanel Margin="0,12">
+                        <TextBlock Text="Tier Conversion (mini &#x27F7; full)"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppSubtext0}"
+                                   Margin="0,0,0,10"/>
+
+                        <TextBlock Text="Project" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
+                        <ComboBox IsEditable="True"
+                                  ItemsSource="{Binding ProjectNames}"
+                                  Text="{Binding ConvertProjectName, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                  MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
+                                  Margin="0,0,0,10"/>
+
+                        <TextBlock Text="Target Tier" Foreground="{DynamicResource AppText}" Margin="0,0,0,4"/>
+                        <ComboBox SelectedValue="{Binding ConvertTargetTier}"
+                                  SelectedValuePath="Tag"
+                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                  Width="130" HorizontalAlignment="Left"
+                                  Margin="0,0,0,10">
+                            <ComboBoxItem Content="full" Tag="full"/>
+                            <ComboBoxItem Content="mini" Tag="mini"/>
+                        </ComboBox>
+
+                        <CheckBox Content="Dry Run (no actual changes)"
+                                  IsChecked="{Binding ConvertDryRun}"
+                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                  Margin="0,0,0,10"/>
+
+                        <ui:Button Content="Run Convert"
+                                   Command="{Binding RunConvertCommand}"
+                                   Appearance="Primary"
+                                   IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"
+                                   HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </TabItem>
+            </TabControl>
+
+            <!-- ===== 出力エリア ===== -->
+            <Grid Grid.Row="1" Margin="0,8,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- 出力ヘッダー + ボタン -->
+                <DockPanel Grid.Row="0" Margin="0,0,0,4">
+                    <TextBlock Text="Output"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource AppSubtext0}"
+                               VerticalAlignment="Center"/>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <ui:Button x:Name="BtnCancel"
+                                   Content="Cancel"
+                                   Command="{Binding CancelCommand}"
+                                   Appearance="Danger"
+                                   Margin="0,0,6,0"
+                                   Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <ui:Button Content="Clear"
+                                   Command="{Binding ClearOutputCommand}"
+                                   Appearance="Secondary"
+                                   IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <!-- 出力テキスト -->
+                <Border Grid.Row="1"
+                        Background="{DynamicResource AppSurface0}"
+                        BorderBrush="{DynamicResource AppSurface2}"
+                        BorderThickness="1"
+                        CornerRadius="4">
+                    <ScrollViewer x:Name="OutputScrollViewer"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="OutputTextBlock"
+                                   Text="{Binding OutputText}"
+                                   FontFamily="Cascadia Mono, Consolas, monospace"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppText}"
+                                   TextWrapping="NoWrap"
+                                   Padding="8"/>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- ProgressRing オーバーレイ -->
+                <Grid Grid.Row="1"
+                      Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      Background="#40000000"
+                      IsHitTestVisible="False">
+                    <ui:ProgressRing IsIndeterminate="True"
+                                     Width="36" Height="36"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"/>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

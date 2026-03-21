@@ -1,0 +1,16 @@
+{
+  "localProjectsRoot": "C:\\Users\\yourname\\Documents\\Projects",
+  "boxProjectsRoot": "C:\\Users\\yourname\\Box\\Projects",
+  "obsidianVaultRoot": "C:\\Users\\yourname\\Box\\Obsidian-Vault",
+  "dashboardTodayQueueVisible": true,
+  "dashboardTodayQueueLimit": 5,
+  "dashboardAutoRefreshMinutes": 0,
+  "hotkey": {
+    "modifiers": "Ctrl+Shift",
+    "key": "P"
+  },
+  "asanaSync": {
+    "enabled": false,
+    "intervalMin": 60
+  }
+}

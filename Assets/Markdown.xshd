@@ -1,0 +1,100 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="Markdown" extensions=".md;.markdown" xmlns="http://icsharpcode.net/sharpdevelop/avalonedit/syntaxdefinition/2008">
+    <Color name="Heading"        foreground="#58a6ff" fontWeight="bold" />
+    <Color name="Emphasis"       foreground="#ffa8cc" fontStyle="italic" />
+    <Color name="StrongEmphasis" foreground="#ffa8cc" fontWeight="bold" />
+    <Color name="InlineCode"     foreground="#ffa657" background="#1e1e1e" />
+    <Color name="FencedCode"     foreground="#ffa657" />
+    <Color name="BlockQuote"     foreground="#7ee787" />
+    <Color name="Link"           foreground="#79c0ff" />
+    <Color name="LinkLabel"      foreground="#d2a8ff" />
+    <Color name="List"           foreground="#f0883e" />
+    <Color name="HRule"          foreground="#484f58" />
+    <Color name="Comment"        foreground="#8b949e" fontStyle="italic" />
+
+    <RuleSet>
+        <!-- Headings: # ## ### etc -->
+        <Rule color="Heading">
+            ^\#{1,6}[^\n]*
+        </Rule>
+
+        <!-- Horizontal rules -->
+        <Rule color="HRule">
+            ^(\-{3,}|\*{3,}|_{3,})\s*$
+        </Rule>
+
+        <!-- Fenced code blocks: ```...``` (must come before inline code) -->
+        <Span color="FencedCode" multiline="true">
+            <Begin>```</Begin>
+            <End>```</End>
+        </Span>
+
+        <!-- Inline code: `...` -->
+        <Span color="InlineCode">
+            <Begin>`</Begin>
+            <End>`</End>
+        </Span>
+
+        <!-- Block quote: lines starting with > -->
+        <Rule color="BlockQuote">
+            ^\s*&gt;[^\n]*
+        </Rule>
+
+        <!-- Bold italic: ***text*** -->
+        <Span color="StrongEmphasis">
+            <Begin>\*\*\*</Begin>
+            <End>\*\*\*</End>
+        </Span>
+
+        <!-- Bold: **text** or __text__ -->
+        <Span color="StrongEmphasis">
+            <Begin>\*\*</Begin>
+            <End>\*\*</End>
+        </Span>
+        <Span color="StrongEmphasis">
+            <Begin>__</Begin>
+            <End>__</End>
+        </Span>
+
+        <!-- Italic: *text* or _text_ -->
+        <Span color="Emphasis">
+            <Begin>\*</Begin>
+            <End>\*</End>
+        </Span>
+        <Span color="Emphasis">
+            <Begin>_</Begin>
+            <End>_</End>
+        </Span>
+
+        <!-- Image: ![alt](url) -->
+        <Rule color="Link">
+            !\[.*?\]\([^\)]*\)
+        </Rule>
+
+        <!-- Link: [text](url) -->
+        <Rule color="Link">
+            \[.*?\]\([^\)]*\)
+        </Rule>
+
+        <!-- Reference-style link label: [text][ref] -->
+        <Rule color="LinkLabel">
+            \[.*?\]\[.*?\]
+        </Rule>
+
+        <!-- Unordered list markers -->
+        <Rule color="List">
+            ^\s*[\*\+\-]\s
+        </Rule>
+
+        <!-- Ordered list markers -->
+        <Rule color="List">
+            ^\s*\d+\.\s
+        </Rule>
+
+        <!-- HTML comment -->
+        <Span color="Comment" multiline="true">
+            <Begin>&lt;!--</Begin>
+            <End>--&gt;</End>
+        </Span>
+    </RuleSet>
+</SyntaxDefinition>

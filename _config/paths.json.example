@@ -1,0 +1,13 @@
+{
+  "localProjectsRoot": "C:\\Users\\yourname\\Documents\\Projects",
+  "boxProjectsRoot": "C:\\Users\\yourname\\Box\\Projects",
+  "obsidianVaultRoot": "C:\\Users\\yourname\\Box\\Obsidian-Vault",
+  "hotkey": {
+    "modifiers": "Ctrl+Shift",
+    "key": "P"
+  },
+  "asanaSync": {
+    "enabled": false,
+    "intervalMin": 60
+  }
+}
