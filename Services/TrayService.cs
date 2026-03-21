@@ -26,7 +26,7 @@ public class TrayService : IDisposable
         _notifyIcon = new WinForms.NotifyIcon
         {
             Icon = icon,
-            Text = "Project Desk",
+            Text = "ProjectCurator",
             Visible = true,
         };
 
