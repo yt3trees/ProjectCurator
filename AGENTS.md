@@ -111,6 +111,10 @@ WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
 
 When adding modal dialogs, follow the patterns in `DashboardPage.xaml.cs` (canonical reference). See `.codex/skills/projectcurator-popup-window/SKILL.md` for detailed guidelines: theme resources, dark-mode support, WPF control conventions, and Win32 interop guardrails. Use English-only text in UI elements.
 
+### WPF Control Best Practices
+
+- ComboBox: do not set an explicit `Height`. Use `Padding` instead (e.g., `Padding = new Thickness(6, 4, 4, 4)`) and let the control auto-size. A fixed height causes the text to be clipped at the bottom.
+
 ## NuGet Dependencies
 
 - `wpf-ui` 3.x - Fluent Design controls and navigation
