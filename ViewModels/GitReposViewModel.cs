@@ -60,6 +60,9 @@ public partial class GitReposViewModel : ObservableObject
     [ObservableProperty]
     private string statusText = "Select a project and scan";
 
+    [ObservableProperty]
+    private GitRepoItem? selectedRepo;
+
     public ObservableCollection<GitRepoItem> Repos { get; } = [];
 
     public GitReposViewModel(ProjectDiscoveryService discoveryService, ConfigService configService)
@@ -258,6 +261,67 @@ public partial class GitReposViewModel : ObservableObject
         }
     }
 
+    [RelayCommand]
+    private void OpenRepoFolder(GitRepoItem? repo)
+    {
+        var target = repo ?? SelectedRepo;
+        if (target == null)
+        {
+            StatusText = "Openするリポジトリを選択してください。";
+            return;
+        }
+
+        var resolvedPath = ResolveRepoPath(target);
+        if (string.IsNullOrEmpty(resolvedPath) || !Directory.Exists(resolvedPath))
+        {
+            StatusText = $"フォルダが見つかりません: {target.RepoName}";
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{resolvedPath}\"",
+                UseShellExecute = true,
+            });
+            StatusText = $"Opened: {target.RepoName}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Open failed: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void OpenRepoTerminal(GitRepoItem? repo)
+    {
+        var target = repo ?? SelectedRepo;
+        if (target == null)
+        {
+            StatusText = "Terminalを開くリポジトリを選択してください。";
+            return;
+        }
+
+        var resolvedPath = ResolveRepoPath(target);
+        if (string.IsNullOrEmpty(resolvedPath) || !Directory.Exists(resolvedPath))
+        {
+            StatusText = $"フォルダが見つかりません: {target.RepoName}";
+            return;
+        }
+
+        if (TryStart("wt.exe", $"-d \"{resolvedPath}\"") ||
+            TryStart("pwsh.exe", $"-NoExit -Command \"Set-Location '{resolvedPath}'\"") ||
+            TryStart("powershell.exe", $"-NoExit -Command \"Set-Location '{resolvedPath}'\""))
+        {
+            StatusText = $"Terminal opened: {target.RepoName}";
+            return;
+        }
+
+        StatusText = "Terminal起動に失敗しました。";
+    }
+
     // --- スキャンロジック ---
 
     private static List<GitRepoItem> ScanGitRepos(ProjectInfo project)
@@ -323,5 +387,46 @@ public partial class GitReposViewModel : ObservableObject
             return stdout.Trim();
         }
         catch { return ""; }
+    }
+
+    private string ResolveRepoPath(GitRepoItem repo)
+    {
+        if (!string.IsNullOrWhiteSpace(repo.FullPath))
+        {
+            if (Path.IsPathRooted(repo.FullPath) && Directory.Exists(repo.FullPath))
+                return repo.FullPath;
+
+            var localRoot = _configService.LoadSettings().LocalProjectsRoot?.TrimEnd('\\', '/');
+            if (!string.IsNullOrWhiteSpace(localRoot) && !Path.IsPathRooted(repo.FullPath))
+            {
+                var candidate = Path.GetFullPath(Path.Combine(localRoot!, repo.FullPath));
+                if (Directory.Exists(candidate)) return candidate;
+            }
+        }
+
+        if (SelectedProject != null && !string.IsNullOrWhiteSpace(repo.RelativePath))
+        {
+            var devSource = Path.Combine(SelectedProject.Path, "development", "source");
+            var relative = repo.RelativePath == "." ? "" : repo.RelativePath;
+            var candidate = string.IsNullOrEmpty(relative)
+                ? devSource
+                : Path.GetFullPath(Path.Combine(devSource, relative));
+            if (Directory.Exists(candidate)) return candidate;
+        }
+
+        return repo.FullPath;
+    }
+
+    private static bool TryStart(string exe, string args)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = true });
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
