@@ -65,9 +65,12 @@ flowchart TD
 
 Open `Settings`, set these values, then save:
 
-- `Local Projects Root`
-- `Box Projects Root`
-- `Obsidian Vault Root`
+- `Local Projects Root` (parent folder for your local working projects)
+  Example: `C:\Users\<your-user>\Documents\Projects`
+- `Box Projects Root` (parent folder synced by Box for shared project files)
+  Example: `C:\Users\<your-user>\Box\Projects`
+- `Obsidian Vault Root` (parent folder for your Obsidian vault)
+  Example: `C:\Users\<your-user>\Box\ObsidianVault`
 
 Required config files are created automatically when you save.
 
@@ -103,6 +106,10 @@ Required config files are created automatically when you save.
 
 ### 6. Start with these pages
 
+- `Setup`: first, use the Setup page features to prepare your working structure
+  - Use `Setup Project` / `Check` to create or validate the project folder and `_work` workspace
+  - Use setup options to create the links for shared files and AI context folders
+  - After setup, open the project from `Dashboard` and `Editor`
 - `Dashboard`: decide what needs attention today
 - `Editor`: update `current_focus.md`
 - `Asana Sync` (optional): sync tasks into Today Queue sources
@@ -169,20 +176,6 @@ flowchart TD
     E --> F["Run Asana Sync (optional)"]
     F --> G["Update Focus from Asana (optional, AI)"]
 ```
-
-## Daily Standup Automation
-
-ProjectCurator includes an automatic standup generator:
-
-- Starts at app startup and checks every hour
-- Generates today's file only if it does not exist yet (idempotent)
-- Target file: `{ObsidianVaultRoot}\standup\YYYY-MM-DD_standup.md`
-- Command Palette command: `standup` (manual generate/open)
-
-The generated sections are:
-- `Yesterday` (focus history, decision logs, completed Asana tasks)
-- `Today` (high-priority queue items)
-- `This Week` (upcoming queue items)
 
 ## AI Agent Collaboration (Claude Code / Codex CLI)
 
@@ -261,14 +254,19 @@ Overview of all projects with health indicators, update freshness, and Today Que
 <details>
 <summary>Dashboard details</summary>
 
-- Project cards are displayed in a grid layout
-- Each card shows: project name, tier badge (FULL / MINI), category badge (DOMAIN), health indicator dots (green / yellow / red), update freshness (Since / Summary in days), and uncommitted changes count
-- Workstreams can be expanded per card
-- Action icons at the bottom of each card open folders, jump to Editor, and more
-- Pinned Folders section in the middle area provides quick access to frequently used work folders
-- Today Queue at the bottom lists prioritized tasks with due dates and descriptions
-- Auto-refresh toggle with configurable interval (e.g. 10 min), manual refresh, and sort buttons in the toolbar
-- Filter bar supports filtering by project and workstream
+![](_assets/Dashboard-Card.png)
+
+- Use the top bar to refresh the view (`↻`), set auto refresh (`Off / 10 / 15 / 30 / 60 min`), and show hidden projects.
+- Each project card gives a quick health check: project name, tier (`FULL`/`MINI`), optional `DOMAIN` tag, link status dots, decision log count, and uncommitted repo count.
+- Click the uncommitted badge to see repository-by-repository change details.
+- `Focus` and `Summary` show how old each file is (in days), and the background color changes as files get older.
+- The 30-day mini activity bar is clickable and opens Timeline.
+- Card buttons help you move straight into work: open folder, open terminal (or launch Claude/Gemini/Codex), open Editor, and pin work folders.
+- Workstreams can be expanded per project. From each row, you can open `current_focus.md`, open the workstream `_work` folder, create today’s work folder, or pin a recent folder.
+- `Pinned Folders` appears when you pin at least one folder. You can open, unpin, drag to reorder, or clear all pins.
+- `Today Queue` reads unchecked tasks from `asana-tasks.md` files and shows them by urgency (`Overdue`, `Today`, `In Nd`, `No due`).
+- In each Today Queue row, you can open the task in Asana, snooze it until tomorrow, or mark it done in Asana.
+- Today Queue also has project/workstream filters, `Show All` (`Top 10` vs up to `100`), unsnooze all, manual refresh, and fixed/resizable height mode.
 
 </details>
 
@@ -350,7 +348,7 @@ Right panel (per-project config):
 - Asana Project GIDs: one GID per line to specify which Asana projects to sync
 - Workstream Map: maps `gid` to `workstream-id` for routing tasks to the correct workstream folder
 - Workstream Field: the custom field name in Asana used to identify the workstream
-- Hidden Aliases: aliases to exclude from sync output (one per line)
+- Project Aliases: aliases used to match Asana custom field `案件` to this project (one per line)
 - Save button to persist the per-project `asana_config.json`
 
 Setup steps:
@@ -468,6 +466,20 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 - AvalonEdit
 - CommunityToolkit.Mvvm
 - Microsoft.Extensions.DependencyInjection
+
+## Helpful Extra: Daily Standup
+
+ProjectCurator includes an automatic standup generator:
+
+- Starts at app startup and checks every hour
+- Generates today's file only if it does not exist yet (idempotent)
+- Target file: `{ObsidianVaultRoot}\standup\YYYY-MM-DD_standup.md`
+- Command Palette command: `standup` (manual generate/open)
+
+The generated sections are:
+- `Yesterday` (focus history, decision logs, completed Asana tasks)
+- `Today` (high-priority queue items)
+- `This Week` (upcoming queue items)
 
 ## Notes
 

@@ -252,9 +252,9 @@
                              BorderThickness="1"/>
                 </Grid>
 
-                <!-- Anken Aliases ラベル -->
+                <!-- Project Aliases ラベル -->
                 <TextBlock Grid.Row="7"
-                           Text="Anken Aliases (1 per line):"
+                           Text="Project Aliases (1 per line):"
                            Foreground="{DynamicResource AppSubtext0}"
                            FontSize="11"
                            Margin="8,8,8,2"/>
