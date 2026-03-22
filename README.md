@@ -38,7 +38,9 @@ flowchart TD
     AS -->|"Write"| TASKS["✅ asana-tasks.md"]
     DB -->|"Read"| TASKS
     TASKS -->|"Feed to LLM"| LLM["🤖 LLM (OpenAI / Azure)"]
+    DB -->|"What's Next (AI)"| LLM
     LLM -->|"Propose update"| ED
+    LLM -->|"Suggest actions"| DB
 
     U -->|"Manage folders"| SU["🧰 Setup"]
     U -->|"Review activity"| TL["🕒 Timeline"]
@@ -102,6 +104,7 @@ Required config files are created automatically when you save.
 - Enter your API Key, Model, and (for Azure) Endpoint and API Version
 - Click `Test Connection` to verify the credentials
 - Once the test passes, toggle `Enable AI Features` to on and save
+- The `What's Next` button (💡) will appear in the Dashboard toolbar
 - The `Update Focus from Asana` button and the `AI Decision Log` button will appear in the Editor toolbar
 
 </details>
@@ -163,20 +166,22 @@ In short:
 ## Recommended Daily Flow
 
 1. Open `Dashboard`
-2. Click a project or workstream and open `current_focus.md`
-3. Update context in `Editor` and save with `Ctrl+S`
-4. Add a `decision_log` entry if needed (when AI Features is enabled, the Dec Log button opens an AI-assisted dialog)
-5. If using Asana, run `Asana Sync` to refresh task files
-6. If AI Features is enabled, click `Update Focus from Asana` in the Editor toolbar to get an LLM-generated update proposal
+2. (If AI Features is enabled) Click the What's Next button (💡) to see AI-prioritized action suggestions across all projects
+3. Click a project or workstream and open `current_focus.md`
+4. Update context in `Editor` and save with `Ctrl+S`
+5. Add a `decision_log` entry if needed (when AI Features is enabled, the Dec Log button opens an AI-assisted dialog)
+6. If using Asana, run `Asana Sync` to refresh task files
+7. If AI Features is enabled, click `Update Focus from Asana` in the Editor toolbar to get an LLM-generated update proposal
 
 ```mermaid
 flowchart TD
-    A["Open Dashboard"] --> B["Pick project or workstream"]
-    B --> C["Open current_focus.md in Editor"]
-    C --> D["Update context and save"]
-    D --> E["Add decision_log entry (optional)"]
-    E --> F["Run Asana Sync (optional)"]
-    F --> G["Update Focus from Asana (optional, AI)"]
+    A["Open Dashboard"] --> B["What's Next (optional, AI)"]
+    B --> C["Pick project or workstream"]
+    C --> D["Open current_focus.md in Editor"]
+    D --> E["Update context and save"]
+    E --> F["Add decision_log entry (optional)"]
+    F --> G["Run Asana Sync (optional)"]
+    G --> H["Update Focus from Asana (optional, AI)"]
 ```
 
 ## AI Agent Collaboration (Claude Code / Codex CLI)
@@ -237,7 +242,7 @@ Skills are sourced from the app's embedded `Assets/ContextCompressionLayer/skill
 
 | Page | What You Can Do |
 |---|---|
-| Dashboard | Project health overview, Today Queue visibility, workstream status checks |
+| Dashboard | Project health overview, Today Queue visibility, workstream status checks, AI-powered What's Next suggestions (requires AI Features enabled) |
 | Editor | Markdown context editing, search, link open, quick decision log creation, AI-powered "Update Focus from Asana" and "AI Decision Log" (both require AI Features enabled) |
 | Timeline | Review recent project activity in chronological order |
 | Git Repos | Recursively scan workspace roots for repositories |
@@ -259,6 +264,7 @@ Overview of all projects with health indicators, update freshness, and Today Que
 ![](_assets/Dashboard-Card.png)
 
 - Use the top bar to refresh the view (`↻`), set auto refresh (`Off / 10 / 15 / 30 / 60 min`), and show hidden projects.
+- When AI Features is enabled, the What's Next button (💡) appears in the top bar. Click it to get 3–5 AI-prioritized action suggestions across all projects, ranked by urgency (overdue tasks, stale focus files, uncommitted changes, unrecorded decisions, etc.). Each suggestion shows the project name, action, and reason, with an Open button to navigate directly to the relevant project or file. A Copy button exports the list as plain text.
 - Each project card gives a quick health check: project name, tier (`FULL`/`MINI`), optional `DOMAIN` tag, link status dots, decision log count, and uncommitted repo count.
 - Click the uncommitted badge to see repository-by-repository change details.
 - `Focus` and `Summary` show how old each file is (in days), and the background color changes as files get older.

@@ -30,6 +30,12 @@
                 <TextBlock Grid.Column="0" Text="Dashboard" FontSize="14" FontWeight="SemiBold"
                            Foreground="{DynamicResource AppText}" VerticalAlignment="Center"/>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <ui:Button Margin="0,0,6,0" Height="34" Padding="10,0" FontSize="13"
+                               ToolTip="What should I do next? — AI analyzes all projects and suggests top priority actions"
+                               Click="OnWhatsNextClickAsync"
+                               Visibility="{Binding IsAiEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ui:SymbolIcon Symbol="Lightbulb24"/>
+                    </ui:Button>
                     <TextBlock Text="Auto:" VerticalAlignment="Center" Margin="0,0,4,0"
                                Foreground="{DynamicResource AppSubtext0}" FontSize="12"/>
                     <ComboBox x:Name="AutoRefreshComboBox"

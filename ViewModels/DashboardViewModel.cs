@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using ProjectCurator.Models;
 using ProjectCurator.Services;
 
@@ -181,6 +182,9 @@ public partial class DashboardViewModel : ObservableObject
     // Snooze カウントが 0 より大きい場合のみ表示用
     public bool HasSnoozed => SnoozeCount > 0;
 
+    [ObservableProperty]
+    private bool isAiEnabled;
+
     public int AutoRefreshMinutes { get; set; }
     public int TodayQueueLimit { get; set; }
 
@@ -206,7 +210,14 @@ public partial class DashboardViewModel : ObservableObject
         _pinnedFoldersList = configService.LoadPinnedFolders();
         foreach (var pf in _pinnedFoldersList) PinnedFolders.Add(pf);
         PinnedFolders.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasPinnedFolders));
+
+        IsAiEnabled = _configService.LoadSettings().AiEnabled;
+        WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
+            (_, msg) => IsAiEnabled = msg.Enabled);
     }
+
+    public List<TodayQueueTask> GetTopTasksForAi(int limit = 30)
+        => _cachedAllTasks.Take(limit).ToList();
 
     public async Task RefreshAsync(bool force = false)
     {
