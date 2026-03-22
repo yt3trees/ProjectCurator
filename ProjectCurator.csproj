@@ -18,6 +18,7 @@
   <ItemGroup>
     <PackageReference Include="WPF-UI" Version="3.*" />
     <PackageReference Include="AvalonEdit" Version="6.*" />
+    <PackageReference Include="DiffPlex" Version="1.*" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.*" />
   </ItemGroup>

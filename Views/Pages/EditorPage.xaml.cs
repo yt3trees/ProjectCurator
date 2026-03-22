@@ -1,12 +1,18 @@
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using MediaColor = System.Windows.Media.Color;
 using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Rendering;
 using ICSharpCode.AvalonEdit.Search;
 using ICSharpCode.AvalonEdit.Highlighting;
+using DiffPlex;
+using DiffPlex.DiffBuilder;
+using DiffPlex.DiffBuilder.Model;
 using Wpf.Ui.Controls;
 using ProjectCurator.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
@@ -20,6 +26,8 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     public EditorViewModel ViewModel { get; }
 
     private readonly TextEditor _editor;
+    private TextEditor? _diffViewer;
+    private DiffLineBackgroundRenderer? _diffRenderer;
     private IHighlightingDefinition? _markdownDefinition;
 
     public EditorPage(EditorViewModel viewModel)
@@ -74,6 +82,13 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             {
                 _editor.Text = ViewModel.EditorText;
                 ApplyHighlighting(ViewModel.CurrentFile);
+            }
+            else if (e.PropertyName == nameof(EditorViewModel.IsDiffViewActive))
+            {
+                if (ViewModel.IsDiffViewActive)
+                    ShowDiffView();
+                else
+                    HideDiffView();
             }
         };
     }
@@ -243,6 +258,10 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                     e.Handled = true;
                     ViewModel.NotifyTextChanged(_editor.Text);
                     await ViewModel.SaveAsync();
+                    break;
+                case Key.D:
+                    e.Handled = true;
+                    ViewModel.IsDiffViewActive = !ViewModel.IsDiffViewActive;
                     break;
                 case Key.F:
                     e.Handled = true;
@@ -431,6 +450,361 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         }
 
         return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Diff ビュー
+    // -------------------------------------------------------------------------
+    private void EnsureDiffViewer()
+    {
+        if (_diffViewer != null) return;
+
+        _diffViewer = new TextEditor
+        {
+            FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+            FontSize = 14,
+            WordWrap = false,
+            ShowLineNumbers = true,
+            IsReadOnly = true,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        };
+
+        // テーマ適用
+        var bg = Application.Current.Resources["EditorBackground"] as System.Windows.Media.SolidColorBrush;
+        var fg = Application.Current.Resources["EditorForeground"] as System.Windows.Media.SolidColorBrush;
+        _diffViewer.Background = bg ?? new System.Windows.Media.SolidColorBrush((MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#0d1117"));
+        _diffViewer.Foreground = fg ?? new System.Windows.Media.SolidColorBrush((MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#c9d1d9"));
+        _diffViewer.LineNumbersForeground = (Application.Current.Resources["AppSubtext0"] as System.Windows.Media.SolidColorBrush)
+            ?? new System.Windows.Media.SolidColorBrush((MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#8b949e"));
+
+        _diffRenderer = new DiffLineBackgroundRenderer();
+        _diffViewer.TextArea.TextView.BackgroundRenderers.Add(_diffRenderer);
+    }
+
+    private void ShowDiffView()
+    {
+        if (string.IsNullOrEmpty(ViewModel.CurrentFile)) return;
+
+        var fileName = Path.GetFileName(ViewModel.CurrentFile);
+        if (fileName.Equals("current_focus.md", StringComparison.OrdinalIgnoreCase))
+        {
+            var dir = Path.GetDirectoryName(ViewModel.CurrentFile)!;
+            var histDir = Path.Combine(dir, "focus_history");
+            var snapshots = GetFocusSnapshots(histDir);
+
+            if (snapshots.Count == 0)
+            {
+                ViewModel.IsDiffViewActive = false;
+                System.Windows.MessageBox.Show(
+                    "No snapshots found in focus_history/.",
+                    "Diff", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var selected = ShowSnapshotPickerDialog(snapshots);
+            if (selected == null)
+            {
+                ViewModel.IsDiffViewActive = false;
+                return;
+            }
+
+            ViewModel.NotifyTextChanged(_editor.Text);
+            var previous = File.ReadAllText(selected);
+            var current = ViewModel.EditorText ?? "";
+            var headerText = $"Diff: current_focus.md  vs  {Path.GetFileName(selected)}";
+            RenderDiff(previous, current, headerText);
+        }
+        else
+        {
+            ViewModel.NotifyTextChanged(_editor.Text);
+            var previous = ViewModel.OriginalContent ?? "";
+            var current = ViewModel.EditorText ?? "";
+
+            if (current == previous)
+            {
+                ViewModel.IsDiffViewActive = false;
+                System.Windows.MessageBox.Show(
+                    "No unsaved changes.",
+                    "Diff", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var headerText = $"Diff: unsaved changes  vs  saved ({fileName})";
+            RenderDiff(previous, current, headerText);
+        }
+    }
+
+    private void RenderDiff(string previous, string current, string headerText)
+    {
+        EnsureDiffViewer();
+
+        var diffBuilder = new InlineDiffBuilder(new Differ());
+        var diffResult = diffBuilder.BuildDiffModel(previous, current);
+
+        var sb = new StringBuilder();
+        var lineTypes = new Dictionary<int, ChangeType>();
+        sb.AppendLine(headerText);
+        sb.AppendLine(new string('─', Math.Min(headerText.Length + 20, 120)));
+        int lineNum = 2;
+
+        foreach (var line in diffResult.Lines)
+        {
+            lineNum++;
+            switch (line.Type)
+            {
+                case ChangeType.Inserted:
+                    sb.AppendLine("+ " + line.Text);
+                    lineTypes[lineNum] = ChangeType.Inserted;
+                    break;
+                case ChangeType.Deleted:
+                    sb.AppendLine("- " + line.Text);
+                    lineTypes[lineNum] = ChangeType.Deleted;
+                    break;
+                case ChangeType.Modified:
+                    sb.AppendLine("~ " + line.Text);
+                    lineTypes[lineNum] = ChangeType.Modified;
+                    break;
+                case ChangeType.Imaginary:
+                    sb.AppendLine();
+                    lineTypes[lineNum] = ChangeType.Imaginary;
+                    break;
+                default:
+                    sb.AppendLine("  " + line.Text);
+                    break;
+            }
+        }
+
+        _diffRenderer!.SetLineTypes(lineTypes);
+        _diffViewer!.Text = sb.ToString();
+
+        if (!string.IsNullOrEmpty(ViewModel.CurrentFile))
+        {
+            var ext = Path.GetExtension(ViewModel.CurrentFile).ToLower();
+            if (ext is ".md" or ".markdown")
+            {
+                if (_markdownDefinition == null) RegisterMarkdownHighlighting();
+                _diffViewer.SyntaxHighlighting = _markdownDefinition;
+            }
+        }
+
+        EditorHost.Content = _diffViewer;
+        DiffToggleButton.Appearance = Wpf.Ui.Controls.ControlAppearance.Primary;
+    }
+
+    private static List<string> GetFocusSnapshots(string histDir)
+    {
+        if (!Directory.Exists(histDir)) return [];
+        return Directory.GetFiles(histDir, "*.md")
+            .OrderByDescending(f => Path.GetFileNameWithoutExtension(f))
+            .ToList();
+    }
+
+    private string? ShowSnapshotPickerDialog(List<string> snapshots)
+    {
+        var appResources = Application.Current.Resources;
+        var surface = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var accent = appResources.Contains("AppOverlay2")
+            ? (System.Windows.Media.Brush)appResources["AppOverlay2"]
+            : text;
+
+        string? result = null;
+
+        var listBox = new System.Windows.Controls.ListBox
+        {
+            MinHeight = 80,
+            MaxHeight = 300,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 13,
+            Margin = new Thickness(0, 8, 0, 0),
+        };
+
+        var todayPrefix = DateTime.Now.ToString("yyyy-MM-dd");
+        int defaultIndex = -1;
+        for (int i = 0; i < snapshots.Count; i++)
+        {
+            var name = Path.GetFileNameWithoutExtension(snapshots[i]);
+            listBox.Items.Add(name);
+            if (defaultIndex < 0 && !name.Equals(todayPrefix, StringComparison.OrdinalIgnoreCase))
+                defaultIndex = i;
+        }
+        listBox.SelectedIndex = defaultIndex >= 0 ? defaultIndex : 0;
+
+        // タイトルバー
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "⇄", Foreground = accent, FontSize = 15,
+            Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Compare with snapshot", Foreground = text, FontSize = 14,
+            FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+
+        var closeButton = new System.Windows.Controls.Button
+        {
+            Content = "✕", Width = 34, Height = 26,
+            Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
+        };
+        Grid.SetColumn(closeButton, 2);
+
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+        titleBar.Children.Add(closeButton);
+
+        var helper = new System.Windows.Controls.TextBlock
+        {
+            Text = "Select a focus_history snapshot to compare:",
+            Foreground = subtext, FontSize = 12,
+        };
+
+        var contentPanel = new StackPanel
+        {
+            Margin = new Thickness(16, 12, 16, 8),
+            Children = { helper, listBox }
+        };
+
+        var compareButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Compare",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 100, Height = 32,
+            Margin = new Thickness(0, 0, 8, 0), IsDefault = true
+        };
+        var cancelButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 80, Height = 32, IsCancel = true
+        };
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 4, 16, 12),
+            Children = { compareButton, cancelButton }
+        };
+
+        var root = new Grid();
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(contentPanel, 1);
+        Grid.SetRow(footer, 2);
+        root.Children.Add(titleBar);
+        root.Children.Add(contentPanel);
+        root.Children.Add(footer);
+
+        var dialog = new Window
+        {
+            Content = root,
+            Width = 360,
+            SizeToContent = SizeToContent.Height,
+            WindowStyle = WindowStyle.None,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = Window.GetWindow(this),
+            ShowInTaskbar = false,
+            Background = surface,
+        };
+
+        titleBar.MouseLeftButtonDown += (s, e) => dialog.DragMove();
+        closeButton.Click += (s, e) => dialog.DialogResult = false;
+        cancelButton.Click += (s, e) => dialog.DialogResult = false;
+        compareButton.Click += (s, e) =>
+        {
+            if (listBox.SelectedIndex >= 0)
+            {
+                result = snapshots[listBox.SelectedIndex];
+                dialog.DialogResult = true;
+            }
+        };
+        listBox.MouseDoubleClick += (s, e) =>
+        {
+            if (listBox.SelectedIndex >= 0)
+            {
+                result = snapshots[listBox.SelectedIndex];
+                dialog.DialogResult = true;
+            }
+        };
+
+        dialog.ShowDialog();
+        return result;
+    }
+
+    private void HideDiffView()
+    {
+        EditorHost.Content = _editor;
+        DiffToggleButton.Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary;
+    }
+
+    private sealed class DiffLineBackgroundRenderer : IBackgroundRenderer
+    {
+        public KnownLayer Layer => KnownLayer.Background;
+        private Dictionary<int, ChangeType> _lineTypes = new();
+
+        private static readonly System.Windows.Media.SolidColorBrush InsertedBrush =
+            new(MediaColor.FromRgb(0x1a, 0x2f, 0x1e)) { Opacity = 1.0 };
+        private static readonly System.Windows.Media.SolidColorBrush DeletedBrush =
+            new(MediaColor.FromRgb(0x3b, 0x1a, 0x1a)) { Opacity = 1.0 };
+        private static readonly System.Windows.Media.SolidColorBrush ModifiedBrush =
+            new(MediaColor.FromRgb(0x2a, 0x24, 0x12)) { Opacity = 1.0 };
+
+        static DiffLineBackgroundRenderer()
+        {
+            InsertedBrush.Freeze();
+            DeletedBrush.Freeze();
+            ModifiedBrush.Freeze();
+        }
+
+        public void SetLineTypes(Dictionary<int, ChangeType> lineTypes)
+        {
+            _lineTypes = new Dictionary<int, ChangeType>(lineTypes);
+        }
+
+        public void Draw(TextView textView, DrawingContext drawingContext)
+        {
+            if (_lineTypes.Count == 0) return;
+
+            foreach (var visualLine in textView.VisualLines)
+            {
+                var lineNumber = visualLine.FirstDocumentLine.LineNumber;
+                if (!_lineTypes.TryGetValue(lineNumber, out var changeType)) continue;
+
+                System.Windows.Media.Brush? brush = changeType switch
+                {
+                    ChangeType.Inserted => InsertedBrush,
+                    ChangeType.Deleted => DeletedBrush,
+                    ChangeType.Modified => ModifiedBrush,
+                    _ => null
+                };
+
+                if (brush == null) continue;
+
+                var y = visualLine.VisualTop - textView.ScrollOffset.Y;
+                var height = visualLine.Height;
+                drawingContext.DrawRectangle(brush, null, new System.Windows.Rect(0, y, textView.ActualWidth, height));
+            }
+        }
     }
 
     private void OnDeleteDecisionLog(object sender, RoutedEventArgs e)

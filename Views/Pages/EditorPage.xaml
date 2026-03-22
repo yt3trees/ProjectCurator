@@ -63,35 +63,43 @@
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <!-- Refresh -->
                     <ui:Button x:Name="RefreshButton"
-                               Content="Refresh"
-                               FontSize="11"
-                               Padding="8,4"
+                               Padding="6,4"
                                Margin="0,0,4,0"
                                Command="{Binding RefreshCommand}"
-                               ToolTip="Reload project and file tree"/>
+                               ToolTip="Reload project and file tree">
+                        <ui:SymbolIcon Symbol="ArrowSync24" FontSize="18" Filled="False"/>
+                    </ui:Button>
                     <!-- New decision_log -->
                     <ui:Button x:Name="NewDecisionLogButton"
-                               Content="+ Dec Log"
-                               FontSize="11"
-                               Padding="8,4"
+                               Padding="6,4"
                                Margin="0,0,4,0"
                                Command="{Binding NewDecisionLogCommand}"
-                               ToolTip="Create new decision log"/>
+                               ToolTip="New decision log">
+                        <ui:SymbolIcon Symbol="NoteAdd24" FontSize="18" Filled="False"/>
+                    </ui:Button>
+                    <!-- Diff -->
+                    <ui:Button x:Name="DiffToggleButton"
+                               Padding="6,4"
+                               Margin="0,0,4,0"
+                               Command="{Binding ToggleDiffViewCommand}"
+                               ToolTip="Diff view (Ctrl+D)">
+                        <ui:SymbolIcon Symbol="DocumentArrowRight24" FontSize="18" Filled="False"/>
+                    </ui:Button>
                     <!-- 検索 -->
                     <ui:Button x:Name="SearchToggleButton"
-                               Content="⌕"
-                               FontSize="14"
-                               Padding="8,4"
+                               Padding="6,4"
                                Margin="0,0,4,0"
                                Command="{Binding ToggleSearchBarCommand}"
-                               ToolTip="Search bar (Ctrl+F)"/>
+                               ToolTip="Search (Ctrl+F)">
+                        <ui:SymbolIcon Symbol="Search24" FontSize="18" Filled="False"/>
+                    </ui:Button>
                     <!-- 保存 -->
                     <ui:Button x:Name="SaveButton"
-                               Content="Save"
-                               FontSize="11"
-                               Padding="8,4"
+                               Padding="6,4"
                                Command="{Binding SaveCommand}"
-                               ToolTip="Save (Ctrl+S)"/>
+                               ToolTip="Save (Ctrl+S)">
+                        <ui:SymbolIcon Symbol="Save24" FontSize="18" Filled="False"/>
+                    </ui:Button>
                 </StackPanel>
             </Grid>
         </Border>

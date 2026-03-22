@@ -70,6 +70,9 @@ public partial class EditorViewModel : ObservableObject
     private bool isDirty;
 
     [ObservableProperty]
+    private bool isDiffViewActive;
+
+    [ObservableProperty]
     private string encoding = "UTF8";
 
     [ObservableProperty]
@@ -88,6 +91,8 @@ public partial class EditorViewModel : ObservableObject
 
     // ---- new decision_log 要求コールバック ----
     public Func<Task<string?>>? RequestNewDecisionLogName;
+
+    public string OriginalContent => _originalContent;
 
     public EditorViewModel(FileEncodingService encodingService, ProjectDiscoveryService discoveryService)
     {
@@ -132,6 +137,7 @@ public partial class EditorViewModel : ObservableObject
     partial void OnSelectedProjectChanged(ProjectInfo? value)
     {
         if (value == null) return;
+        IsDiffViewActive = false;
         BuildFileTree(value);
         UpdateStatus();
 
@@ -428,6 +434,8 @@ public partial class EditorViewModel : ObservableObject
     // =====================================================================
     public async Task OpenFileAsync(string path)
     {
+        IsDiffViewActive = false;
+
         if (IsDirty)
         {
             var result = MessageBox.Show(
@@ -489,6 +497,7 @@ public partial class EditorViewModel : ObservableObject
 
             _originalContent = EditorText;
             IsDirty = false;
+            IsDiffViewActive = false;
             UpdateStatus();
         }
         catch (Exception ex)
@@ -598,6 +607,12 @@ public partial class EditorViewModel : ObservableObject
             MessageBox.Show($"Failed to delete:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+
+    // =====================================================================
+    // Diff ビュートグル
+    // =====================================================================
+    [RelayCommand]
+    public void ToggleDiffView() => IsDiffViewActive = !IsDiffViewActive;
 
     // =====================================================================
     // 検索バートグル
