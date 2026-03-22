@@ -102,7 +102,7 @@ Required config files are created automatically when you save.
 - Enter your API Key, Model, and (for Azure) Endpoint and API Version
 - Click `Test Connection` to verify the credentials
 - Once the test passes, toggle `Enable AI Features` to on and save
-- The `Update Focus from Asana` button will appear in the Editor toolbar
+- The `Update Focus from Asana` button and the `AI Decision Log` button will appear in the Editor toolbar
 
 </details>
 
@@ -165,7 +165,7 @@ In short:
 1. Open `Dashboard`
 2. Click a project or workstream and open `current_focus.md`
 3. Update context in `Editor` and save with `Ctrl+S`
-4. Add a `decision_log` entry if needed
+4. Add a `decision_log` entry if needed (when AI Features is enabled, the Dec Log button opens an AI-assisted dialog)
 5. If using Asana, run `Asana Sync` to refresh task files
 6. If AI Features is enabled, click `Update Focus from Asana` in the Editor toolbar to get an LLM-generated update proposal
 
@@ -238,7 +238,7 @@ Skills are sourced from the app's embedded `Assets/ContextCompressionLayer/skill
 | Page | What You Can Do |
 |---|---|
 | Dashboard | Project health overview, Today Queue visibility, workstream status checks |
-| Editor | Markdown context editing, search, link open, quick decision log creation, AI-powered "Update Focus from Asana" (requires AI Features enabled) |
+| Editor | Markdown context editing, search, link open, quick decision log creation, AI-powered "Update Focus from Asana" and "AI Decision Log" (both require AI Features enabled) |
 | Timeline | Review recent project activity in chronological order |
 | Git Repos | Recursively scan workspace roots for repositories |
 | Asana Sync | Sync Asana tasks to project/workstream Markdown outputs |
@@ -286,6 +286,7 @@ Tree-based file browser for AI context files (`current_focus.md`, `decision_log`
 - Syntax-highlighted Markdown editor on the right with section-based coloring
 - Toolbar buttons: Refresh, Dec Log (quick decision log entry), P (pin folder), Save
 - Update Focus from Asana button (visible when AI Features is enabled): reads `asana-tasks.md`, sends it to the configured LLM, and shows a diff-based proposal dialog; optionally filter by workstream; supports natural-language refinement and debug view; backup is saved to `focus_history/` automatically
+- Dec Log button (AI mode, visible when AI Features is enabled): detects implicit decisions from recent `focus_history` changes; accepts description of what was decided, Status (Confirmed / Tentative), Trigger (Solo decision / AI session / Meeting), and optional attached files (.txt / .md); LLM generates a structured decision log draft with Options / Why / Risk / Revisit Trigger sections; preview dialog supports natural-language refinement and debug view; optionally removes the resolved item from `tensions.md`; saves as `YYYY-MM-DD_{topic}.md` under `decision_log/`
 - Full file path displayed in the header bar
 - Status bar at the bottom shows the current project and file name
 
