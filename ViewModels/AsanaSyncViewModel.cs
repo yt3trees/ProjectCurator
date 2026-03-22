@@ -32,6 +32,7 @@ public partial class AsanaSyncViewModel : ObservableObject
     private readonly ProjectDiscoveryService _discoveryService;
     private readonly AsanaSyncService _asanaSyncService;
     private System.Timers.Timer? _syncTimer;
+    private bool _initialized;
 
     [ObservableProperty]
     private ObservableCollection<ProjectInfo> projects = [];
@@ -81,6 +82,9 @@ public partial class AsanaSyncViewModel : ObservableObject
 
     public async Task InitAsync()
     {
+        if (_initialized) return;
+        _initialized = true;
+
         // プロジェクトリスト読み込み
         var infos = await Task.Run(() => _discoveryService.GetProjectInfoList());
         Projects.Clear();
@@ -94,12 +98,6 @@ public partial class AsanaSyncViewModel : ObservableObject
             ScheduleEnabled = settings.AsanaSync.Enabled;  // OnScheduleEnabledChanged でタイマー開始
         }
 
-        // スケジュール有効時: 起動直後に初回同期
-        if (ScheduleEnabled)
-        {
-            AppendOutput("=== Auto Sync on Startup ===\n");
-            await RunSyncAsync();
-        }
     }
 
     [RelayCommand]

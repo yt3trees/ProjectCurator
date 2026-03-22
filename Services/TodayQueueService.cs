@@ -109,6 +109,8 @@ public class TodayQueueService
         new(@"/(\d+)$", RegexOptions.Compiled);
     private static readonly Regex RoleTagRx =
         new(@"^\[(?:担当|コラボ|他)\]\s*", RegexOptions.Compiled);
+    private static readonly Regex ColaboTagRx =
+        new(@"^\[コラボ\]", RegexOptions.Compiled);
     private static readonly Regex InProgressHeadingRx =
         new(@"^\s*#{2,3}\s*進行中", RegexOptions.Compiled);
     private static readonly Regex DoneHeadingRx =
@@ -205,6 +207,7 @@ public class TodayQueueService
                     currentParent = null;
                     continue;
                 }
+                if (ColaboTagRx.IsMatch(body)) { currentParent = null; continue; }
 
                 var dueDate = ParseDueDate(body);
                 var (asanaUrl, asanaGid) = ParseAsanaLink(body);
@@ -237,6 +240,7 @@ public class TodayQueueService
                 {
                     var body = sub.Groups[1].Value.Trim();
                     if (string.IsNullOrWhiteSpace(body) || body.StartsWith("<!--")) continue;
+                    if (ColaboTagRx.IsMatch(body)) continue;
 
                     var dueDate = ParseDueDate(body) ?? currentParent.DueDate;
                     var (asanaUrl, asanaGid) = ParseAsanaLink(body);
