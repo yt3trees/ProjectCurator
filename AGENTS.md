@@ -36,21 +36,24 @@ MVVM + Dependency Injection (`Microsoft.Extensions.DependencyInjection`). All se
 
 | Service | Responsibility |
 |---|---|
-| ConfigService | JSON config at `%USERPROFILE%\Documents\Projects\_config\` (settings.json, asana_global.json, etc.) |
-| ProjectDiscoveryService | Recursively scans Local and Box project roots; 5-minute TTL cache |
-| TodayQueueService | Reads/prioritizes tasks from `asana-tasks.md` files |
-| AsanaSyncService | Syncs Asana API tasks to Markdown files |
-| ContextCompressionLayerService | Manages AI context files (current_focus.md, decision_log, project_summary.md) |
-| StandupGeneratorService | Generates daily standup Markdown on startup and hourly |
-| HotkeyService | Registers global hotkey (Win32 P/Invoke) |
+| ConfigService | JSON config at `%USERPROFILE%\Documents\Projects\_config\` (settings.json, asana_global.json, hidden_projects.json, pinned_folders.json) |
+| ProjectDiscoveryService | Recursively scans Local and Box project roots; 5-minute TTL cache; detects junction status, focus age, decision log count, uncommitted git changes |
+| TodayQueueService | Reads/prioritizes tasks from `asana-tasks.md` into overdue/today/soon/normal buckets |
+| AsanaSyncService | Syncs Asana API tasks to Markdown files; maps workstreams via asana_config.json per project |
+| ContextCompressionLayerService | Manages AI context files (current_focus.md, decision_log, project_summary.md); extracts embedded skills from assembly to disk on first run |
+| StandupGeneratorService | Generates daily standup Markdown on startup and hourly (6am+) |
+| HotkeyService | Registers global hotkey (Win32 P/Invoke); re-registers on config change without restart |
 | TrayService | System tray icon via Windows Forms `NotifyIcon` |
+| FileEncodingService | Async file I/O with BOM-based encoding detection (UTF-8/UTF-8BOM/SJIS/UTF-16); preserves encoding on write |
+| ScriptRunnerService | Runs PowerShell/Python scripts async; dispatches output to UI thread; cancellable |
 
 ### WPF-Specific Patterns
 
-- Window visibility: the app moves the window to (-32000, -32000) instead of `Hide()` to avoid DWM re-initialization flashing. See `Win32Interop.cs` and `MainWindow.xaml.cs`.
-- Page navigation uses wpf-ui 3.x `INavigationService`.
-- Markdown editing uses AvalonEdit with `Assets/Markdown.xshd` for syntax highlighting.
+- Window visibility: the app moves the window to (-32000, -32000) instead of `Hide()` to avoid DWM re-initialization flashing. A FlashBlocker Grid hides partial redraws during movement. See `Win32Interop.cs` and `MainWindow.xaml.cs`.
+- Page navigation uses wpf-ui 3.x `INavigationService`. Cross-page navigation (e.g., Dashboard → Editor with a specific file) is done via callbacks set on ViewModels (`OnOpenInEditor`, `OnOpenInTimeline`) rather than direct service calls.
+- Markdown editing uses AvalonEdit with `Assets/Markdown.xshd` for syntax highlighting. EditorPage also has a diff view mode (DiffPlex) toggled via `IsDiffViewActive`; `DiffLineBackgroundRenderer` highlights changed lines against the original file content.
 - `GlobalUsings.cs` aliases WPF `Application` over WinForms to resolve namespace conflicts.
+- Cross-ViewModel communication uses CommunityToolkit.Mvvm `WeakReferenceMessenger`. `StatusUpdateMessage` broadcasts editor state (project, file, encoding, dirty flag) from `EditorViewModel` to `MainWindowViewModel` for status bar updates.
 
 ### Configuration
 
@@ -81,3 +84,4 @@ When adding modal dialogs, follow the patterns in `DashboardPage.xaml.cs` (canon
 - `AvalonEdit` 6.x - Syntax-highlighted Markdown editor
 - `CommunityToolkit.Mvvm` 8.x - MVVM source generators
 - `Microsoft.Extensions.DependencyInjection` 9.x - DI container
+- `DiffPlex` - Line-level diff computation for Editor diff view mode
