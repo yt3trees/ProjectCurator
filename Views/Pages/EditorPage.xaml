@@ -83,7 +83,7 @@
                                Margin="0,0,4,0"
                                Command="{Binding ToggleDiffViewCommand}"
                                ToolTip="Diff view (Ctrl+D)">
-                        <ui:SymbolIcon Symbol="DocumentArrowRight24" FontSize="18" Filled="False"/>
+                        <ui:SymbolIcon Symbol="DocumentChevronDouble20" FontSize="18" Filled="False"/>
                     </ui:Button>
                     <!-- 検索 -->
                     <ui:Button x:Name="SearchToggleButton"
@@ -92,6 +92,15 @@
                                Command="{Binding ToggleSearchBarCommand}"
                                ToolTip="Search (Ctrl+F)">
                         <ui:SymbolIcon Symbol="Search24" FontSize="18" Filled="False"/>
+                    </ui:Button>
+                    <!-- Update Focus from Asana -->
+                    <ui:Button x:Name="UpdateFocusButton"
+                               Padding="6,4"
+                               Margin="0,0,4,0"
+                               Command="{Binding UpdateFocusCommand}"
+                               ToolTip="Update Focus from Asana"
+                               Visibility="{Binding IsAiEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ui:SymbolIcon Symbol="DocumentCatchUp20" FontSize="18" Filled="False"/>
                     </ui:Button>
                     <!-- 保存 -->
                     <ui:Button x:Name="SaveButton"

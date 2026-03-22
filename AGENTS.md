@@ -46,6 +46,9 @@ MVVM + Dependency Injection (`Microsoft.Extensions.DependencyInjection`). All se
 | TrayService | System tray icon via Windows Forms `NotifyIcon` |
 | FileEncodingService | Async file I/O with BOM-based encoding detection (UTF-8/UTF-8BOM/SJIS/UTF-16); preserves encoding on write |
 | ScriptRunnerService | Runs PowerShell/Python scripts async; dispatches output to UI thread; cancellable |
+| LlmClientService | Sends chat completion requests to OpenAI or Azure OpenAI; reads provider/key/model/endpoint from settings; supports Test Connection |
+| AsanaTaskParser | Parses `asana-tasks.md` into structured task lists for use in LLM prompts |
+| FocusUpdateService | Orchestrates the "Update Focus from Asana" flow: loads context files, builds prompt, calls LlmClientService, saves backup to `focus_history/`, and returns proposed diff |
 
 ### WPF-Specific Patterns
 
@@ -53,13 +56,15 @@ MVVM + Dependency Injection (`Microsoft.Extensions.DependencyInjection`). All se
 - Page navigation uses wpf-ui 3.x `INavigationService`. Cross-page navigation (e.g., Dashboard → Editor with a specific file) is done via callbacks set on ViewModels (`OnOpenInEditor`, `OnOpenInTimeline`) rather than direct service calls.
 - Markdown editing uses AvalonEdit with `Assets/Markdown.xshd` for syntax highlighting. EditorPage also has a diff view mode (DiffPlex) toggled via `IsDiffViewActive`; `DiffLineBackgroundRenderer` highlights changed lines against the original file content.
 - `GlobalUsings.cs` aliases WPF `Application` over WinForms to resolve namespace conflicts.
-- Cross-ViewModel communication uses CommunityToolkit.Mvvm `WeakReferenceMessenger`. `StatusUpdateMessage` broadcasts editor state (project, file, encoding, dirty flag) from `EditorViewModel` to `MainWindowViewModel` for status bar updates.
+- Cross-ViewModel communication uses CommunityToolkit.Mvvm `WeakReferenceMessenger`. `StatusUpdateMessage` broadcasts editor state (project, file, encoding, dirty flag) from `EditorViewModel` to `MainWindowViewModel` for status bar updates. `AiEnabledChangedMessage` is sent by `SettingsViewModel` when the "Enable AI Features" toggle changes, and received by `EditorViewModel` to show or hide the "Update Focus from Asana" toolbar button.
 
 ### Configuration
 
 Runtime config is loaded from `%USERPROFILE%\Documents\Projects\_config\`. See `_config/` directory for `.example` templates:
-- `settings.json` - workspace roots, hotkey, auto-refresh, Asana sync settings
+- `settings.json` - workspace roots, hotkey, auto-refresh, Asana sync settings, and LLM/AI settings (`LlmProvider`, `LlmApiKey`, `LlmModel`, `LlmEndpoint`, `LlmApiVersion`, `AiFeaturesEnabled`)
 - `asana_global.json` - Asana token, workspace/user GIDs, personal project GIDs
+
+LLM settings are configured in `Settings > LLM API`. Supported providers are `openai` and `azure_openai`. "Enable AI Features" can only be turned on after a successful Test Connection.
 
 ### Managed Folder Layout
 

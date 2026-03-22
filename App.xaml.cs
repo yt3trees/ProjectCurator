@@ -65,6 +65,9 @@ public partial class App : WpfApplication
         services.AddSingleton<TodayQueueService>();
         services.AddSingleton<StandupGeneratorService>();
         services.AddSingleton<AsanaSyncService>();
+        services.AddSingleton<LlmClientService>();
+        services.AddSingleton<AsanaTaskParser>();
+        services.AddSingleton<FocusUpdateService>();
 
         // ViewModels
         services.AddSingleton<MainWindowViewModel>();

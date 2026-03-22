@@ -32,6 +32,8 @@ public partial class SettingsPage : WpfUserControl, INavigableView<SettingsViewM
     {
         ViewModel.Load();
         InitAutoRefreshCombo();
+        // PasswordBox はバインディング非対応のため、ロード後に手動でセット
+        LlmApiKeyBox.Password = ViewModel.LlmApiKey;
     }
 
     private void InitAutoRefreshCombo()
@@ -58,4 +60,10 @@ public partial class SettingsPage : WpfUserControl, INavigableView<SettingsViewM
 
     private void OnApplyHotkey(object sender, RoutedEventArgs e)
         => ViewModel.ApplyHotkeyCommand.Execute(null);
+
+    private void OnLlmApiKeyChanged(object sender, RoutedEventArgs e)
+    {
+        // PasswordBox → ViewModel に手動同期
+        ViewModel.LlmApiKey = LlmApiKeyBox.Password;
+    }
 }

@@ -1,4 +1,3 @@
-using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -14,14 +13,36 @@ public class LlmClientService
     private readonly ConfigService _configService;
     private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(120) };
 
+    public string LastSystemPrompt { get; private set; } = "";
+    public string LastUserPrompt   { get; private set; } = "";
+    public string LastResponse     { get; private set; } = "";
+
     public LlmClientService(ConfigService configService)
     {
         _configService = configService;
     }
 
+    /// <summary>シングルターン (system + user 1往復)</summary>
     public async Task<string> ChatCompletionAsync(
         string systemPrompt,
         string userPrompt,
+        CancellationToken ct = default)
+    {
+        var messages = new List<(string role, string content)>
+        {
+            ("user", userPrompt)
+        };
+        var response = await ChatWithHistoryAsync(systemPrompt, messages, ct);
+        LastSystemPrompt = systemPrompt;
+        LastUserPrompt   = userPrompt;
+        LastResponse     = response;
+        return response;
+    }
+
+    /// <summary>マルチターン (会話履歴付き)</summary>
+    public async Task<string> ChatWithHistoryAsync(
+        string systemPrompt,
+        IReadOnlyList<(string role, string content)> messages,
         CancellationToken ct = default)
     {
         var settings = _configService.LoadSettings();
@@ -31,39 +52,14 @@ public class LlmClientService
                 "LLM API key is not configured. Please set it in Settings > LLM API.");
 
         var response = settings.LlmProvider.Equals("azure_openai", StringComparison.OrdinalIgnoreCase)
-            ? await AzureOpenAiCompletionAsync(settings, systemPrompt, userPrompt, ct)
-            : await OpenAiCompletionAsync(settings, systemPrompt, userPrompt, ct);
+            ? await SendAsync(settings, systemPrompt, messages, isAzure: true,  ct)
+            : await SendAsync(settings, systemPrompt, messages, isAzure: false, ct);
 
-        WriteDebugLog(systemPrompt, userPrompt, response);
+        // デバッグログ: 最後のユーザーメッセージを記録
+        LastSystemPrompt = systemPrompt;
+        LastUserPrompt   = messages.LastOrDefault(m => m.role == "user").content ?? "";
+        LastResponse     = response;
         return response;
-    }
-
-    private static void WriteDebugLog(string systemPrompt, string userPrompt, string response)
-    {
-        try
-        {
-            var configDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "Projects", "_config");
-            Directory.CreateDirectory(configDir);
-            var logPath = Path.Combine(configDir, "llm_debug.log");
-
-            var sb = new StringBuilder();
-            sb.AppendLine($"=== {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
-            sb.AppendLine();
-            sb.AppendLine("--- SYSTEM PROMPT ---");
-            sb.AppendLine(systemPrompt);
-            sb.AppendLine();
-            sb.AppendLine("--- USER PROMPT ---");
-            sb.AppendLine(userPrompt);
-            sb.AppendLine();
-            sb.AppendLine("--- RESPONSE ---");
-            sb.AppendLine(response);
-            sb.AppendLine();
-
-            File.WriteAllText(logPath, sb.ToString(), Encoding.UTF8);
-        }
-        catch { /* ログ失敗は握り潰す */ }
     }
 
     public async Task<string> TestConnectionAsync(CancellationToken ct = default)
@@ -72,61 +68,49 @@ public class LlmClientService
     }
 
     // -----------------------------------------------------------------------
-    private async Task<string> OpenAiCompletionAsync(
-        AppSettings settings, string systemPrompt, string userPrompt, CancellationToken ct)
+    private async Task<string> SendAsync(
+        AppSettings settings,
+        string systemPrompt,
+        IReadOnlyList<(string role, string content)> messages,
+        bool isAzure,
+        CancellationToken ct)
     {
-        const string endpoint = "https://api.openai.com/v1/chat/completions";
-        var model = string.IsNullOrWhiteSpace(settings.LlmModel) ? "gpt-4o" : settings.LlmModel;
-
-        var payload = new
+        string url;
+        if (isAzure)
         {
-            model,
-            messages = new[]
-            {
-                new { role = "system", content = systemPrompt },
-                new { role = "user",   content = userPrompt   }
-            },
-            temperature = 0.3
-        };
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.LlmApiKey);
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-
-        using var response = await _http.SendAsync(request, ct);
-        var json = await response.Content.ReadAsStringAsync(ct);
-
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"OpenAI API error {(int)response.StatusCode}: {json}");
-
-        return ExtractContent(json);
-    }
-
-    private async Task<string> AzureOpenAiCompletionAsync(
-        AppSettings settings, string systemPrompt, string userPrompt, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(settings.LlmEndpoint))
-            throw new InvalidOperationException(
-                "Azure OpenAI endpoint is not configured. Please set LlmEndpoint in Settings.");
-
-        var endpoint = settings.LlmEndpoint.TrimEnd('/');
-        var model     = string.IsNullOrWhiteSpace(settings.LlmModel)      ? "gpt-4o"               : settings.LlmModel;
-        var apiVersion = string.IsNullOrWhiteSpace(settings.LlmApiVersion) ? "2024-12-01-preview"   : settings.LlmApiVersion;
-        var url = $"{endpoint}/openai/deployments/{model}/chat/completions?api-version={apiVersion}";
-
-        var payload = new
+            if (string.IsNullOrWhiteSpace(settings.LlmEndpoint))
+                throw new InvalidOperationException(
+                    "Azure OpenAI endpoint is not configured. Please set LlmEndpoint in Settings.");
+            var endpoint   = settings.LlmEndpoint.TrimEnd('/');
+            var model      = string.IsNullOrWhiteSpace(settings.LlmModel)      ? "gpt-4o"             : settings.LlmModel;
+            var apiVersion = string.IsNullOrWhiteSpace(settings.LlmApiVersion) ? "2024-12-01-preview" : settings.LlmApiVersion;
+            url = $"{endpoint}/openai/deployments/{model}/chat/completions?api-version={apiVersion}";
+        }
+        else
         {
-            messages = new[]
-            {
-                new { role = "system", content = systemPrompt },
-                new { role = "user",   content = userPrompt   }
-            },
-            temperature = 0.3
+            url = "https://api.openai.com/v1/chat/completions";
+        }
+
+        var model2 = string.IsNullOrWhiteSpace(settings.LlmModel) ? "gpt-4o" : settings.LlmModel;
+
+        // messages 配列を構築 (system → 履歴)
+        var allMessages = new List<object>
+        {
+            new { role = "system", content = systemPrompt }
         };
+        foreach (var (role, content) in messages)
+            allMessages.Add(new { role, content });
+
+        object payload = isAzure
+            ? new { messages = allMessages, temperature = 0.3 }
+            : new { model = model2, messages = allMessages, temperature = 0.3 };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("api-key", settings.LlmApiKey);
+        if (isAzure)
+            request.Headers.Add("api-key", settings.LlmApiKey);
+        else
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.LlmApiKey);
+
         request.Content = new StringContent(
             JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
@@ -134,7 +118,10 @@ public class LlmClientService
         var json = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"Azure OpenAI API error {(int)response.StatusCode}: {json}");
+        {
+            var provider = isAzure ? "Azure OpenAI" : "OpenAI";
+            throw new HttpRequestException($"{provider} API error {(int)response.StatusCode}: {json}");
+        }
 
         return ExtractContent(json);
     }

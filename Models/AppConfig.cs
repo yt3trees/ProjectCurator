@@ -49,4 +49,12 @@ public class AppSettings
     public string ObsidianVaultRoot { get; set; } = "";
     public HotkeyConfig? Hotkey { get; set; }
     public AsanaSyncConfig? AsanaSync { get; set; }
+
+    // LLM API 設定 (Update Focus from Asana 機能用)
+    public string LlmProvider { get; set; } = "openai";         // "openai" | "azure_openai"
+    public string LlmApiKey { get; set; } = "";
+    public string LlmModel { get; set; } = "gpt-4o";
+    public string LlmEndpoint { get; set; } = "";              // Azure OpenAI のエンドポイント URL
+    public string LlmApiVersion { get; set; } = "2024-12-01-preview"; // Azure OpenAI の API バージョン
+    public bool AiEnabled { get; set; } = false;               // AI 機能を有効にするか
 }

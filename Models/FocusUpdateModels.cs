@@ -14,4 +14,7 @@ public class FocusUpdateResult
     public WorkMode WorkMode      { get; set; }
     public string WorkstreamId    { get; set; } = "";
     public string Summary         { get; set; } = "";
+    public string DebugSystemPrompt { get; set; } = "";
+    public string DebugUserPrompt   { get; set; } = "";
+    public string DebugResponse     { get; set; } = "";
 }

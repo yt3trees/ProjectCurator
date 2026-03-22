@@ -95,6 +95,20 @@ public partial class CommandPaletteViewModel : ObservableObject
         // --- Global commands ---
         commands.Add(new CommandItem
         {
+            Label = "update focus",
+            Category = "project",
+            Display = "[>]  update focus (Update Focus from Asana)",
+            Action = async (w) =>
+            {
+                w.RootNavigation.Navigate(typeof(EditorPage));
+                await Task.Delay(50);
+                if (_editorViewModel.UpdateFocusCommand.CanExecute(null))
+                    await _editorViewModel.UpdateFocusCommand.ExecuteAsync(null);
+            }
+        });
+
+        commands.Add(new CommandItem
+        {
             Label = "standup",
             Category = "project",
             Display = "[>]  standup (Daily Standup)",

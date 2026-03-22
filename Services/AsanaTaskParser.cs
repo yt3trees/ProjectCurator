@@ -15,13 +15,16 @@ public class AsanaTaskParser
         RegexOptions.Compiled);
 
     private static readonly Regex CollabTagRegex  = new(@"\[コラボ\]",               RegexOptions.Compiled);
-    private static readonly Regex PriorityRegex   = new(@"\[(?<prio>最高|High|Medium|Low)\]", RegexOptions.Compiled);
+    private static readonly Regex PriorityRegex   = new(@"\[(?<prio>高|High|Medium|Low)\]", RegexOptions.Compiled);
     private static readonly Regex AsanaIdRegex    = new(@"\[id:(?<id>[^\]]+)\]",    RegexOptions.Compiled);
-    private static readonly Regex DueDateRegex    = new(@"期日:\s*(?<date>\d{4}-\d{2}-\d{2})", RegexOptions.Compiled);
+    private static readonly Regex DueDateRegex    = new(@"\(Due:\s*(?<date>\d{4}-\d{2}-\d{2})\)", RegexOptions.Compiled);
 
     public AsanaTaskParseResult Parse(string content, string sourcePath = "")
     {
         var result = new AsanaTaskParseResult { SourcePath = sourcePath };
+
+        // インデントなしの直前の親タスクを追跡する
+        string? currentParentTitle = null;
 
         foreach (var rawLine in content.Split('\n'))
         {
@@ -30,6 +33,10 @@ public class AsanaTaskParser
 
             var match = TaskLineRegex.Match(line);
             if (!match.Success) continue;
+
+            // 先頭スペース数でサブタスクかどうか判定
+            var leadingSpaces = line.Length - line.TrimStart().Length;
+            var isSubtask = leadingSpaces > 0;
 
             var checkStr  = match.Groups["check"].Value;
             var titleRaw  = match.Groups["title"].Value.Trim();
@@ -49,19 +56,26 @@ public class AsanaTaskParser
                 .Replace("[担当]", "")
                 .Replace($"[{priority}]", "")
                 .Replace($"[id:{id}]", "")
-                .Replace($"期日: {dueDate}", "")
-                .Replace($"期日:{dueDate}", "")
+                .Replace($"(Due: {dueDate})", "")
+                .Replace($"(Due:{dueDate})", "")
                 .Trim();
+
+            var resolvedTitle = string.IsNullOrWhiteSpace(cleanTitle) ? titleRaw : cleanTitle;
+
+            // トップレベルタスクなら親タスクとして記録
+            if (!isSubtask)
+                currentParentTitle = resolvedTitle;
 
             var task = new ParsedAsanaTask
             {
-                Title        = string.IsNullOrWhiteSpace(cleanTitle) ? titleRaw : cleanTitle,
+                Title        = resolvedTitle,
                 Id           = string.IsNullOrWhiteSpace(id)      ? null : id,
                 Status       = status,
                 Priority     = priority,
                 AssigneeType = assigneeType,
                 DueDate      = string.IsNullOrWhiteSpace(dueDate) ? null : dueDate,
-                RawLine      = rawLine
+                RawLine      = rawLine,
+                ParentTitle  = isSubtask ? currentParentTitle : null,
             };
 
             if (assigneeType == AsanaTaskAssigneeType.Collaborator)
@@ -106,7 +120,7 @@ public class AsanaTaskParser
         if (checkStr == "[ ]")
         {
             var prio = PriorityRegex.Match(title).Groups["prio"].Value;
-            if (prio is "最高" or "High")
+            if (prio is "高" or "High")
                 return AsanaTaskStatus.InProgress;
         }
 

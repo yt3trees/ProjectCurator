@@ -22,6 +22,8 @@ public class ParsedAsanaTask
     public AsanaTaskAssigneeType AssigneeType { get; set; } = AsanaTaskAssigneeType.Owner;
     public string? DueDate { get; set; }
     public string RawLine { get; set; } = "";
+    /// <summary>サブタスクの場合に設定される親タスクのタイトル。トップレベルタスクは null。</summary>
+    public string? ParentTitle { get; set; }
 }
 
 public class AsanaTaskParseResult

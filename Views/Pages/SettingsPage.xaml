@@ -262,6 +262,135 @@
                 </StackPanel>
             </Border>
 
+            <!-- ===== LLM API ===== -->
+            <TextBlock Text="LLM API" FontSize="15" FontWeight="SemiBold"
+                       Foreground="{DynamicResource AppText}" Margin="0,20,0,10"/>
+
+            <Border Background="{DynamicResource AppSurface0}"
+                    BorderBrush="{DynamicResource AppSurface2}"
+                    BorderThickness="1" CornerRadius="6"
+                    Padding="16,12" Margin="0,0,0,6">
+                <StackPanel>
+                    <TextBlock Text="Used for Update Focus from Asana feature." FontSize="11"
+                               Foreground="{DynamicResource AppSubtext0}" Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Provider" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
+                    <ComboBox SelectedValue="{Binding LlmProvider, UpdateSourceTrigger=PropertyChanged}"
+                              SelectedValuePath="Tag"
+                              Margin="0,2,0,8"
+                              Background="{DynamicResource AppSurface1}"
+                              Foreground="{DynamicResource AppText}"
+                              BorderBrush="{DynamicResource AppSurface2}">
+                        <ComboBoxItem Tag="openai" Content="OpenAI"/>
+                        <ComboBoxItem Tag="azure_openai" Content="Azure OpenAI (Microsoft Foundry)"/>
+                    </ComboBox>
+
+                    <TextBlock Text="API Key" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
+                    <ui:PasswordBox x:Name="LlmApiKeyBox"
+                                    Margin="0,2,0,8" Padding="6,4"
+                                    Background="{DynamicResource AppSurface1}"
+                                    Foreground="{DynamicResource AppText}"
+                                    BorderBrush="{DynamicResource AppSurface2}"
+                                    PasswordChanged="OnLlmApiKeyChanged"/>
+
+                    <TextBlock Text="Model" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
+                    <TextBox Text="{Binding LlmModel, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,2,0,8" Padding="6,4"
+                             Background="{DynamicResource AppSurface1}"
+                             Foreground="{DynamicResource AppText}"
+                             BorderBrush="{DynamicResource AppSurface2}"/>
+
+                    <!-- Azure OpenAI のみ表示 -->
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding LlmIsAzure}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="Endpoint URL" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
+                        <TextBox Text="{Binding LlmEndpoint, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,2,0,8" Padding="6,4"
+                                 Background="{DynamicResource AppSurface1}"
+                                 Foreground="{DynamicResource AppText}"
+                                 BorderBrush="{DynamicResource AppSurface2}"/>
+                        <TextBlock Text="API Version" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
+                        <TextBox Text="{Binding LlmApiVersion, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,2,0,8" Padding="6,4"
+                                 Background="{DynamicResource AppSurface1}"
+                                 Foreground="{DynamicResource AppText}"
+                                 BorderBrush="{DynamicResource AppSurface2}"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,6">
+                        <ui:Button Content="Save LLM Settings"
+                                   Command="{Binding SaveLlmCommand}"
+                                   Padding="16,6" FontSize="12"
+                                   Margin="0,0,8,0"/>
+                        <ui:Button Content="Test Connection"
+                                   Command="{Binding TestLlmConnectionCommand}"
+                                   Padding="16,6" FontSize="12"/>
+                    </StackPanel>
+                    <TextBox Text="{Binding LlmStatus, Mode=OneWay}"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             AcceptsReturn="True"
+                             MaxHeight="120"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             Background="{DynamicResource AppSurface1}"
+                             Foreground="{DynamicResource AppSubtext0}"
+                             BorderBrush="{DynamicResource AppSurface2}"
+                             BorderThickness="1"
+                             Padding="6,4"
+                             FontFamily="Consolas, Courier New"
+                             FontSize="11">
+                        <TextBox.Style>
+                            <Style TargetType="TextBox">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding LlmStatus}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
+
+                    <!-- Enable AI Features toggle -->
+                    <Separator Margin="0,8,0,8"
+                               Background="{DynamicResource AppSurface2}"/>
+                    <DockPanel LastChildFill="False">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="Enable AI Features"
+                                   Foreground="{DynamicResource AppText}"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <ui:ToggleSwitch DockPanel.Dock="Right"
+                                         IsChecked="{Binding AiEnabled, Mode=TwoWay}"
+                                         IsEnabled="{Binding AiToggleCanEnable}"/>
+                    </DockPanel>
+                    <TextBlock Text="Run Test Connection successfully to enable this toggle."
+                               Foreground="{DynamicResource AppSubtext0}"
+                               FontSize="11"
+                               Margin="0,2,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding AiToggleCanEnable}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
             <!-- ===== About ===== -->
             <TextBlock Text="About" FontSize="15" FontWeight="SemiBold"
                        Foreground="{DynamicResource AppText}" Margin="0,20,0,10"/>

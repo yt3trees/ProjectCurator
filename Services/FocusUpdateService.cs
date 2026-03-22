@@ -57,12 +57,34 @@ public class FocusUpdateService
         // Step 4: Asana タスク解析
         var asanaTasks = _parser.ParseFile(asanaPath);
 
+        // Whole project モード: アクティブな各 workstream のタスクも収集
+        var obsidianNotes = Path.Combine(project.AiContextPath, "obsidian_notes");
+        var workstreamTasks = new List<(string id, string label, AsanaTaskParseResult tasks)>();
+        if (workMode == WorkMode.General)
+        {
+            foreach (var ws in project.Workstreams.Where(w => !w.IsClosed))
+            {
+                var wsAsanaPath = Path.Combine(obsidianNotes, "workstreams", ws.Id, "asana-tasks.md");
+                if (File.Exists(wsAsanaPath))
+                    workstreamTasks.Add((ws.Id, ws.Label, _parser.ParseFile(wsAsanaPath)));
+            }
+        }
+
         // Step 5: current_focus.md 読み込み
         var (currentContent, _) = await _encoding.ReadFileAsync(focusPath);
 
+        // project_summary.md (任意)
+        var summaryPath = Path.Combine(project.AiContextContentPath, "project_summary.md");
+        string? projectSummary = null;
+        if (File.Exists(summaryPath))
+        {
+            var (summaryContent, _) = await _encoding.ReadFileAsync(summaryPath);
+            projectSummary = summaryContent;
+        }
+
         // Step 6: LLM に更新提案を生成させる
         var systemPrompt = BuildSystemPrompt();
-        var userPrompt   = BuildUserPrompt(project.Name, workstreamId, currentContent, asanaTasks);
+        var userPrompt   = BuildUserPrompt(project.Name, workstreamId, currentContent, asanaTasks, projectSummary, workstreamTasks);
         var proposed     = await _llm.ChatCompletionAsync(systemPrompt, userPrompt, ct);
 
         // サマリ生成
@@ -77,7 +99,10 @@ public class FocusUpdateService
             TargetFocusPath = focusPath,
             WorkMode        = workMode,
             WorkstreamId    = resolvedWsId,
-            Summary         = summary
+            Summary         = summary,
+            DebugSystemPrompt = _llm.LastSystemPrompt,
+            DebugUserPrompt   = _llm.LastUserPrompt,
+            DebugResponse     = _llm.LastResponse,
         };
     }
 
@@ -148,22 +173,27 @@ public class FocusUpdateService
         3. For each in-progress Asana task ([担当] owner tasks with 🔄 or high priority [ ]):
            - If a matching item already exists in the file → keep it as is (no duplicate).
            - If it is missing from "What I'm working on" or "Next up" sections → add it.
-        4. For each completed Asana task (✅ or [x]):
+        4. For "Not started, other" tasks ([担当]):
+           - These are upcoming tasks. Add them to the "Next up" (or equivalent) section if not already present.
+           - Do not add them to "What I'm working on".
+        5. For each completed Asana task (✅ or [x]):
            - If a matching item exists in the file → append " [完了]" to the end of that line.
            - Do NOT delete the line.
-        5. [コラボ] (collaborator) tasks:
+        6. [コラボ] (collaborator) tasks:
            - Exclude them unless already present in the file.
            - If already present → keep them (do not add [完了] based on collab tasks alone).
            - Exception: if a collab task is due today or tomorrow AND clearly requires the user's action, you may mention it, prefixed with [コラボ].
-        6. Update the "更新: YYYY-MM-DD" date line at the bottom with today's date.
-        7. Do not fabricate information. Only use data present in the provided task lists.
+        7. Update the date line at the bottom with today's date. The line may use "更新: YYYY-MM-DD" or "Last Updated: YYYY-MM-DD" format — preserve whichever format is already used. Do NOT add a second date line.
+        8. Do not fabricate information. Only use data present in the provided task lists.
         """;
 
     private static string BuildUserPrompt(
         string projectName,
         string? workstreamId,
         string currentContent,
-        AsanaTaskParseResult asanaTasks)
+        AsanaTaskParseResult asanaTasks,
+        string? projectSummary = null,
+        IReadOnlyList<(string id, string label, AsanaTaskParseResult tasks)>? workstreamTasks = null)
     {
         var today = DateTime.Now.ToString("yyyy-MM-dd");
         var sb = new StringBuilder();
@@ -174,6 +204,15 @@ public class FocusUpdateService
             sb.AppendLine($"- Workstream: {workstreamId}");
         sb.AppendLine($"- Today: {today}");
         sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(projectSummary))
+        {
+            sb.AppendLine("## project_summary.md (background context — do not modify, use for understanding only)");
+            sb.AppendLine("```");
+            sb.AppendLine(projectSummary);
+            sb.AppendLine("```");
+            sb.AppendLine();
+        }
 
         sb.AppendLine("## Current current_focus.md");
         sb.AppendLine(currentContent);
@@ -208,8 +247,12 @@ public class FocusUpdateService
 
         sb.AppendLine();
         var highPriorityNotStarted = asanaTasks.NotStarted
-            .Where(t => t.Priority is "最高" or "High")
+            .Where(t => t.Priority is "高" or "High")
             .ToList();
+        var otherNotStarted = asanaTasks.NotStarted
+            .Where(t => t.Priority is not ("高" or "High"))
+            .ToList();
+
         sb.AppendLine("## Asana tasks: Not started, high priority [担当]");
         if (highPriorityNotStarted.Count == 0)
         {
@@ -221,6 +264,19 @@ public class FocusUpdateService
             {
                 var due = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
                 sb.AppendLine($"- {t.Title}{due}");
+            }
+        }
+
+        if (otherNotStarted.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("## Asana tasks: Not started, other [担当]");
+            foreach (var t in otherNotStarted)
+            {
+                var due = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
+                var prio = !string.IsNullOrEmpty(t.Priority) ? $"  [priority: {t.Priority}]" : "";
+                var parent = t.ParentTitle != null ? $"  [subtask of: {t.ParentTitle}]" : "";
+                sb.AppendLine($"- {t.Title}{due}{prio}{parent}");
             }
         }
 
@@ -238,6 +294,56 @@ public class FocusUpdateService
                 sb.AppendLine($"- {t.Title}  [due: {t.DueDate}]");
         }
 
+        // Whole project モード: ワークストリームごとのタスクを追記
+        if (workstreamTasks != null && workstreamTasks.Count > 0)
+        {
+            foreach (var (wsId, wsLabel, wsTasks) in workstreamTasks)
+            {
+                var displayName = string.IsNullOrWhiteSpace(wsLabel) ? wsId : wsLabel;
+
+                sb.AppendLine();
+                sb.AppendLine($"## Workstream [{displayName}] — In-progress [担当]");
+                if (wsTasks.InProgress.Count == 0)
+                {
+                    sb.AppendLine("(none)");
+                }
+                else
+                {
+                    foreach (var t in wsTasks.InProgress)
+                    {
+                        var due  = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
+                        var prio = !string.IsNullOrEmpty(t.Priority) ? $"  [priority: {t.Priority}]" : "";
+                        sb.AppendLine($"- {t.Title}{due}{prio}");
+                    }
+                }
+
+                var wsOther = wsTasks.NotStarted.Where(t => t.Priority is not ("高" or "High")).ToList();
+                var wsHigh  = wsTasks.NotStarted.Where(t => t.Priority is "高" or "High").ToList();
+
+                if (wsHigh.Count > 0)
+                {
+                    sb.AppendLine($"## Workstream [{displayName}] — Not started, high priority [担当]");
+                    foreach (var t in wsHigh)
+                    {
+                        var due = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
+                        sb.AppendLine($"- {t.Title}{due}");
+                    }
+                }
+
+                if (wsOther.Count > 0)
+                {
+                    sb.AppendLine($"## Workstream [{displayName}] — Not started, other [担当]");
+                    foreach (var t in wsOther)
+                    {
+                        var due    = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
+                        var prio   = !string.IsNullOrEmpty(t.Priority) ? $"  [priority: {t.Priority}]" : "";
+                        var parent = t.ParentTitle != null ? $"  [subtask of: {t.ParentTitle}]" : "";
+                        sb.AppendLine($"- {t.Title}{due}{prio}{parent}");
+                    }
+                }
+            }
+        }
+
         sb.AppendLine();
         sb.AppendLine("## Instruction");
         sb.AppendLine("Apply the update rules to produce the complete updated current_focus.md.");
@@ -249,36 +355,29 @@ public class FocusUpdateService
     // -----------------------------------------------------------------------
     /// <summary>
     /// 既存の提案に対してユーザーの自然言語指示を適用し、更新後の全文を返す。
+    /// 会話履歴 (history) を渡すことで複数回の Refine でも文脈が維持される。
     /// </summary>
     public async Task<string> RefineAsync(
-        string originalContent,
-        string currentProposed,
+        string initialUserPrompt,
+        string initialProposed,
         string instructions,
+        IReadOnlyList<(string instruction, string result)> history,
         CancellationToken ct = default)
     {
         var systemPrompt = BuildSystemPrompt();
-        var userPrompt = $"""
-            ## Original current_focus.md
 
-            ```markdown
-            {originalContent}
-            ```
+        // 会話履歴を構築: 初回生成のやり取り → 過去の Refine → 今回の指示
+        var messages = new List<(string role, string content)>();
+        messages.Add(("user",      initialUserPrompt));
+        messages.Add(("assistant", initialProposed));
+        foreach (var (instr, result) in history)
+        {
+            messages.Add(("user",      instr));
+            messages.Add(("assistant", result));
+        }
+        messages.Add(("user", instructions));
 
-            ## Current proposal
-
-            ```markdown
-            {currentProposed}
-            ```
-
-            ## Refinement instruction
-
-            {instructions}
-
-            Please revise the current proposal according to the refinement instruction above.
-            Output only the full revised content of current_focus.md.
-            """;
-
-        var refined = await _llm.ChatCompletionAsync(systemPrompt, userPrompt, ct);
+        var refined = await _llm.ChatWithHistoryAsync(systemPrompt, messages, ct);
         return refined.Trim();
     }
 

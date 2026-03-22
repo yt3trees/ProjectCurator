@@ -13,6 +13,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
+using System.Threading;
 using ProjectCurator.Models;
 using ProjectCurator.Services;
 using ProjectCurator.Views.Pages;
@@ -40,8 +41,12 @@ public partial class EditorViewModel : ObservableObject
 {
     private readonly FileEncodingService _encodingService;
     private readonly ProjectDiscoveryService _discoveryService;
+    private readonly FocusUpdateService _focusUpdateService;
+    private readonly LlmClientService _llmClient;
+    private readonly ConfigService _configService;
     private string? _pendingFileToOpen;
     private bool _suppressAutoFileOpenOnProjectChange;
+    private CancellationTokenSource? _focusUpdateCts;
 
     // ---- 選択プロジェクト ----
     [ObservableProperty]
@@ -89,15 +94,40 @@ public partial class EditorViewModel : ObservableObject
     [ObservableProperty]
     private bool isLoading;
 
+    // ---- AI 機能 ----
+    [ObservableProperty]
+    private bool isAiEnabled;
+
     // ---- new decision_log 要求コールバック ----
     public Func<Task<string?>>? RequestNewDecisionLogName;
 
+    // ---- Update Focus ダイアログコールバック ----
+    // workstream 選択: workstream リストを渡す → (ok=false でキャンセル, ok=true で wsId=null:general / wsId=id:workstream)
+    public Func<List<WorkstreamInfo>, Task<(bool ok, string? wsId)>>? RequestWorkstreamSelection;
+    // 更新提案を表示 → (適用するか, 適用コンテンツ) を返す
+    // 第2引数: refineFunc(currentProposed, instructions) → 改訂後全文
+    public Func<FocusUpdateResult, Func<string, string, Task<string>>, Task<(bool apply, string? content)>>? RequestFocusUpdateApproval;
+    // スクロール可能なエラーダイアログ
+    public Action<string, string>? ShowScrollableError;
+
     public string OriginalContent => _originalContent;
 
-    public EditorViewModel(FileEncodingService encodingService, ProjectDiscoveryService discoveryService)
+    public EditorViewModel(
+        FileEncodingService encodingService,
+        ProjectDiscoveryService discoveryService,
+        FocusUpdateService focusUpdateService,
+        LlmClientService llmClient,
+        ConfigService configService)
     {
         _encodingService = encodingService;
         _discoveryService = discoveryService;
+        _focusUpdateService = focusUpdateService;
+        _llmClient = llmClient;
+        _configService = configService;
+
+        IsAiEnabled = _configService.LoadSettings().AiEnabled;
+        WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
+            (_, msg) => IsAiEnabled = msg.Enabled);
     }
 
     // =====================================================================
@@ -140,6 +170,7 @@ public partial class EditorViewModel : ObservableObject
         IsDiffViewActive = false;
         BuildFileTree(value);
         UpdateStatus();
+        UpdateFocusCommand.NotifyCanExecuteChanged();
 
         if (_suppressAutoFileOpenOnProjectChange)
             return;
@@ -455,6 +486,8 @@ public partial class EditorViewModel : ObservableObject
             SuppressChangeEvent = false;
             _originalContent = content;
             CurrentFile = path;
+            // 同じパスを再オープンした場合 CurrentFile の PropertyChanged が発火しないため強制通知
+            OnPropertyChanged(nameof(CurrentFile));
             Encoding = enc;
             IsDirty = false;
             UpdateStatus();
@@ -621,13 +654,156 @@ public partial class EditorViewModel : ObservableObject
     public void ToggleSearchBar() => IsSearchBarVisible = !IsSearchBarVisible;
 
     // =====================================================================
+    // Update Focus from Asana
+    // =====================================================================
+    [RelayCommand(CanExecute = nameof(CanUpdateFocus))]
+    public async Task UpdateFocusAsync()
+    {
+        if (SelectedProject == null) return;
+
+        // API キー未設定チェック
+        var settings = _configService.LoadSettings();
+        if (string.IsNullOrWhiteSpace(settings.LlmApiKey))
+        {
+            MessageBox.Show(
+                "LLM API key is not configured.\nPlease open Settings and set the API key under \"LLM API\".",
+                "Update Focus",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        // Workstream 選択: 1件でも必ずダイアログで確認 (general or workstream)
+        string? workstreamId = null;
+        var activeWorkstreams = SelectedProject.Workstreams.Where(w => !w.IsClosed).ToList();
+        if (activeWorkstreams.Count > 0 && RequestWorkstreamSelection != null)
+        {
+            var (ok, wsId) = await RequestWorkstreamSelection(activeWorkstreams);
+            if (!ok) return; // キャンセル
+            workstreamId = wsId; // null = general
+        }
+
+        IsLoading = true;
+        _focusUpdateCts = new CancellationTokenSource();
+        try
+        {
+            var result = await _focusUpdateService.GenerateProposalAsync(
+                SelectedProject, workstreamId, _focusUpdateCts.Token);
+
+            if (RequestFocusUpdateApproval == null) return;
+            var capturedResult = result;
+            var cts = _focusUpdateCts!;
+
+            // Refine 会話履歴 (instruction → refined result の積み上げ)
+            var refineHistory = new List<(string instruction, string result)>();
+            var initialUserPrompt = capturedResult.DebugUserPrompt;
+            var initialProposed   = capturedResult.ProposedContent;
+
+            var (apply, content) = await RequestFocusUpdateApproval(
+                result,
+                async (_, instructions) =>
+                {
+                    var refined = await _focusUpdateService.RefineAsync(
+                        initialUserPrompt, initialProposed, instructions, refineHistory, cts.Token);
+                    refineHistory.Add((instructions, refined));
+                    // Refine 後のデバッグ情報を更新 (View Debug で送信した全会話が見えるようにする)
+                    capturedResult.DebugSystemPrompt = _llmClient.LastSystemPrompt;
+                    capturedResult.DebugUserPrompt   = BuildRefineDebugConversation(
+                        initialUserPrompt, initialProposed, refineHistory);
+                    capturedResult.DebugResponse     = refined;
+                    return refined;
+                });
+            if (!apply) return;
+
+            // 適用
+            var finalContent = content ?? result.ProposedContent;
+
+            // 更新日付を今日で上書き
+            finalContent = UpdateDateLine(finalContent);
+
+            await _encodingService.WriteFileAsync(result.TargetFocusPath, finalContent, "UTF8");
+
+            // focus_history スナップショット
+            var histDir = Path.Combine(Path.GetDirectoryName(result.TargetFocusPath)!, "focus_history");
+            Directory.CreateDirectory(histDir);
+            var snapPath = Path.Combine(histDir, $"{DateTime.Now:yyyy-MM-dd}.md");
+            await _encodingService.WriteFileAsync(snapPath, finalContent, "UTF8");
+
+            // Editor で current_focus.md を開く
+            if (SelectedProject != null)
+                BuildFileTree(SelectedProject);
+            await OpenFileAndSelectNodeAsync(result.TargetFocusPath);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (ShowScrollableError != null)
+                ShowScrollableError("Update Focus failed", ex.Message);
+            else
+                MessageBox.Show($"Update Focus failed:\n{ex.Message}", "Update Focus",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+            _focusUpdateCts?.Dispose();
+            _focusUpdateCts = null;
+        }
+    }
+
+    private bool CanUpdateFocus() => SelectedProject != null;
+
+    private static string BuildRefineDebugConversation(
+        string initialUserPrompt,
+        string initialProposed,
+        IReadOnlyList<(string instruction, string result)> history)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("[user — initial prompt]");
+        sb.AppendLine(initialUserPrompt);
+        sb.AppendLine();
+        sb.AppendLine("[assistant — initial proposal]");
+        sb.AppendLine(initialProposed);
+        foreach (var (instr, res) in history.Take(history.Count - 1))
+        {
+            sb.AppendLine();
+            sb.AppendLine("[user — refine instruction]");
+            sb.AppendLine(instr);
+            sb.AppendLine();
+            sb.AppendLine("[assistant — refined result]");
+            sb.AppendLine(res);
+        }
+        if (history.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("[user — latest refine instruction]");
+            sb.AppendLine(history[^1].instruction);
+        }
+        return sb.ToString();
+    }
+
+    private static string UpdateDateLine(string content)
+    {
+        var today = DateTime.Now.ToString("yyyy-MM-dd");
+        var datePattern = new System.Text.RegularExpressions.Regex(
+            @"(更新:|Last Updated:)\s*\d{4}-\d{2}-\d{2}",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (datePattern.IsMatch(content))
+            return datePattern.Replace(content, m => $"{m.Groups[1].Value} {today}");
+
+        // どちらのパターンもなければ変更しない (LLM が既に処理済みとみなす)
+        return content;
+    }
+
+    // =====================================================================
     // ステータスバー更新 (メッセンジャー経由)
     // =====================================================================
     private void UpdateStatus()
     {
         var projectLabel = SelectedProject?.Name ?? "";
         var fileLabel = string.IsNullOrEmpty(CurrentFile) ? "" : Path.GetFileName(CurrentFile);
-        
+
         // メッセンジャー経由で MainWindowViewModel へ通知
         WeakReferenceMessenger.Default.Send(new StatusUpdateMessage(projectLabel, fileLabel, Encoding, IsDirty));
     }

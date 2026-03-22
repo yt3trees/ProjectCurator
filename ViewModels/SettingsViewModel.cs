@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using ProjectCurator.Models;
 using ProjectCurator.Services;
 
@@ -13,6 +15,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ConfigService _configService;
     private readonly HotkeyService _hotkeyService;
     private readonly TrayService _trayService;
+    private readonly LlmClientService _llmClientService;
     private bool _loading;
 
     // ホットキー
@@ -74,6 +77,35 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string asanaGlobalStatus = "";
 
+    // LLM API settings
+    [ObservableProperty]
+    private string llmProvider = "openai";
+
+    [ObservableProperty]
+    private string llmApiKey = "";
+
+    [ObservableProperty]
+    private string llmModel = "gpt-4o";
+
+    [ObservableProperty]
+    private string llmEndpoint = "";
+
+    [ObservableProperty]
+    private string llmApiVersion = "2024-12-01-preview";
+
+    [ObservableProperty]
+    private string llmStatus = "";
+
+    [ObservableProperty]
+    private bool llmIsAzure;
+
+    [ObservableProperty]
+    private bool aiEnabled;
+
+    // Test Connection が成功するまでトグルを有効化できない
+    [ObservableProperty]
+    private bool aiToggleCanEnable;
+
     // About
     public string AppVersion { get; } =
         "v" + (System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0");
@@ -83,11 +115,16 @@ public partial class SettingsViewModel : ObservableObject
     // ホットキー表示更新コールバック (TrayService.UpdateHotkeyDisplay を呼ぶ)
     public Action<string>? OnHotkeyDisplayChanged;
 
-    public SettingsViewModel(ConfigService configService, HotkeyService hotkeyService, TrayService trayService)
+    public SettingsViewModel(
+        ConfigService configService,
+        HotkeyService hotkeyService,
+        TrayService trayService,
+        LlmClientService llmClientService)
     {
         _configService = configService;
         _hotkeyService = hotkeyService;
         _trayService = trayService;
+        _llmClientService = llmClientService;
     }
 
     /// <summary>ディスクから設定を読み込む。ページ表示時に呼ぶ。</summary>
@@ -122,6 +159,17 @@ public partial class SettingsViewModel : ObservableObject
             AsanaPersonalProjectGids = string.Join("\n", asana.PersonalProjectGids);
             AsanaOutputFile = asana.OutputFile;
             AsanaGlobalStatus = "";
+
+            // LLM
+            LlmProvider    = settings.LlmProvider;
+            LlmApiKey      = settings.LlmApiKey;
+            LlmModel       = settings.LlmModel;
+            LlmEndpoint    = settings.LlmEndpoint;
+            LlmApiVersion  = settings.LlmApiVersion;
+            LlmIsAzure         = settings.LlmProvider.Equals("azure_openai", StringComparison.OrdinalIgnoreCase);
+            LlmStatus          = "";
+            AiEnabled          = settings.AiEnabled;
+            AiToggleCanEnable  = settings.AiEnabled; // 既にオンなら再テスト不要
         }
         finally
         {
@@ -165,8 +213,62 @@ public partial class SettingsViewModel : ObservableObject
         settings.LocalProjectsRoot = LocalProjectsRoot.Trim();
         settings.BoxProjectsRoot = BoxProjectsRoot.Trim();
         settings.ObsidianVaultRoot = ObsidianVaultRoot.Trim();
+        // LLM 設定も同時に保存 (どちらの Save ボタンを押してもすべて反映される)
+        settings.LlmProvider   = LlmProvider.Trim();
+        settings.LlmApiKey     = LlmApiKey.Trim();
+        settings.LlmModel      = LlmModel.Trim();
+        settings.LlmEndpoint   = LlmEndpoint.Trim();
+        settings.LlmApiVersion = LlmApiVersion.Trim();
+        settings.AiEnabled     = AiEnabled;
         _configService.SaveSettings(settings);
         UpdateWorkspacePathsWarning();
+    }
+
+    [RelayCommand]
+    public void SaveLlm()
+    {
+        var settings = _configService.LoadSettings();
+        settings.LlmProvider   = LlmProvider.Trim();
+        settings.LlmApiKey     = LlmApiKey.Trim();
+        settings.LlmModel      = LlmModel.Trim();
+        settings.LlmEndpoint   = LlmEndpoint.Trim();
+        settings.LlmApiVersion = LlmApiVersion.Trim();
+        settings.AiEnabled     = AiEnabled;
+        _configService.SaveSettings(settings);
+        LlmStatus = $"Saved {DateTime.Now:HH:mm:ss}";
+    }
+
+    [RelayCommand]
+    public async Task TestLlmConnectionAsync()
+    {
+        LlmStatus = "Testing...";
+        try
+        {
+            var reply = await _llmClientService.TestConnectionAsync(CancellationToken.None);
+            LlmStatus = $"OK: {reply.Trim()} ({DateTime.Now:HH:mm:ss})";
+            AiToggleCanEnable = true;
+        }
+        catch (Exception ex)
+        {
+            LlmStatus = $"Error: {ex.Message}";
+            AiToggleCanEnable = false;
+            AiEnabled = false;
+        }
+    }
+
+    partial void OnAiEnabledChanged(bool value)
+    {
+        if (_loading) return;
+        var settings = _configService.LoadSettings();
+        settings.AiEnabled = value;
+        _configService.SaveSettings(settings);
+        WeakReferenceMessenger.Default.Send(new AiEnabledChangedMessage(value));
+    }
+
+    partial void OnLlmProviderChanged(string value)
+    {
+        if (_loading) return;
+        LlmIsAzure = value.Equals("azure_openai", StringComparison.OrdinalIgnoreCase);
     }
 
     [RelayCommand]

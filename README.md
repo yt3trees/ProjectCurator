@@ -35,6 +35,8 @@ flowchart TD
     U -->|"Sync tasks (optional)"| AS["🔄 Asana Sync"]
     AS -->|"Write"| TASKS["✅ asana-tasks.md"]
     DB -->|"Read"| TASKS
+    TASKS -->|"Feed to LLM"| LLM["🤖 LLM (OpenAI / Azure)"]
+    LLM -->|"Propose update"| ED
 
     U -->|"Manage folders"| SU["🧰 Setup"]
     U -->|"Review activity"| TL["🕒 Timeline"]
@@ -85,7 +87,21 @@ Required config files are created automatically when you save.
 
 </details>
 
-### 5. Start with these pages
+### 5. Optional: Set up LLM / AI features
+
+<details>
+<summary>Show LLM setup steps</summary>
+
+- Open `Settings` and find the `LLM API` section
+- Choose a provider: `openai` or `azure_openai`
+- Enter your API Key, Model, and (for Azure) Endpoint and API Version
+- Click `Test Connection` to verify the credentials
+- Once the test passes, toggle `Enable AI Features` to on and save
+- The `Update Focus from Asana` button will appear in the Editor toolbar
+
+</details>
+
+### 6. Start with these pages
 
 - `Dashboard`: decide what needs attention today
 - `Editor`: update `current_focus.md`
@@ -142,6 +158,7 @@ In short:
 3. Update context in `Editor` and save with `Ctrl+S`
 4. Add a `decision_log` entry if needed
 5. If using Asana, run `Asana Sync` to refresh task files
+6. If AI Features is enabled, click `Update Focus from Asana` in the Editor toolbar to get an LLM-generated update proposal
 
 ```mermaid
 flowchart TD
@@ -150,6 +167,7 @@ flowchart TD
     C --> D["Update context and save"]
     D --> E["Add decision_log entry (optional)"]
     E --> F["Run Asana Sync (optional)"]
+    F --> G["Update Focus from Asana (optional, AI)"]
 ```
 
 ## Daily Standup Automation
@@ -225,12 +243,12 @@ Skills are sourced from the app's embedded `Assets/ContextCompressionLayer/skill
 | Page | What You Can Do |
 |---|---|
 | Dashboard | Project health overview, Today Queue visibility, workstream status checks |
-| Editor | Markdown context editing, search, link open, quick decision log creation |
+| Editor | Markdown context editing, search, link open, quick decision log creation, AI-powered "Update Focus from Asana" (requires AI Features enabled) |
 | Timeline | Review recent project activity in chronological order |
 | Git Repos | Recursively scan workspace roots for repositories |
 | Asana Sync | Sync Asana tasks to project/workstream Markdown outputs |
 | Setup | Create/check/archive projects, tier conversion, workstream management |
-| Settings | Theme, hotkey, workspace paths, refresh behavior |
+| Settings | Theme, hotkey, workspace paths, refresh behavior, LLM API configuration, Enable AI Features toggle |
 
 ## UI Overview
 
@@ -267,6 +285,7 @@ Tree-based file browser for AI context files (`current_focus.md`, `decision_log`
 - Tree view on the left lists AI context files: `current_focus.md`, `file_map.md`, `project_summary.md`, `tensions.md`, `decision_log/`, `focus_history/`, `obsidian_notes/`, `workstreams/`, `CLAUDE.md`, `AGENTS.md`
 - Syntax-highlighted Markdown editor on the right with section-based coloring
 - Toolbar buttons: Refresh, Dec Log (quick decision log entry), P (pin folder), Save
+- Update Focus from Asana button (visible when AI Features is enabled): reads `asana-tasks.md`, sends it to the configured LLM, and shows a diff-based proposal dialog; optionally filter by workstream; supports natural-language refinement and debug view; backup is saved to `focus_history/` automatically
 - Full file path displayed in the header bar
 - Status bar at the bottom shows the current project and file name
 

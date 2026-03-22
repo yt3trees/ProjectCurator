@@ -874,13 +874,15 @@ public class AsanaSyncService
         var roleTag = string.IsNullOrWhiteSpace(role) ? "" : $"[{role}] ";
         var anken = GetCustomFieldValue(task, "案件");
         var ankenTag = string.IsNullOrWhiteSpace(anken) ? "" : $"[{anken}] ";
+        var priority = !task.Completed ? GetCustomFieldValue(task, "優先度") : null;
+        var priorityTag = string.IsNullOrWhiteSpace(priority) ? "" : $" [{priority}]";
         var completedTag = "";
         if (task.Completed && !string.IsNullOrWhiteSpace(task.CompletedAt)
             && DateTime.TryParse(task.CompletedAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var completedDt))
         {
             completedTag = $" <!-- completed: {completedDt.ToLocalTime():yyyy-MM-dd} -->";
         }
-        w.WriteLine($"- [{check}] {roleTag}{ankenTag}{task.Name}{due} [[Asana](https://app.asana.com/0/0/{gid})]{completedTag}");
+        w.WriteLine($"- [{check}] {roleTag}{ankenTag}{task.Name}{due}{priorityTag} [[Asana](https://app.asana.com/0/0/{gid})]{completedTag}");
 
         var notes = (task.Notes ?? "").Trim();
         if (!string.IsNullOrWhiteSpace(notes))

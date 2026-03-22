@@ -12,3 +12,11 @@ public class StatusUpdateMessage(string project, string file, string encoding, b
     public string Encoding { get; } = encoding;
     public bool IsDirty { get; } = isDirty;
 }
+
+/// <summary>
+/// AI 機能の有効/無効が変わったときのメッセージ。
+/// </summary>
+public class AiEnabledChangedMessage(bool enabled)
+{
+    public bool Enabled { get; } = enabled;
+}
