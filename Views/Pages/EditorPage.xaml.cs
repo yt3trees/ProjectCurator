@@ -1900,6 +1900,15 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         if (_markdownDefinition != null)
             previewViewer.SyntaxHighlighting = _markdownDefinition;
         previewViewer.Text = currentContent;
+        previewViewer.PreviewMouseWheel += (s, e) =>
+        {
+            if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) return;
+            var sv = FindVisualChild<ScrollViewer>(previewViewer);
+            if (sv == null || sv.ScrollableWidth <= 0) return;
+            const double step = 48d;
+            sv.ScrollToHorizontalOffset(sv.HorizontalOffset + (e.Delta > 0 ? -step : step));
+            e.Handled = true;
+        };
 
         // ---- Refine 行 ----
         var refineBox = new System.Windows.Controls.TextBox
