@@ -7,6 +7,8 @@
 
 複数のプロジェクトを横断管理する、Windows向けデスクトップアプリです。
 
+![Dashboard screenshot](_assets/Dashboard.png)
+
 ## このアプリで何が便利になるか
 
 ProjectCurator は、次の「面倒な行き来」を減らすためのツールです。

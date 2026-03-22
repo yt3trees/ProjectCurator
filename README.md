@@ -9,6 +9,8 @@
 
 A Windows desktop app for managing projects across multiple workspaces.
 
+![Dashboard screenshot](_assets/Dashboard.png)
+
 ## Why This App Is Useful
 
 ProjectCurator reduces context switching in three areas:
