@@ -61,7 +61,7 @@ MVVM + Dependency Injection (`Microsoft.Extensions.DependencyInjection`). All se
 ### Configuration
 
 Runtime config is loaded from `%USERPROFILE%\Documents\Projects\_config\`. See `_config/` directory for `.example` templates:
-- `settings.json` - workspace roots, hotkey, auto-refresh, Asana sync settings, and LLM/AI settings (`LlmProvider`, `LlmApiKey`, `LlmModel`, `LlmEndpoint`, `LlmApiVersion`, `AiFeaturesEnabled`)
+- `settings.json` - workspace roots, hotkey, auto-refresh, Asana sync settings, and LLM/AI settings (`LlmProvider`, `LlmApiKey`, `LlmModel`, `LlmEndpoint`, `LlmApiVersion`, `AiEnabled`)
 - `asana_global.json` - Asana token, workspace/user GIDs, personal project GIDs
 
 LLM settings are configured in `Settings > LLM API`. Supported providers are `openai` and `azure_openai`. "Enable AI Features" can only be turned on after a successful Test Connection.
@@ -78,6 +78,34 @@ Local Projects Root/
 ```
 
 Projects are classified by tier (`full`/`mini`) and category (`project`/`domain`), detected from path conventions.
+
+## AI Features
+
+New AI-powered features must follow these patterns.
+
+### Gating
+
+- Never call `LlmClientService` unless `settings.AiEnabled` is `true`.
+- In each ViewModel that exposes an AI action, declare an `[ObservableProperty] bool isAiEnabled` and initialize it from settings. Bind UI button/control visibility to this property.
+- React to real-time toggle changes by registering for `AiEnabledChangedMessage` in the ViewModel constructor:
+
+```csharp
+IsAiEnabled = _configService.LoadSettings().AiEnabled;
+WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
+    (_, msg) => IsAiEnabled = msg.Enabled);
+```
+
+### LLM Calls
+
+- All LLM API calls go through `LlmClientService` — never make direct HTTP calls to LLM providers.
+- Use `ChatCompletionAsync` for single-turn (system + user); use `ChatWithHistoryAsync` for multi-turn with conversation history.
+- `LlmClientService` throws `InvalidOperationException` if the API key is not configured — callers do not need to re-check the key themselves.
+- Services orchestrating LLM workflows (e.g., `FocusUpdateService`) must accept a `CancellationToken` and pass it through to `LlmClientService`.
+
+### Settings
+
+- `AiEnabled` can only be set to `true` after a successful `TestLlmConnectionAsync`. Enforce this by binding the toggle's `IsEnabled` to `AiToggleCanEnable` (see `SettingsViewModel` pattern).
+- When `AiEnabled` changes, persist immediately to settings and broadcast `AiEnabledChangedMessage` via `WeakReferenceMessenger` (see `SettingsViewModel.OnAiEnabledChanged`).
 
 ## Popup / Dialog Windows
 
