@@ -24,7 +24,7 @@ public class TimelineEntryItem
     public string ProjectHiddenKey { get; init; } = "";
 
     public string GapText => GapDays == 1 ? "-- 1 day gap --" : $"-- {GapDays} days gap --";
-    public string DateText => Date.ToString("yyyy-MM-dd (ddd)");
+    public string DateText => Date.ToString("yyyy-MM-dd (ddd)", CultureInfo.InvariantCulture);
     public string TypeBadge => EntryType switch
     {
         "Decision" => "[Decision]",
