@@ -78,6 +78,9 @@ public partial class EditorViewModel : ObservableObject
     private bool isDiffViewActive;
 
     [ObservableProperty]
+    private bool canUseDiff;
+
+    [ObservableProperty]
     private string encoding = "UTF8";
 
     [ObservableProperty]
@@ -295,6 +298,8 @@ public partial class EditorViewModel : ObservableObject
 
     private void BuildFileTree(ProjectInfo project)
     {
+        var expandedState = CaptureExpandedState(TreeNodes);
+
         TreeNodes.Clear();
 
         var aiCtxContent = project.AiContextContentPath;  // _ai-context/context
@@ -383,6 +388,40 @@ public partial class EditorViewModel : ObservableObject
             if (File.Exists(fp))
                 TreeNodes.Add(new FileTreeNode { Name = fn, FullPath = fp, IsDirectory = false });
         }
+
+        ApplyExpandedState(TreeNodes, expandedState);
+    }
+
+    private static Dictionary<string, bool> CaptureExpandedState(IEnumerable<FileTreeNode> nodes)
+    {
+        var state = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var node in nodes)
+            CaptureExpandedStateRecursive(node, state);
+        return state;
+    }
+
+    private static void CaptureExpandedStateRecursive(FileTreeNode node, IDictionary<string, bool> state)
+    {
+        if (node.IsDirectory)
+            state[node.FullPath] = node.IsExpanded;
+
+        foreach (var child in node.Children)
+            CaptureExpandedStateRecursive(child, state);
+    }
+
+    private static void ApplyExpandedState(IEnumerable<FileTreeNode> nodes, IReadOnlyDictionary<string, bool> state)
+    {
+        foreach (var node in nodes)
+            ApplyExpandedStateRecursive(node, state);
+    }
+
+    private static void ApplyExpandedStateRecursive(FileTreeNode node, IReadOnlyDictionary<string, bool> state)
+    {
+        if (node.IsDirectory && state.TryGetValue(node.FullPath, out var isExpanded))
+            node.IsExpanded = isExpanded;
+
+        foreach (var child in node.Children)
+            ApplyExpandedStateRecursive(child, state);
     }
 
     private static void AddDirectoryChildren(FileTreeNode parentNode, string dir, bool includeSubdirectories = false)
@@ -642,10 +681,137 @@ public partial class EditorViewModel : ObservableObject
     }
 
     // =====================================================================
+    // obsidian_notes 追加/削除
+    // =====================================================================
+    public bool CanAddObsidianNote(FileTreeNode? node)
+    {
+        if (SelectedProject == null) return false;
+        return TryResolveObsidianTargetDirectory(node, out _);
+    }
+
+    public bool CanDeleteObsidianNote(FileTreeNode? node)
+    {
+        if (node == null || node.IsDirectory) return false;
+        if (!string.Equals(Path.GetExtension(node.FullPath), ".md", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return IsPathUnderObsidianNotes(node.FullPath);
+    }
+
+    public async Task<(bool Ok, string? FilePath, string? Error)> CreateObsidianNoteAsync(FileTreeNode? node, string requestedName)
+    {
+        if (!TryResolveObsidianTargetDirectory(node, out var targetDir))
+            return (false, null, "Select a folder under obsidian_notes first.");
+
+        var rawName = (requestedName ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(rawName))
+            return (false, null, "File name is required.");
+
+        if (rawName.IndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) >= 0)
+            return (false, null, "Nested paths are not supported. Enter only a file name.");
+
+        var fileName = SanitizeFileName(rawName);
+        if (string.IsNullOrWhiteSpace(fileName))
+            return (false, null, "File name is invalid.");
+
+        if (!fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            fileName += ".md";
+
+        var filePath = Path.Combine(targetDir, fileName);
+        if (File.Exists(filePath))
+            return (false, null, $"'{fileName}' already exists.");
+
+        var title = Path.GetFileNameWithoutExtension(fileName);
+        var template = $"# {title}{Environment.NewLine}{Environment.NewLine}";
+
+        try
+        {
+            await _encodingService.WriteFileAsync(filePath, template, "UTF8");
+
+            if (SelectedProject != null)
+                BuildFileTree(SelectedProject);
+
+            await OpenFileAndSelectNodeAsync(filePath);
+            return (true, filePath, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, null, ex.Message);
+        }
+    }
+
+    public (bool Ok, string? Error) DeleteObsidianNote(FileTreeNode? node)
+    {
+        if (!CanDeleteObsidianNote(node))
+            return (false, "Only Markdown files under obsidian_notes can be deleted.");
+
+        try
+        {
+            File.Delete(node!.FullPath);
+            if (string.Equals(CurrentFile, node.FullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                EditorText = "";
+                _originalContent = "";
+                CurrentFile = "";
+                IsDirty = false;
+                UpdateStatus();
+            }
+
+            if (SelectedProject != null)
+                BuildFileTree(SelectedProject);
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+    }
+
+    private bool TryResolveObsidianTargetDirectory(FileTreeNode? node, out string directory)
+    {
+        directory = string.Empty;
+        if (SelectedProject == null) return false;
+
+        if (node == null)
+        {
+            directory = Path.Combine(SelectedProject.AiContextPath, "obsidian_notes");
+            return Directory.Exists(directory);
+        }
+
+        directory = node.IsDirectory
+            ? node.FullPath
+            : Path.GetDirectoryName(node.FullPath) ?? string.Empty;
+
+        if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+            return false;
+
+        return IsPathUnderObsidianNotes(directory);
+    }
+
+    private bool IsPathUnderObsidianNotes(string path)
+    {
+        if (SelectedProject == null) return false;
+        var obsidianRoot = Path.Combine(SelectedProject.AiContextPath, "obsidian_notes");
+        return IsPathUnderDirectory(path, obsidianRoot);
+    }
+
+    private static string SanitizeFileName(string fileName)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var cleaned = new string(fileName
+            .Select(ch => invalidChars.Contains(ch) ? '_' : ch)
+            .ToArray())
+            .Trim();
+        return cleaned.Trim('.');
+    }
+
+    // =====================================================================
     // Diff ビュートグル
     // =====================================================================
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanToggleDiffView))]
     public void ToggleDiffView() => IsDiffViewActive = !IsDiffViewActive;
+
+    private bool CanToggleDiffView() => CanUseDiff;
 
     // =====================================================================
     // 検索バートグル
@@ -751,7 +917,7 @@ public partial class EditorViewModel : ObservableObject
         }
     }
 
-    private bool CanUpdateFocus() => SelectedProject != null;
+    private bool CanUpdateFocus() => SelectedProject != null && IsCurrentFocusFile(CurrentFile);
 
     private static string BuildRefineDebugConversation(
         string initialUserPrompt,
@@ -801,10 +967,27 @@ public partial class EditorViewModel : ObservableObject
     // =====================================================================
     private void UpdateStatus()
     {
+        var nextCanUseDiff = IsCurrentFocusFile(CurrentFile);
+        if (CanUseDiff != nextCanUseDiff)
+        {
+            CanUseDiff = nextCanUseDiff;
+            if (!nextCanUseDiff)
+                IsDiffViewActive = false;
+            ToggleDiffViewCommand.NotifyCanExecuteChanged();
+        }
+
+        UpdateFocusCommand.NotifyCanExecuteChanged();
+
         var projectLabel = SelectedProject?.Name ?? "";
         var fileLabel = string.IsNullOrEmpty(CurrentFile) ? "" : Path.GetFileName(CurrentFile);
 
         // メッセンジャー経由で MainWindowViewModel へ通知
         WeakReferenceMessenger.Default.Send(new StatusUpdateMessage(projectLabel, fileLabel, Encoding, IsDirty));
+    }
+
+    private static bool IsCurrentFocusFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        return string.Equals(Path.GetFileName(path), "current_focus.md", StringComparison.OrdinalIgnoreCase);
     }
 }

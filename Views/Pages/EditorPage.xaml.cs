@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -252,6 +253,99 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             await ViewModel.OpenFileAsync(node.FullPath);
             // CurrentFile PropertyChanged がエディタ同期とハイライト適用を担う
         }
+    }
+
+    private void OnTreeItemPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is System.Windows.Controls.TreeViewItem treeViewItem)
+            treeViewItem.IsSelected = true;
+    }
+
+    private void OnFileTreeContextMenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu menu) return;
+
+        var selectedNode = FileTreeView.SelectedItem as FileTreeNode;
+        var addItem = menu.Items.OfType<System.Windows.Controls.MenuItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag as string, "AddObsidianNote", StringComparison.Ordinal));
+        var deleteItem = menu.Items.OfType<System.Windows.Controls.MenuItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag as string, "DeleteNode", StringComparison.Ordinal));
+
+        if (addItem != null)
+            addItem.IsEnabled = ViewModel.CanAddObsidianNote(selectedNode);
+        if (deleteItem != null)
+            deleteItem.IsEnabled = ViewModel.CanDeleteObsidianNote(selectedNode) || CanDeleteDecisionLog(selectedNode);
+    }
+
+    private async void OnAddObsidianNote(object sender, RoutedEventArgs e)
+    {
+        var selectedNode = FileTreeView.SelectedItem as FileTreeNode;
+        if (!ViewModel.CanAddObsidianNote(selectedNode))
+        {
+            MessageBox.Show(
+                "Select a folder (or file) under obsidian_notes first.",
+                "Add Note",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var fileName = await ShowNewObsidianNoteDialog();
+        if (string.IsNullOrWhiteSpace(fileName)) return;
+
+        var result = await ViewModel.CreateObsidianNoteAsync(selectedNode, fileName);
+        if (!result.Ok)
+        {
+            MessageBox.Show(
+                $"Failed to create note:\n{result.Error}",
+                "Add Note",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void OnDeleteNode(object sender, RoutedEventArgs e)
+    {
+        var selectedNode = FileTreeView.SelectedItem as FileTreeNode;
+        if (ViewModel.CanDeleteObsidianNote(selectedNode))
+        {
+            var confirm = MessageBox.Show(
+                $"Delete '{selectedNode!.Name}'?",
+                "Delete",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            var result = ViewModel.DeleteObsidianNote(selectedNode);
+            if (!result.Ok)
+            {
+                MessageBox.Show(
+                    $"Failed to delete:\n{result.Error}",
+                    "Delete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            return;
+        }
+
+        if (CanDeleteDecisionLog(selectedNode))
+        {
+            ViewModel.DeleteDecisionLogCommand.Execute(selectedNode);
+            return;
+        }
+
+        MessageBox.Show(
+            "This item cannot be deleted from this menu.",
+            "Delete",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    private static bool CanDeleteDecisionLog(FileTreeNode? node)
+    {
+        if (node == null || node.IsDirectory) return false;
+        return node.FullPath.Contains("decision_log", StringComparison.OrdinalIgnoreCase);
     }
 
     private async void OnPageKeyDown(object sender, WpfKeyEventArgs e)
@@ -815,7 +909,8 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
 
     private void OnDeleteDecisionLog(object sender, RoutedEventArgs e)
     {
-        if (FileTreeView.SelectedItem is FileTreeNode node) ViewModel.DeleteDecisionLogCommand.Execute(node);
+        if (FileTreeView.SelectedItem is FileTreeNode node && CanDeleteDecisionLog(node))
+            ViewModel.DeleteDecisionLogCommand.Execute(node);
     }
 
     // -------------------------------------------------------------------------
@@ -1376,6 +1471,15 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     private Task<string?> ShowNewDecisionLogDialog()
     {
         var dialog = new InputDialog("New Decision Log", "File name (date is added automatically):") { Owner = Window.GetWindow(this) };
+        return Task.FromResult(dialog.ShowDialog() == true ? dialog.InputText : null);
+    }
+
+    private Task<string?> ShowNewObsidianNoteDialog()
+    {
+        var dialog = new InputDialog("Add Obsidian Note", "File name (.md is optional):")
+        {
+            Owner = Window.GetWindow(this)
+        };
         return Task.FromResult(dialog.ShowDialog() == true ? dialog.InputText : null);
     }
 }

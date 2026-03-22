@@ -82,10 +82,21 @@
                                Padding="6,4"
                                Margin="0,0,4,0"
                                Command="{Binding ToggleDiffViewCommand}"
+                               IsEnabled="{Binding CanUseDiff}"
                                ToolTip="Diff view (Ctrl+D)">
+                        <ui:Button.Style>
+                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                <Setter Property="Opacity" Value="1"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Opacity" Value="0.45"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:Button.Style>
                         <ui:SymbolIcon Symbol="DocumentChevronDouble20" FontSize="18" Filled="False"/>
                     </ui:Button>
-                    <!-- 検索 -->
+                    <!-- 検索
                     <ui:Button x:Name="SearchToggleButton"
                                Padding="6,4"
                                Margin="0,0,4,0"
@@ -93,6 +104,7 @@
                                ToolTip="Search (Ctrl+F)">
                         <ui:SymbolIcon Symbol="Search24" FontSize="18" Filled="False"/>
                     </ui:Button>
+                    -->
                     <!-- Update Focus from Asana -->
                     <ui:Button x:Name="UpdateFocusButton"
                                Padding="6,4"
@@ -100,6 +112,16 @@
                                Command="{Binding UpdateFocusCommand}"
                                ToolTip="Update Focus from Asana"
                                Visibility="{Binding IsAiEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ui:Button.Style>
+                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                <Setter Property="Opacity" Value="1"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Opacity" Value="0.45"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:Button.Style>
                         <ui:SymbolIcon Symbol="DocumentCatchUp20" FontSize="18" Filled="False"/>
                     </ui:Button>
                     <!-- 保存 -->
@@ -175,12 +197,26 @@
                           Background="{DynamicResource AppMantle}"
                           BorderThickness="0"
                           SelectedItemChanged="OnTreeSelectedItemChanged">
+                    <TreeView.ContextMenu>
+                        <ContextMenu Opened="OnFileTreeContextMenuOpened">
+                            <MenuItem x:Name="AddObsidianNoteMenuItem"
+                                      Header="Add"
+                                      Tag="AddObsidianNote"
+                                      Click="OnAddObsidianNote"/>
+                            <MenuItem x:Name="DeleteMenuItem"
+                                      Header="Delete"
+                                      Tag="DeleteNode"
+                                      Click="OnDeleteNode"/>
+                        </ContextMenu>
+                    </TreeView.ContextMenu>
                     <TreeView.Resources>
                         <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
                             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                             <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
                             <Setter Property="Foreground" Value="{DynamicResource AppText}"/>
                             <Setter Property="FontSize" Value="12"/>
+                            <EventSetter Event="PreviewMouseRightButtonDown"
+                                         Handler="OnTreeItemPreviewMouseRightButtonDown"/>
                         </Style>
                     </TreeView.Resources>
                     <TreeView.ItemTemplate>
