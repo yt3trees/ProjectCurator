@@ -25,7 +25,12 @@ public class TimelineEntryItem
 
     public string GapText => GapDays == 1 ? "-- 1 day gap --" : $"-- {GapDays} days gap --";
     public string DateText => Date.ToString("yyyy-MM-dd (ddd)");
-    public string TypeBadge => EntryType == "Decision" ? "[Decision]" : "[Focus]";
+    public string TypeBadge => EntryType switch
+    {
+        "Decision" => "[Decision]",
+        "Work" => "[Work]",
+        _ => "[Focus]",
+    };
 }
 
 public class TimelineHeatmapCellItem
@@ -72,7 +77,7 @@ public partial class TimelineViewModel : ObservableObject
     private bool isGraphLoading;
 
     [ObservableProperty]
-    private string statsText = "";
+    private string statsText = "No project selected";
 
     [ObservableProperty]
     private string graphStatsText = "";
@@ -141,11 +146,14 @@ public partial class TimelineViewModel : ObservableObject
     public async Task LoadEntriesAsync()
     {
         Entries.Clear();
-        StatsText = "";
 
         if (SelectedProject == null)
+        {
+            StatsText = "No project selected";
             return;
+        }
 
+        StatsText = "Loading...";
         IsLoading = true;
         var project = SelectedProject;
         var daysBack = DaysBack;
@@ -215,6 +223,13 @@ public partial class TimelineViewModel : ObservableObject
     {
         if (entry.IsGap || string.IsNullOrEmpty(entry.FilePath))
             return;
+
+        if (entry.EntryType == "Work")
+        {
+            if (Directory.Exists(entry.FilePath))
+                Process.Start("explorer.exe", $"\"{entry.FilePath}\"");
+            return;
+        }
 
         var project = Projects.FirstOrDefault(p => p.HiddenKey == entry.ProjectHiddenKey) ?? SelectedProject;
         if (project == null)
@@ -288,9 +303,13 @@ public partial class TimelineViewModel : ObservableObject
                     result.Add(new TimelineEntryItem { IsGap = true, GapDays = gap });
             }
 
-            string preview = raw.Type == "Focus"
-                ? "[Focus] " + GetFocusPreview(raw.Path)
-                : "[Decision] " + raw.Topic;
+            string preview = raw.Type switch
+            {
+                "Focus" => "[Focus] " + GetFocusPreview(raw.Path),
+                "Decision" => "[Decision] " + raw.Topic,
+                "Work" => "[Work] " + raw.Topic,
+                _ => raw.Topic,
+            };
 
             result.Add(new TimelineEntryItem
             {
@@ -308,6 +327,9 @@ public partial class TimelineViewModel : ObservableObject
 
         // 統計
         int totalEntries = rawEntries.Count;
+        int focusCount = rawEntries.Count(e => e.Type == "Focus");
+        int decisionCount = rawEntries.Count(e => e.Type == "Decision");
+        int workCount = rawEntries.Count(e => e.Type == "Work");
         var uniqueDays = rawEntries.Select(e => e.Date.Date).Distinct().Count();
         var newest = rawEntries.First().Date.ToString("yyyy-MM-dd");
         var oldest = rawEntries.Last().Date.ToString("yyyy-MM-dd");
@@ -316,9 +338,11 @@ public partial class TimelineViewModel : ObservableObject
         if (daysBack > 0)
             activeRate = uniqueDays * 100.0 / daysBack;
 
+        string typeSummary = $"Focus: {focusCount}  Decision: {decisionCount}  Work: {workCount}";
+
         string stats = daysBack > 0
-            ? $"Total: {totalEntries} entries | Active: {uniqueDays} days | Period: {oldest} ~ {newest} | Rate: {activeRate:F1}%"
-            : $"Total: {totalEntries} entries | Active: {uniqueDays} days | Period: {oldest} ~ {newest}";
+            ? $"Total: {totalEntries} entries  ({typeSummary}) | Active: {uniqueDays} days | Period: {oldest} ~ {newest} | Rate: {activeRate:F1}%"
+            : $"Total: {totalEntries} entries  ({typeSummary}) | Active: {uniqueDays} days | Period: {oldest} ~ {newest}";
 
         return (result, stats);
     }
@@ -514,7 +538,70 @@ public partial class TimelineViewModel : ObservableObject
             }
         }
 
+        // Work folders under shared/_work/
+        // General:    _work/{year(4d)}/{yearMonth(6d)}/{yyyyMMdd}_{name}
+        // Workstream: _work/{workstreamId}/{yearMonth(6d)}/{yyyyMMdd}_{name}
+        var workRoot = Path.Combine(project.Path, "shared", "_work");
+        if (Directory.Exists(workRoot))
+            ScanWorkFolders(workRoot, project, cutoff, rawEntries);
+
         return rawEntries;
+    }
+
+    /// <summary>
+    /// shared/_work/ 以下の日付フォルダをスキャンして rawEntries に追加する。
+    /// General:    _work/{year(4d)}/{yearMonth(6d)}/{yyyyMMdd}_{name}
+    /// Workstream: _work/{workstreamId}/{yearMonth(6d)}/{yyyyMMdd}_{name}
+    /// </summary>
+    private static void ScanWorkFolders(string workRoot, ProjectInfo project, DateTime cutoff, List<TimelineRawEntry> rawEntries)
+    {
+        string[] l1Dirs;
+        try { l1Dirs = Directory.GetDirectories(workRoot); }
+        catch (Exception ex) { Debug.WriteLine($"[Timeline] _work L1 error: {ex.Message}"); return; }
+
+        foreach (var l1 in l1Dirs)
+        {
+            var l1Name = Path.GetFileName(l1)!;
+
+            // year dir (4 digits) → get yearMonth dirs inside it
+            // workstream dir (other) → treat its subdirs as yearMonth dirs
+            string[] l2Dirs;
+            try { l2Dirs = Directory.GetDirectories(l1); }
+            catch { continue; }
+
+            foreach (var l2 in l2Dirs)
+            {
+                if (!Regex.IsMatch(Path.GetFileName(l2)!, @"^\d{6}$"))
+                    continue;
+
+                string[] l3Dirs;
+                try { l3Dirs = Directory.GetDirectories(l2); }
+                catch { continue; }
+
+                foreach (var l3 in l3Dirs)
+                {
+                    var name = Path.GetFileName(l3)!;
+                    if (!Regex.IsMatch(name, @"^\d{8}_"))
+                        continue;
+
+                    if (!DateTime.TryParseExact(name[..8], "yyyyMMdd",
+                            CultureInfo.InvariantCulture,
+                            DateTimeStyles.None, out var date)
+                        || date < cutoff)
+                        continue;
+
+                    rawEntries.Add(new TimelineRawEntry
+                    {
+                        Date = date,
+                        Path = l3,
+                        Type = "Work",
+                        Topic = name[9..],
+                        ProjectName = project.Name,
+                        ProjectHiddenKey = project.HiddenKey,
+                    });
+                }
+            }
+        }
     }
 
     /// <summary>focus_history ファイルから「今やってること」セクションの最初の箇条書きを取得。</summary>

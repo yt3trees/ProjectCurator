@@ -300,8 +300,8 @@ AI コンテキストファイル(`current_focus.md`、`decision_log` など)を
 - Project ドロップダウンでプロジェクトを絞り込み(例: `GenAi [Domain]`)
 - Period ドロップダウンで表示期間を設定(例: 30 days)
 - Graph scope で単一プロジェクトか全プロジェクトを選択
-- Entries タブに日付(曜日付き)と Focus ラベル付きのエントリ一覧を表示
-- Graph タブで選択期間のアクティビティ推移をグラフ表示
+- Entries タブに日付(曜日付き)と `[Focus]`/`[Decision]`/`[Work]` ラベル付きのエントリ一覧を表示。`[Work]` エントリは `shared/_work/` 配下の日付フォルダ(例: `20260321_fix-login-bug`)が対象で、クリックすると Explorer でフォルダを開く
+- Graph タブで選択期間のアクティビティ推移をグラフ表示。Work フォルダのイベントも Focus/Decision と合算してカウントされる
 
 </details>
 

@@ -303,8 +303,8 @@ Chronological view of project activity filtered by project and time period.
 - Project dropdown to filter by a specific project (e.g. `GenAi [Domain]`)
 - Period dropdown to set the time range (e.g. 30 days)
 - Graph scope selector to choose between single project and all projects
-- Entries tab shows a list of timeline entries with dates (including day of week) and focus labels
-- Graph tab visualizes activity trends over the selected period
+- Entries tab shows a list of timeline entries (`[Focus]`, `[Decision]`, `[Work]`) with dates (including day of week); `[Work]` entries come from `shared/_work/` date folders (e.g. `20260321_fix-login-bug`) and clicking them opens the folder in Explorer
+- Graph tab visualizes activity trends over the selected period; Work folder events are counted alongside Focus and Decision entries
 
 </details>
 
