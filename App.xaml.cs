@@ -68,6 +68,7 @@ public partial class App : WpfApplication
         services.AddSingleton<LlmClientService>();
         services.AddSingleton<AsanaTaskParser>();
         services.AddSingleton<FocusUpdateService>();
+        services.AddSingleton<DecisionLogGeneratorService>();
 
         // ViewModels
         services.AddSingleton<MainWindowViewModel>();

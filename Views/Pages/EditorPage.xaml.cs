@@ -76,6 +76,11 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             ShowFocusUpdateProposalDialogAsync(proposal, refineFunc);
         ViewModel.ShowScrollableError = (t, m) => ShowScrollableErrorDialog(t, m);
 
+        // AI Decision Log ダイアログ
+        ViewModel.RequestAiDecisionLogInput = ShowAiDecisionLogInputDialogAsync;
+        ViewModel.RequestDecisionLogPreview = (draft, refineFunc) =>
+            ShowDecisionLogPreviewDialogAsync(draft, refineFunc);
+
         // キーバインド:
         // handledEventsToo=true で子コントロールが処理済みのキーも捕捉する。
         AddHandler(Keyboard.PreviewKeyDownEvent, new WpfKeyEventHandler(OnPageKeyDown), handledEventsToo: true);
@@ -1481,6 +1486,641 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             Owner = Window.GetWindow(this)
         };
         return Task.FromResult(dialog.ShowDialog() == true ? dialog.InputText : null);
+    }
+
+    // -------------------------------------------------------------------------
+    // AI Decision Log - 入力ダイアログ
+    // -------------------------------------------------------------------------
+    private Task<ProjectCurator.Models.AiDecisionLogInputResult?> ShowAiDecisionLogInputDialogAsync(
+        List<ProjectCurator.Models.DetectedDecision> candidates)
+    {
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var accent   = appResources.Contains("AppBlue")
+            ? (System.Windows.Media.Brush)appResources["AppBlue"] : text;
+
+        ProjectCurator.Models.AiDecisionLogInputResult? result = null;
+
+        // ---- タイトルバー ----
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "✦", Foreground = accent, FontSize = 13,
+            Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = "AI Decision Log", Foreground = text, FontSize = 14,
+            FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+        var closeBtn = new System.Windows.Controls.Button
+        {
+            Content = "✕", Width = 34, Height = 26,
+            Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
+        };
+        Grid.SetColumn(closeBtn, 2);
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+        titleBar.Children.Add(closeBtn);
+
+        // ---- Input セクション ----
+        var inputLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "What was decided?",
+            Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 0, 0, 4)
+        };
+        var inputBox = new System.Windows.Controls.TextBox
+        {
+            Padding = new Thickness(8, 6, 8, 6),
+            Background = surface1, Foreground = text, BorderBrush = surface2,
+            BorderThickness = new Thickness(1), FontSize = 13,
+            TextWrapping = TextWrapping.Wrap,
+            AcceptsReturn = true,
+            Height = 90,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        };
+
+        // ---- Status ----
+        var confirmedRadio = new System.Windows.Controls.RadioButton
+        {
+            Content = "Confirmed", IsChecked = true,
+            Foreground = text, FontSize = 12, Margin = new Thickness(0, 0, 16, 0)
+        };
+        var tentativeRadio = new System.Windows.Controls.RadioButton
+        {
+            Content = "Tentative",
+            Foreground = text, FontSize = 12
+        };
+        var statusPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        var statusLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Status: ", Foreground = subtext, FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0)
+        };
+        statusPanel.Children.Add(statusLabel);
+        statusPanel.Children.Add(confirmedRadio);
+        statusPanel.Children.Add(tentativeRadio);
+
+        // ---- Trigger ----
+        var triggerLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Trigger: ", Foreground = subtext, FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0)
+        };
+        var triggerCombo = new System.Windows.Controls.ComboBox
+        {
+            Background = surface1, Foreground = text, BorderBrush = surface2,
+            FontSize = 12, MinWidth = 160, Padding = new Thickness(6, 4, 4, 4)
+        };
+        triggerCombo.Items.Add("Solo decision");
+        triggerCombo.Items.Add("AI session");
+        triggerCombo.Items.Add("Meeting");
+        triggerCombo.SelectedIndex = 0;
+        var triggerPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 6, 0, 0)
+        };
+        triggerPanel.Children.Add(triggerLabel);
+        triggerPanel.Children.Add(triggerCombo);
+
+        var inputSection = new StackPanel { Margin = new Thickness(16, 12, 16, 8) };
+        inputSection.Children.Add(inputLabel);
+        inputSection.Children.Add(inputBox);
+        inputSection.Children.Add(statusPanel);
+        inputSection.Children.Add(triggerPanel);
+
+        // ---- 添付ファイル ----
+        var attachedFiles     = new List<string>();
+        var attachedFilesList = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
+        var attachButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Attach file...",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            Height = 26, FontSize = 11,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            Margin = new Thickness(0, 6, 0, 0),
+            Padding = new Thickness(8, 2, 8, 2)
+        };
+        attachButton.Click += (s, e) =>
+        {
+            var ofd = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Text/Markdown (*.txt;*.md)|*.txt;*.md",
+                Multiselect = true
+            };
+            if (ofd.ShowDialog() != true) return;
+
+            foreach (var f in ofd.FileNames)
+            {
+                if (attachedFiles.Contains(f)) continue;
+                attachedFiles.Add(f);
+
+                var row = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Margin = new Thickness(0, 2, 0, 0)
+                };
+                var fileLabel = new System.Windows.Controls.TextBlock
+                {
+                    Text = Path.GetFileName(f),
+                    Foreground = text, FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 6, 0)
+                };
+                var removeBtn = new System.Windows.Controls.Button
+                {
+                    Content = "✕", FontSize = 10, Width = 18, Height = 18,
+                    Background = System.Windows.Media.Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    Foreground = subtext, Padding = new Thickness(0)
+                };
+                var capturedFile = f;
+                var capturedRow  = row;
+                removeBtn.Click += (s2, e2) =>
+                {
+                    attachedFiles.Remove(capturedFile);
+                    attachedFilesList.Children.Remove(capturedRow);
+                };
+                row.Children.Add(fileLabel);
+                row.Children.Add(removeBtn);
+                attachedFilesList.Children.Add(row);
+            }
+        };
+
+        inputSection.Children.Add(attachButton);
+        inputSection.Children.Add(attachedFilesList);
+
+        // ---- Detected candidates セクション (候補がある場合のみ表示) ----
+        var checkBoxItems = new List<(System.Windows.Controls.CheckBox chk,
+            ProjectCurator.Models.DetectedDecision candidate)>();
+
+        var candidatesSection = new StackPanel
+        {
+            Margin = new Thickness(16, 0, 16, 8),
+            Visibility = candidates.Count > 0 ? Visibility.Visible : Visibility.Collapsed
+        };
+        if (candidates.Count > 0)
+        {
+            candidatesSection.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = "Detected from recent changes",
+                Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 0, 0, 6)
+            });
+
+            foreach (var candidate in candidates)
+            {
+                var statusTag = candidate.Status == "tentative" ? " (tentative)" : "";
+                var chk = new System.Windows.Controls.CheckBox
+                {
+                    Content = candidate.Summary + statusTag,
+                    IsChecked = candidate.IsSelected,
+                    Foreground = text, FontSize = 12,
+                    Margin = new Thickness(0, 2, 0, 2)
+                };
+                checkBoxItems.Add((chk, candidate));
+                candidatesSection.Children.Add(chk);
+            }
+        }
+
+        // ---- フッター ----
+        var generateButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Generate Draft",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 120, Height = 32, Margin = new Thickness(0, 0, 8, 0)
+        };
+        var blankButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Blank Template",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 110, Height = 32, Margin = new Thickness(0, 0, 8, 0)
+        };
+        var cancelButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 80, Height = 32, IsCancel = true
+        };
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 4, 16, 12),
+            Children = { generateButton, blankButton, cancelButton }
+        };
+
+        // Generate Draft のボタン状態更新
+        void UpdateGenerateButtonState()
+        {
+            var hasInput    = !string.IsNullOrWhiteSpace(inputBox.Text);
+            var hasSelected = checkBoxItems.Any(pair => pair.chk.IsChecked == true);
+            generateButton.IsEnabled = hasInput || hasSelected;
+        }
+        inputBox.TextChanged += (s, e) => UpdateGenerateButtonState();
+        foreach (var (chk, _) in checkBoxItems)
+        {
+            chk.Checked   += (s, e) => UpdateGenerateButtonState();
+            chk.Unchecked += (s, e) => UpdateGenerateButtonState();
+        }
+        // 初期状態
+        generateButton.IsEnabled = candidates.Count > 0 && candidates.Any(c => c.IsSelected);
+
+        // ---- レイアウト ----
+        var root = new Grid();
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar,          0);
+        Grid.SetRow(inputSection,      1);
+        Grid.SetRow(candidatesSection, 2);
+        Grid.SetRow(footer,            3);
+        root.Children.Add(titleBar);
+        root.Children.Add(inputSection);
+        root.Children.Add(candidatesSection);
+        root.Children.Add(footer);
+
+        var dialog = new Window
+        {
+            Content = root, Width = 480,
+            SizeToContent = SizeToContent.Height,
+            WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = Window.GetWindow(this), ShowInTaskbar = false,
+            Background = surface
+        };
+
+        titleBar.MouseLeftButtonDown += (s, e) => dialog.DragMove();
+        closeBtn.Click    += (s, e) => dialog.DialogResult = false;
+        cancelButton.Click += (s, e) => dialog.DialogResult = false;
+
+        generateButton.Click += (s, e) =>
+        {
+            var selectedCandidates = checkBoxItems
+                .Where(pair => pair.chk.IsChecked == true)
+                .Select(pair =>
+                {
+                    pair.candidate.IsSelected = true;
+                    return pair.candidate;
+                })
+                .ToList();
+
+            result = new ProjectCurator.Models.AiDecisionLogInputResult
+            {
+                UseBlankTemplate   = false,
+                UserInput          = inputBox.Text.Trim(),
+                Status             = confirmedRadio.IsChecked == true ? "Confirmed" : "Tentative",
+                Trigger            = triggerCombo.SelectedItem as string ?? "Solo decision",
+                SelectedCandidates = selectedCandidates,
+                AttachedFilePaths  = [..attachedFiles],
+            };
+            dialog.DialogResult = true;
+        };
+
+        blankButton.Click += (s, e) =>
+        {
+            result = new ProjectCurator.Models.AiDecisionLogInputResult { UseBlankTemplate = true };
+            dialog.DialogResult = true;
+        };
+
+        dialog.ShowDialog();
+        return Task.FromResult(result);
+    }
+
+    // -------------------------------------------------------------------------
+    // AI Decision Log - プレビュー/承認ダイアログ
+    // -------------------------------------------------------------------------
+    private async Task<(bool save, string? content, string? fileName, bool removeTension)>
+        ShowDecisionLogPreviewDialogAsync(
+            ProjectCurator.Models.DecisionLogDraftResult draft,
+            Func<string, string, Task<string>> refineFunc)
+    {
+        var tcs = new TaskCompletionSource<(bool save, string? content, string? fileName, bool removeTension)>();
+
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var accent   = appResources.Contains("AppGreen")
+            ? (System.Windows.Media.Brush)appResources["AppGreen"] : text;
+        var editorBg = (Application.Current.Resources["EditorBackground"] as System.Windows.Media.SolidColorBrush)
+            ?? new System.Windows.Media.SolidColorBrush(
+                (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#0d1117"));
+        var editorFg = (Application.Current.Resources["EditorForeground"] as System.Windows.Media.SolidColorBrush)
+            ?? new System.Windows.Media.SolidColorBrush(
+                (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#c9d1d9"));
+
+        string currentContent = draft.DraftContent;
+        bool removeTension    = false;
+
+        // ---- タイトルバー (ファイル名編集可能) ----
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "✦", Foreground = accent, FontSize = 13,
+            Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+
+        // ファイル名: 編集可能 TextBox
+        var fileNameBox = new System.Windows.Controls.TextBox
+        {
+            Text = draft.SuggestedFileName,
+            Background = System.Windows.Media.Brushes.Transparent,
+            Foreground = text, BorderThickness = new Thickness(0, 0, 0, 1),
+            BorderBrush = surface2, FontSize = 13,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 4, 8, 4), Padding = new Thickness(2, 0, 2, 0)
+        };
+        Grid.SetColumn(fileNameBox, 1);
+
+        var fileNameHint = new System.Windows.Controls.TextBlock
+        {
+            Text = ".md", Foreground = subtext, FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0)
+        };
+        Grid.SetColumn(fileNameHint, 2);
+
+        var closeBtn = new System.Windows.Controls.Button
+        {
+            Content = "✕", Width = 34, Height = 26,
+            Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
+        };
+        Grid.SetColumn(closeBtn, 3);
+
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(fileNameBox);
+        titleBar.Children.Add(fileNameHint);
+        titleBar.Children.Add(closeBtn);
+
+        // ---- AvalonEdit プレビュー (読み取り専用) ----
+        var previewViewer = new ICSharpCode.AvalonEdit.TextEditor
+        {
+            FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+            FontSize = 12, WordWrap = false, ShowLineNumbers = true, IsReadOnly = true,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Visible,
+            VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
+            Background = editorBg, Foreground = editorFg
+        };
+        previewViewer.LineNumbersForeground =
+            (Application.Current.Resources["AppSubtext0"] as System.Windows.Media.SolidColorBrush)
+            ?? new System.Windows.Media.SolidColorBrush(
+                (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#8b949e"));
+        // TextView の下余白をスクロールバー高さ分確保し、最終行がバーに隠れないようにする
+        previewViewer.TextArea.TextView.Margin = new Thickness(
+            previewViewer.TextArea.TextView.Margin.Left,
+            previewViewer.TextArea.TextView.Margin.Top,
+            previewViewer.TextArea.TextView.Margin.Right,
+            SystemParameters.HorizontalScrollBarHeight + 2);
+        if (_markdownDefinition != null)
+            previewViewer.SyntaxHighlighting = _markdownDefinition;
+        previewViewer.Text = currentContent;
+
+        // ---- Refine 行 ----
+        var refineBox = new System.Windows.Controls.TextBox
+        {
+            Padding = new Thickness(8, 6, 8, 6),
+            Background = surface1, Foreground = text, BorderBrush = surface2,
+            BorderThickness = new Thickness(1), FontSize = 12,
+            VerticalContentAlignment = VerticalAlignment.Center
+        };
+        var refineButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Refine",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 80, Height = 32, Margin = new Thickness(8, 0, 0, 0)
+        };
+        var refineStatus = new System.Windows.Controls.TextBlock
+        {
+            Foreground = subtext, FontSize = 11, VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 0, 0), TextWrapping = TextWrapping.Wrap
+        };
+        var refinePlaceholder = new System.Windows.Controls.TextBlock
+        {
+            Text = "Refinement instructions (e.g. \"Add more detail to Why section\")",
+            Foreground = subtext, FontSize = 12, IsHitTestVisible = false,
+            Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center
+        };
+        refineBox.TextChanged += (s, e) =>
+            refinePlaceholder.Visibility = string.IsNullOrEmpty(refineBox.Text)
+                ? Visibility.Visible : Visibility.Collapsed;
+        refineBox.KeyDown += (s, e) =>
+        {
+            if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                refineButton.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+                e.Handled = true;
+            }
+        };
+        var refineInputHost = new Grid();
+        refineInputHost.Children.Add(refineBox);
+        refineInputHost.Children.Add(refinePlaceholder);
+
+        var refineRow = new Grid { Margin = new Thickness(16, 6, 16, 4) };
+        refineRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        refineRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        refineRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(refineInputHost, 0);
+        Grid.SetColumn(refineButton,    1);
+        Grid.SetColumn(refineStatus,    2);
+        refineRow.Children.Add(refineInputHost);
+        refineRow.Children.Add(refineButton);
+        refineRow.Children.Add(refineStatus);
+
+        // ---- Tension 解決パネル (ResolvedTension がある場合のみ表示) ----
+        var tensionPanel = new StackPanel
+        {
+            Margin = new Thickness(16, 2, 16, 4),
+            Visibility = string.IsNullOrWhiteSpace(draft.ResolvedTension)
+                ? Visibility.Collapsed : Visibility.Visible
+        };
+        if (!string.IsNullOrWhiteSpace(draft.ResolvedTension))
+        {
+            var tensionCheckBox = new System.Windows.Controls.CheckBox
+            {
+                Content = $"Remove resolved tension from tensions.md: \"{draft.ResolvedTension}\"",
+                IsChecked = false,
+                Foreground = subtext, FontSize = 11
+            };
+            tensionCheckBox.Checked   += (s, e) => removeTension = true;
+            tensionCheckBox.Unchecked += (s, e) => removeTension = false;
+            tensionPanel.Children.Add(tensionCheckBox);
+        }
+
+        // ---- フッター ----
+        var saveButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Save",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 90, Height = 32, Margin = new Thickness(0, 0, 8, 0)
+        };
+        var cancelFooterButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 80, Height = 32, Margin = new Thickness(0, 0, 8, 0)
+        };
+        var debugButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "View Debug",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 90, Height = 32
+        };
+        var footerLeft = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            Children = { debugButton }
+        };
+        var footerRight = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Children = { saveButton, cancelFooterButton }
+        };
+        var footerGrid = new Grid { Margin = new Thickness(16, 4, 16, 10) };
+        footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(footerLeft,  0);
+        Grid.SetColumn(footerRight, 2);
+        footerGrid.Children.Add(footerLeft);
+        footerGrid.Children.Add(footerRight);
+
+        // ---- レイアウト ----
+        var root = new Grid();
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar,    0);
+        Grid.SetRow(previewViewer, 1);
+        Grid.SetRow(refineRow,   2);
+        Grid.SetRow(tensionPanel, 3);
+        Grid.SetRow(footerGrid,  4);
+        root.Children.Add(titleBar);
+        root.Children.Add(previewViewer);
+        root.Children.Add(refineRow);
+        root.Children.Add(tensionPanel);
+        root.Children.Add(footerGrid);
+
+        var dialog = new Window
+        {
+            Content = root, Width = 760, Height = 580,
+            MinWidth = 500, MinHeight = 400,
+            WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.CanResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = Window.GetWindow(this), ShowInTaskbar = false,
+            Background = surface
+        };
+        // WindowChrome で OS アクセントカラーのボーダーを除去しつつリサイズを維持
+        System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight         = 0,
+                ResizeBorderThickness = new Thickness(4),
+                GlassFrameThickness   = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
+
+        // ---- イベント ----
+        void Complete(bool save)
+        {
+            var fn = fileNameBox.Text.Trim();
+            if (!tcs.Task.IsCompleted)
+                tcs.SetResult((save, save ? currentContent : null,
+                    save ? (string.IsNullOrWhiteSpace(fn) ? null : fn) : null,
+                    save && removeTension));
+            dialog.Close();
+            dialog.Owner?.Activate();
+        }
+
+        titleBar.MouseLeftButtonDown    += (s, e) => dialog.DragMove();
+        closeBtn.Click                  += (s, e) => Complete(false);
+        cancelFooterButton.Click        += (s, e) => Complete(false);
+        saveButton.Click                += (s, e) => Complete(true);
+        dialog.Closed += (s, e) =>
+        {
+            if (!tcs.Task.IsCompleted) tcs.SetResult((false, null, null, false));
+            dialog.Owner?.Activate();
+        };
+
+        debugButton.Click += (s, e) =>
+        {
+            var debugText = new StringBuilder();
+            debugText.AppendLine("=== SYSTEM PROMPT ===");
+            debugText.AppendLine(draft.DebugSystemPrompt);
+            debugText.AppendLine();
+            debugText.AppendLine("=== USER PROMPT ===");
+            debugText.AppendLine(draft.DebugUserPrompt);
+            debugText.AppendLine();
+            debugText.AppendLine("=== RESPONSE ===");
+            debugText.AppendLine(draft.DebugResponse);
+            ShowScrollableErrorDialog("LLM Debug Log", debugText.ToString(),
+                Wpf.Ui.Controls.SymbolRegular.Bug24);
+        };
+
+        refineButton.Click += async (s, e) =>
+        {
+            var instructions = refineBox.Text.Trim();
+            if (string.IsNullOrEmpty(instructions))
+            {
+                refineStatus.Text = "Enter refinement instructions above.";
+                return;
+            }
+
+            refineButton.IsEnabled   = false;
+            refineBox.IsEnabled      = false;
+            saveButton.IsEnabled     = false;
+            refineStatus.Text        = "Refining...";
+            try
+            {
+                var refined      = await refineFunc(currentContent, instructions);
+                currentContent   = refined;
+                previewViewer.Text = refined;
+                refineBox.Clear();
+                refineStatus.Text = "Done.";
+            }
+            catch (Exception ex)
+            {
+                refineStatus.Text = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                refineButton.IsEnabled = true;
+                refineBox.IsEnabled    = true;
+                saveButton.IsEnabled   = true;
+            }
+        };
+
+        dialog.Show();
+        return await tcs.Task;
     }
 }
 

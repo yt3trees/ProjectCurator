@@ -44,9 +44,11 @@ public partial class EditorViewModel : ObservableObject
     private readonly FocusUpdateService _focusUpdateService;
     private readonly LlmClientService _llmClient;
     private readonly ConfigService _configService;
+    private readonly DecisionLogGeneratorService _decisionLogService;
     private string? _pendingFileToOpen;
     private bool _suppressAutoFileOpenOnProjectChange;
     private CancellationTokenSource? _focusUpdateCts;
+    private CancellationTokenSource? _decisionLogCts;
 
     // ---- 選択プロジェクト ----
     [ObservableProperty]
@@ -113,6 +115,13 @@ public partial class EditorViewModel : ObservableObject
     // スクロール可能なエラーダイアログ
     public Action<string, string>? ShowScrollableError;
 
+    // ---- AI Decision Log コールバック ----
+    // 入力ダイアログ: 検出候補リストを渡す → 入力結果 (null=キャンセル)
+    public Func<List<DetectedDecision>, Task<AiDecisionLogInputResult?>>? RequestAiDecisionLogInput;
+    // プレビューダイアログ: ドラフト + Refine 関数を渡す → (保存するか, コンテンツ, ファイル名, tension削除フラグ)
+    public Func<DecisionLogDraftResult, Func<string, string, Task<string>>,
+        Task<(bool save, string? content, string? fileName, bool removeTension)>>? RequestDecisionLogPreview;
+
     public string OriginalContent => _originalContent;
 
     public EditorViewModel(
@@ -120,13 +129,15 @@ public partial class EditorViewModel : ObservableObject
         ProjectDiscoveryService discoveryService,
         FocusUpdateService focusUpdateService,
         LlmClientService llmClient,
-        ConfigService configService)
+        ConfigService configService,
+        DecisionLogGeneratorService decisionLogService)
     {
         _encodingService = encodingService;
         _discoveryService = discoveryService;
         _focusUpdateService = focusUpdateService;
         _llmClient = llmClient;
         _configService = configService;
+        _decisionLogService = decisionLogService;
 
         IsAiEnabled = _configService.LoadSettings().AiEnabled;
         WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
@@ -601,12 +612,25 @@ public partial class EditorViewModel : ObservableObject
     public async Task NewDecisionLogAsync()
     {
         if (SelectedProject == null) return;
+
+        // AI 有効時は AI フローへルーティング
+        if (IsAiEnabled)
+        {
+            await NewAiDecisionLogAsync();
+            return;
+        }
+
+        await CreateBlankDecisionLogAsync();
+    }
+
+    private async Task CreateBlankDecisionLogAsync()
+    {
+        if (SelectedProject == null) return;
         if (RequestNewDecisionLogName == null) return;
 
         var logName = await RequestNewDecisionLogName();
         if (string.IsNullOrWhiteSpace(logName)) return;
 
-        // 現在開いているファイルが Workstream 配下なら、その decision_log に作成する
         var logDir = GetActiveDecisionLogDir();
         Directory.CreateDirectory(logDir);
         var fileName = $"{DateTime.Now:yyyy-MM-dd}_{logName.Trim()}.md";
@@ -619,6 +643,178 @@ public partial class EditorViewModel : ObservableObject
             BuildFileTree(SelectedProject);
 
         await OpenFileAndSelectNodeAsync(filePath);
+    }
+
+    [RelayCommand]
+    public async Task NewAiDecisionLogAsync()
+    {
+        if (SelectedProject == null) return;
+
+        // API キー未設定チェック
+        var settings = _configService.LoadSettings();
+        if (string.IsNullOrWhiteSpace(settings.LlmApiKey))
+        {
+            MessageBox.Show(
+                "LLM API key is not configured.\nPlease open Settings and set the API key under \"LLM API\".",
+                "AI Decision Log",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        // Step 1: 現在のファイルから workstream ID を判定
+        var wsPath = !string.IsNullOrEmpty(CurrentFile) ? DetectWorkstreamPath(CurrentFile) : null;
+        var wsId   = wsPath != null ? Path.GetFileName(wsPath) : null;
+
+        // Step 2: 候補を検出 (失敗しても空リストで続行)
+        IsLoading = true;
+        _decisionLogCts = new CancellationTokenSource();
+        List<DetectedDecision> candidates = [];
+        try
+        {
+            candidates = await _decisionLogService.DetectCandidatesAsync(
+                SelectedProject, wsId, _decisionLogCts.Token);
+        }
+        catch { /* 候補検出エラーは無視して続行 */ }
+        finally
+        {
+            IsLoading = false;
+        }
+
+        // Step 3: 入力ダイアログを表示
+        if (RequestAiDecisionLogInput == null) return;
+        var input = await RequestAiDecisionLogInput(candidates);
+        if (input == null) return; // キャンセル
+
+        if (input.UseBlankTemplate)
+        {
+            await CreateBlankDecisionLogAsync();
+            return;
+        }
+
+        // Step 4: ドラフト生成
+        IsLoading = true;
+        _decisionLogCts = new CancellationTokenSource();
+        try
+        {
+            var draft = await _decisionLogService.GenerateDraftAsync(
+                input.UserInput,
+                input.SelectedCandidates,
+                input.Status,
+                input.Trigger,
+                SelectedProject,
+                wsId,
+                input.AttachedFilePaths,
+                _decisionLogCts.Token);
+
+            IsLoading = false;
+
+            if (RequestDecisionLogPreview == null) return;
+
+            var capturedDraft    = draft;
+            var cts              = _decisionLogCts!;
+            var refineHistory    = new List<(string instruction, string result)>();
+            var initialUserPrompt = draft.DebugUserPrompt;
+            var initialDraft     = draft.DraftContent;
+
+            // Step 5: プレビューダイアログを表示
+            var (save, content, fileName, removeTension) = await RequestDecisionLogPreview(
+                draft,
+                async (_, instructions) =>
+                {
+                    var refined = await _decisionLogService.RefineAsync(
+                        initialUserPrompt, initialDraft, instructions, refineHistory, cts.Token);
+                    refineHistory.Add((instructions, refined));
+                    capturedDraft.DebugSystemPrompt = _llmClient.LastSystemPrompt;
+                    capturedDraft.DebugUserPrompt   = BuildRefineDebugConversation(
+                        initialUserPrompt, initialDraft, refineHistory);
+                    capturedDraft.DebugResponse     = refined;
+                    return refined;
+                });
+
+            if (!save) return;
+
+            // Step 6: ファイル保存
+            var logDir   = GetActiveDecisionLogDir();
+            Directory.CreateDirectory(logDir);
+            var topic        = (fileName ?? draft.SuggestedFileName).Trim();
+            var baseFileName = $"{DateTime.Now:yyyy-MM-dd}_{topic}.md";
+            var filePath     = GetUniqueDecisionLogPath(logDir, baseFileName);
+
+            await _encodingService.WriteFileAsync(filePath, content ?? draft.DraftContent, "UTF8");
+
+            // Step 7: tensions.md 解決項目の削除 (ユーザーが承認した場合のみ)
+            if (removeTension && !string.IsNullOrWhiteSpace(draft.ResolvedTension))
+                await RemoveResolvedTensionAsync(draft.ResolvedTension, wsId);
+
+            // Step 8: ツリー更新とエディタで開く
+            if (SelectedProject != null)
+                BuildFileTree(SelectedProject);
+            await OpenFileAndSelectNodeAsync(filePath);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            IsLoading = false;
+            if (ShowScrollableError != null)
+                ShowScrollableError("AI Decision Log failed", ex.Message);
+            else
+                MessageBox.Show($"AI Decision Log failed:\n{ex.Message}", "AI Decision Log",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+            _decisionLogCts?.Dispose();
+            _decisionLogCts = null;
+        }
+    }
+
+    private static string GetUniqueDecisionLogPath(string logDir, string baseFileName)
+    {
+        var fullPath = Path.Combine(logDir, baseFileName);
+        if (!File.Exists(fullPath)) return fullPath;
+
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(baseFileName);
+        var ext            = Path.GetExtension(baseFileName);
+        foreach (var suffix in "abcdefghijklmnopqrstuvwxyz")
+        {
+            var candidate = Path.Combine(logDir, $"{nameWithoutExt}_{suffix}{ext}");
+            if (!File.Exists(candidate)) return candidate;
+        }
+        return Path.Combine(logDir, $"{nameWithoutExt}_{DateTime.Now:HHmmss}{ext}");
+    }
+
+    private async Task RemoveResolvedTensionAsync(string tensionText, string? workstreamId)
+    {
+        if (SelectedProject == null) return;
+
+        string? tensionsPath = null;
+        if (!string.IsNullOrWhiteSpace(workstreamId))
+        {
+            var wsPath = Path.Combine(
+                SelectedProject.AiContextContentPath, "workstreams", workstreamId, "tensions.md");
+            if (File.Exists(wsPath)) tensionsPath = wsPath;
+        }
+        if (tensionsPath == null)
+        {
+            var rootPath = Path.Combine(SelectedProject.AiContextContentPath, "tensions.md");
+            if (File.Exists(rootPath)) tensionsPath = rootPath;
+        }
+        if (tensionsPath == null) return;
+
+        try
+        {
+            var (content, enc) = await _encodingService.ReadFileAsync(tensionsPath);
+            var lines = content.Split('\n').ToList();
+            var filtered = lines.Where(l =>
+                !l.Trim().Contains(tensionText.Trim(), StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (filtered.Count < lines.Count)
+                await _encodingService.WriteFileAsync(tensionsPath, string.Join('\n', filtered), enc);
+        }
+        catch { /* エラーは無視 */ }
     }
 
     private string GetActiveDecisionLogDir()
