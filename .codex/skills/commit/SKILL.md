@@ -18,6 +18,13 @@ Use a short, imperative subject and keep scope aligned with actual staged change
 4. Compose an English commit message.
 5. Run `git commit` and report commit hash and summary.
 
+## Execution Reliability (PowerShell)
+
+- For shell tool calls in this workflow, default to `login: false` to avoid shell startup overhead (for example, PSReadLine initialization delays).
+- Use `timeout_ms: 60000` for `git status`, `git diff`, `git add`, and `git commit` commands unless a longer timeout is clearly needed.
+- If a command still times out once, rerun it immediately with the same non-login setting before changing strategy.
+- Prefer lightweight commands first (`git status --short`, `git diff --stat`) and only run full diffs when needed.
+
 ## Message Rules
 
 - Write in English only.
