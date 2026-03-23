@@ -19,20 +19,46 @@ public class AsanaTaskParser
     private static readonly Regex AsanaIdRegex    = new(@"\[id:(?<id>[^\]]+)\]",    RegexOptions.Compiled);
     private static readonly Regex DueDateRegex    = new(@"\(Due:\s*(?<date>\d{4}-\d{2}-\d{2})\)", RegexOptions.Compiled);
 
+    private const int MaxDescriptionLines = 3;
+    // "    > テキスト" または "    >" (空行) の blockquote 行
+    private static readonly Regex DescLineRegex = new(@"^    > ?", RegexOptions.Compiled);
+
     public AsanaTaskParseResult Parse(string content, string sourcePath = "")
     {
         var result = new AsanaTaskParseResult { SourcePath = sourcePath };
 
         // インデントなしの直前の親タスクを追跡する
         string? currentParentTitle = null;
+        ParsedAsanaTask? lastTask = null;
+        var descLines = new List<string>();
+
+        void FlushDescription()
+        {
+            if (lastTask != null && descLines.Count > 0)
+                lastTask.Description = string.Join(" / ", descLines);
+            descLines.Clear();
+        }
 
         foreach (var rawLine in content.Split('\n'))
         {
             var line = rawLine.TrimEnd();
+
+            // blockquote 行: 直前タスクの概要として収集 (最大 MaxDescriptionLines 行)
+            if (DescLineRegex.IsMatch(line) && lastTask != null && descLines.Count < MaxDescriptionLines)
+            {
+                var text = DescLineRegex.Replace(line, "").Trim();
+                if (!string.IsNullOrEmpty(text))
+                    descLines.Add(text);
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(line)) continue;
 
             var match = TaskLineRegex.Match(line);
             if (!match.Success) continue;
+
+            // 新しいタスク行が来たら前のタスクの概要を確定
+            FlushDescription();
 
             // 先頭スペース数でサブタスクかどうか判定
             var leadingSpaces = line.Length - line.TrimStart().Length;
@@ -78,6 +104,8 @@ public class AsanaTaskParser
                 ParentTitle  = isSubtask ? currentParentTitle : null,
             };
 
+            lastTask = task;
+
             if (assigneeType == AsanaTaskAssigneeType.Collaborator)
             {
                 result.Collaborating.Add(task);
@@ -93,6 +121,7 @@ public class AsanaTaskParser
             }
         }
 
+        FlushDescription(); // 末尾タスクの概要を確定
         return result;
     }
 

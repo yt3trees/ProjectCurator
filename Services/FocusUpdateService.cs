@@ -191,14 +191,17 @@ public class FocusUpdateService
 
         ## Writing style
 
-        - Asana task titles are raw source data, not final text. When adding a new item, rephrase it
-          to match the tone, granularity, and sentence style of existing items in that section.
+        - Asana task titles are raw identifiers, not final prose. Always rephrase them.
+        - When a task has "(notes: ...)", read the notes to understand the actual content and intent
+          of the task. Use the notes as the primary source for writing natural, meaningful text —
+          not the title alone. If the notes clarify what the task is really about, write based on
+          that understanding rather than translating the title literally.
         - Mirror the document's voice: if existing items are phrased as short action-oriented notes,
           keep additions short and action-oriented. If they are narrative phrases, write narratively.
         - Do not list every Asana task mechanically. Add only tasks that represent genuinely new
           information not already captured by existing entries. Prefer fewer, more meaningful
           additions over exhaustive coverage.
-        - If a task title is too vague or cryptic to fit naturally into the document, skip it rather
+        - If a task title is too vague or cryptic and has no useful notes, skip it rather
           than pasting it verbatim.
         - When adding a new item that has a due date, include the due date inline in a natural way
           (e.g., "(due: MM/DD)" or similar short notation). Do not add due dates to items that
@@ -248,6 +251,8 @@ public class FocusUpdateService
                 var due = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
                 var prio = !string.IsNullOrEmpty(t.Priority) ? $"  [priority: {t.Priority}]" : "";
                 sb.AppendLine($"- {t.Title}{due}{prio}");
+                if (!string.IsNullOrWhiteSpace(t.Description))
+                    sb.AppendLine($"  (notes: {t.Description})");
             }
         }
 
@@ -282,6 +287,8 @@ public class FocusUpdateService
             {
                 var due = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
                 sb.AppendLine($"- {t.Title}{due}");
+                if (!string.IsNullOrWhiteSpace(t.Description))
+                    sb.AppendLine($"  (notes: {t.Description})");
             }
         }
 
@@ -295,6 +302,8 @@ public class FocusUpdateService
                 var prio = !string.IsNullOrEmpty(t.Priority) ? $"  [priority: {t.Priority}]" : "";
                 var parent = t.ParentTitle != null ? $"  [subtask of: {t.ParentTitle}]" : "";
                 sb.AppendLine($"- {t.Title}{due}{prio}{parent}");
+                if (!string.IsNullOrWhiteSpace(t.Description))
+                    sb.AppendLine($"  (notes: {t.Description})");
             }
         }
 
