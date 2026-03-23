@@ -200,6 +200,9 @@ public class FocusUpdateService
           additions over exhaustive coverage.
         - If a task title is too vague or cryptic to fit naturally into the document, skip it rather
           than pasting it verbatim.
+        - When adding a new item that has a due date, include the due date inline in a natural way
+          (e.g., "(due: MM/DD)" or similar short notation). Do not add due dates to items that
+          already exist in the document.
         """;
 
     private static string BuildUserPrompt(
