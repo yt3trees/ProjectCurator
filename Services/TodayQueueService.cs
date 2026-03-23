@@ -62,6 +62,7 @@ public class TodayQueueTask
     public string ProjectFilterLabel => HasWorkstream
         ? $"{ProjectShortName} / {WorkstreamLabel}"
         : ProjectShortName;
+    public string? AsanaFilePath { get; set; }
     public bool CanComplete => !string.IsNullOrWhiteSpace(AsanaTaskGid);
     public bool HasAsanaUrl => !string.IsNullOrWhiteSpace(AsanaUrl);
 
@@ -88,6 +89,7 @@ public class TodayQueueTask
 public class TodayQueueService
 {
     private readonly ConfigService _configService;
+    private readonly FileEncodingService _fileEncodingService;
     private static readonly HttpClient _http = new();
 
     // Snooze 状態: key → snooze解除日時
@@ -116,9 +118,10 @@ public class TodayQueueService
     private static readonly Regex DoneHeadingRx =
         new(@"^\s*#{2,3}\s*完了", RegexOptions.Compiled);
 
-    public TodayQueueService(ConfigService configService)
+    public TodayQueueService(ConfigService configService, FileEncodingService fileEncodingService)
     {
         _configService = configService;
+        _fileEncodingService = fileEncodingService;
     }
 
     /// <summary>
@@ -222,6 +225,7 @@ public class TodayQueueService
                     DueDate = dueDate,
                     AsanaUrl = asanaUrl,
                     AsanaTaskGid = asanaGid,
+                    AsanaFilePath = asanaPath,
                     IsSubtask = false,
                 };
                 currentParent = task;
@@ -256,6 +260,7 @@ public class TodayQueueService
                         DueDate = dueDate,
                         AsanaUrl = asanaUrl,
                         AsanaTaskGid = asanaGid,
+                        AsanaFilePath = asanaPath,
                         IsSubtask = true,
                     });
                 }
@@ -392,6 +397,31 @@ public class TodayQueueService
         catch (Exception ex)
         {
             return (false, $"Asana 通信エラー: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// asana-tasks.md 内の該当タスク行のチェックボックスを [ ] から [x] に更新する。
+    /// </summary>
+    public void MarkTaskCompletedInFile(TodayQueueTask task)
+    {
+        if (string.IsNullOrWhiteSpace(task.AsanaFilePath) || !File.Exists(task.AsanaFilePath))
+            return;
+        if (string.IsNullOrWhiteSpace(task.AsanaTaskGid))
+            return;
+
+        try
+        {
+            var (content, encoding) = _fileEncodingService.ReadFile(task.AsanaFilePath);
+            // GID を含む行の [ ] を [x] に置換 (GIDは一意のため最初の1件のみ)
+            var pattern = @"(?m)^([ \t]*-\s+)\[ \](.*" + Regex.Escape(task.AsanaTaskGid) + @".*)$";
+            var updated = Regex.Replace(content, pattern, "$1[x]$2", RegexOptions.None, TimeSpan.FromSeconds(5));
+            if (updated != content)
+                _fileEncodingService.WriteFile(task.AsanaFilePath, updated, encoding);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[TodayQueue] MarkTaskCompletedInFile error: {ex}");
         }
     }
 

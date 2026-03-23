@@ -257,6 +257,7 @@ public partial class DashboardViewModel : ObservableObject
     {
         try
         {
+            TodayQueueLimit = _configService.LoadSettings().DashboardTodayQueueLimit;
             var allTasks = await Task.Run(() => _todayQueueService.GetAllTasksSorted(projects, 10000));
             _todayQueueService.EnsureSnoozeLoaded();
             _cachedAllTasks = allTasks;
@@ -350,7 +351,7 @@ public partial class DashboardViewModel : ObservableObject
                 .ToList();
         }
 
-        var limit = ShowAllTasks ? 100 : 10;
+        var limit = ShowAllTasks ? 100 : TodayQueueLimit;
         var visible = tasks.Where(t => !_todayQueueService.IsSnoozed(t.SnoozeKey)).Take(limit).ToList();
         var snoozed = tasks.Count(t => _todayQueueService.IsSnoozed(t.SnoozeKey));
 
@@ -373,7 +374,7 @@ public partial class DashboardViewModel : ObservableObject
                 if (isWorkstreamFiltered) suffixParts.Add(workstreamFilter);
                 var suffix = suffixParts.Count > 0
                     ? $" ({string.Join(" / ", suffixParts)})"
-                    : (ShowAllTasks ? "" : " (Top 10)");
+                    : (ShowAllTasks ? "" : $" (Top {TodayQueueLimit})");
                 status = $"Today Queue: {visible.Count} items{suffix}";
                 if (snoozed > 0) status += $", {snoozed} snoozed";
             }
@@ -387,6 +388,7 @@ public partial class DashboardViewModel : ObservableObject
         var (ok, msg) = await _todayQueueService.CompleteAsanaTaskAsync(task.AsanaTaskGid!);
         if (ok)
         {
+            await Task.Run(() => _todayQueueService.MarkTaskCompletedInFile(task));
             _cachedAllTasks.Remove(task);
             Application.Current.Dispatcher.Invoke(() => TodayQueueTasks.Remove(task));
         }
