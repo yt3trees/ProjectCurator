@@ -386,7 +386,10 @@ public partial class DashboardViewModel : ObservableObject
         TodayQueueStatus = "Today Queue: Submitting to Asana...";
         var (ok, msg) = await _todayQueueService.CompleteAsanaTaskAsync(task.AsanaTaskGid!);
         if (ok)
+        {
+            _cachedAllTasks.Remove(task);
             Application.Current.Dispatcher.Invoke(() => TodayQueueTasks.Remove(task));
+        }
         TodayQueueStatus = $"Today Queue: {msg}";
     }
 
