@@ -34,6 +34,7 @@ public partial class SettingsPage : WpfUserControl, INavigableView<SettingsViewM
         InitAutoRefreshCombo();
         // PasswordBox はバインディング非対応のため、ロード後に手動でセット
         LlmApiKeyBox.Password = ViewModel.LlmApiKey;
+        AsanaTokenBox.Password = ViewModel.AsanaToken;
     }
 
     private void InitAutoRefreshCombo()
@@ -65,5 +66,11 @@ public partial class SettingsPage : WpfUserControl, INavigableView<SettingsViewM
     {
         // PasswordBox → ViewModel に手動同期
         ViewModel.LlmApiKey = LlmApiKeyBox.Password;
+    }
+
+    private void OnAsanaTokenChanged(object sender, RoutedEventArgs e)
+    {
+        // PasswordBox → ViewModel に手動同期
+        ViewModel.AsanaToken = AsanaTokenBox.Password;
     }
 }
