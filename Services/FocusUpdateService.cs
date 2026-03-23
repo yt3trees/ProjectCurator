@@ -168,23 +168,38 @@ public class FocusUpdateService
 
         ## Update rules
 
-        1. PRESERVE all lines originally written by the user unless a task is clearly completed.
+        1. Keep user-written lines that are still relevant. You may modify or remove lines when they
+           are clearly outdated or superseded by Asana task data (e.g., a task has been completed).
         2. PRESERVE the existing Markdown heading/section structure exactly (do not add, remove, or rename sections).
         3. For each in-progress Asana task ([担当] owner tasks with 🔄 or high priority [ ]):
            - If a matching item already exists in the file → keep it as is (no duplicate).
-           - If it is missing from "What I'm working on" or "Next up" sections → add it.
+           - If it is missing from "What I'm working on" or "Next up" sections → add it,
+             rephrased to match the document's existing writing style.
         4. For "Not started, other" tasks ([担当]):
-           - These are upcoming tasks. Add them to the "Next up" (or equivalent) section if not already present.
+           - These are upcoming tasks. Add them to the "Next up" (or equivalent) section if not already
+             present, rephrased to match the document's existing writing style.
            - Do not add them to "What I'm working on".
         5. For each completed Asana task (✅ or [x]):
-           - If a matching item exists in the file → append " [完了]" to the end of that line.
-           - Do NOT delete the line.
+           - If a matching item exists in the file → remove that line entirely.
+           - Do not leave completed tasks in the document.
         6. [コラボ] (collaborator) tasks:
            - Exclude them unless already present in the file.
            - If already present → keep them (do not add [完了] based on collab tasks alone).
            - Exception: if a collab task is due today or tomorrow AND clearly requires the user's action, you may mention it, prefixed with [コラボ].
         7. Update the date line at the bottom with today's date. The line may use "更新: YYYY-MM-DD" or "Last Updated: YYYY-MM-DD" format — preserve whichever format is already used. Do NOT add a second date line.
         8. Do not fabricate information. Only use data present in the provided task lists.
+
+        ## Writing style
+
+        - Asana task titles are raw source data, not final text. When adding a new item, rephrase it
+          to match the tone, granularity, and sentence style of existing items in that section.
+        - Mirror the document's voice: if existing items are phrased as short action-oriented notes,
+          keep additions short and action-oriented. If they are narrative phrases, write narratively.
+        - Do not list every Asana task mechanically. Add only tasks that represent genuinely new
+          information not already captured by existing entries. Prefer fewer, more meaningful
+          additions over exhaustive coverage.
+        - If a task title is too vague or cryptic to fit naturally into the document, skip it rather
+          than pasting it verbatim.
         """;
 
     private static string BuildUserPrompt(
