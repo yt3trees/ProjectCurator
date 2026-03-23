@@ -37,6 +37,17 @@ public class AsanaGlobalConfig
 }
 
 /// <summary>
+/// window_state.json に対応する設定クラス。
+/// </summary>
+public class WindowPlacement
+{
+    public double Left { get; set; }
+    public double Top { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+}
+
+/// <summary>
 /// settings.json に対応する設定クラス。
 /// </summary>
 public class AppSettings

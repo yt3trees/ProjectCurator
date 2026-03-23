@@ -24,6 +24,7 @@ public partial class MainWindow : FluentWindow
     private readonly MainWindowViewModel _viewModel;
     private readonly IPageService _pageService;
     private readonly IContentDialogService _contentDialogService;
+    private readonly ConfigService _configService;
     private IntPtr _hwnd;
 
     // ウィンドウが画面上に表示されているかのフラグ (Hide() を使わない方式)
@@ -35,7 +36,8 @@ public partial class MainWindow : FluentWindow
         TrayService trayService,
         MainWindowViewModel viewModel,
         IPageService pageService,
-        IContentDialogService contentDialogService)
+        IContentDialogService contentDialogService,
+        ConfigService configService)
     {
         _serviceProvider = serviceProvider;
         _hotkeyService = hotkeyService;
@@ -43,6 +45,7 @@ public partial class MainWindow : FluentWindow
         _viewModel = viewModel;
         _pageService = pageService;
         _contentDialogService = contentDialogService;
+        _configService = configService;
 
         DataContext = _viewModel;
         InitializeComponent();
@@ -109,6 +112,18 @@ public partial class MainWindow : FluentWindow
     /// </summary>
     private void MoveOffScreen()
     {
+        // 画面外に移動する前にウィンドウ位置・サイズを保存する
+        if (_isShownOnScreen)
+        {
+            _configService.SaveWindowPlacement(new Models.WindowPlacement
+            {
+                Left = Left,
+                Top = Top,
+                Width = Width,
+                Height = Height,
+            });
+        }
+
         FlashBlocker.Visibility = Visibility.Visible;
         System.Windows.Media.CompositionTarget.Rendering -= OnFlashBlockerRenderedThenMoveOff;
         System.Windows.Media.CompositionTarget.Rendering += OnFlashBlockerRenderedThenMoveOff;
@@ -128,8 +143,31 @@ public partial class MainWindow : FluentWindow
     private void MoveOnScreen()
     {
         var workArea = SystemParameters.WorkArea;
-        Left = workArea.Left + (workArea.Width - Width) / 2;
-        Top = workArea.Top + (workArea.Height - Height) / 2;
+        var saved = _configService.LoadWindowPlacement();
+
+        if (saved != null)
+        {
+            Width = saved.Width;
+            Height = saved.Height;
+        }
+
+        // ウィンドウが作業領域より大きい場合はサイズを縮小する (MinWidth/MinHeight は守る)
+        if (Width > workArea.Width)
+            Width = Math.Max(MinWidth, workArea.Width);
+        if (Height > workArea.Height)
+            Height = Math.Max(MinHeight, workArea.Height);
+
+        if (saved != null)
+        {
+            // 保存された位置が作業領域内に収まるよう調整する
+            Left = Math.Max(workArea.Left, Math.Min(saved.Left, workArea.Right - Width));
+            Top = Math.Max(workArea.Top, Math.Min(saved.Top, workArea.Bottom - Height));
+        }
+        else
+        {
+            Left = workArea.Left + (workArea.Width - Width) / 2;
+            Top = workArea.Top + (workArea.Height - Height) / 2;
+        }
         _isShownOnScreen = true;
         WindowState = WindowState.Normal;
         Activate();

@@ -135,6 +135,32 @@ public class ConfigService
         File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
+    // ---------- WindowPlacement ----------
+
+    public WindowPlacement? LoadWindowPlacement()
+    {
+        var path = Path.Combine(ConfigDir, "window_state.json");
+        if (!File.Exists(path))
+            return null;
+        try
+        {
+            var content = File.ReadAllText(path, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            return JsonSerializer.Deserialize<WindowPlacement>(content, JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public void SaveWindowPlacement(WindowPlacement placement)
+    {
+        EnsureConfigDir();
+        var path = Path.Combine(ConfigDir, "window_state.json");
+        var json = JsonSerializer.Serialize(placement, JsonOptions);
+        File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
     // ---------- private ----------
 
     private void EnsureConfigDir()
