@@ -1198,6 +1198,15 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                 (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#8b949e"));
         var diffRenderer = new DiffLineBackgroundRenderer();
         diffViewer.TextArea.TextView.BackgroundRenderers.Add(diffRenderer);
+        diffViewer.PreviewMouseWheel += (s, e) =>
+        {
+            if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) return;
+            var sv = FindVisualChild<ScrollViewer>(diffViewer);
+            if (sv == null || sv.ScrollableWidth <= 0) return;
+            const double step = 48d;
+            sv.ScrollToHorizontalOffset(sv.HorizontalOffset + (e.Delta > 0 ? -step : step));
+            e.Handled = true;
+        };
 
         void RefreshDiff(string proposed)
         {
