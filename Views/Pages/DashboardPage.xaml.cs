@@ -516,11 +516,13 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "git",
-                    Arguments = $"-C \"{repoPath}\" status --porcelain=1 --untracked-files=normal",
+                    Arguments = $"-c core.quotepath=false -C \"{repoPath}\" status --porcelain=1 --untracked-files=normal",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
                 }
             };
 
