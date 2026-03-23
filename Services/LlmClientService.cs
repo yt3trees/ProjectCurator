@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -101,9 +102,17 @@ public class LlmClientService
         foreach (var (role, content) in messages)
             allMessages.Add(new { role, content });
 
-        object payload = isAzure
-            ? new { messages = allMessages, temperature = 0.3 }
-            : new { model = model2, messages = allMessages, temperature = 0.3 };
+        // ペイロードを動的に構築
+        var payload = new Dictionary<string, object>
+        {
+            ["messages"] = allMessages
+        };
+        if (!isAzure)
+            payload["model"] = model2;
+
+        // ユーザー設定パラメータをマージ
+        foreach (var (key, rawValue) in settings.LlmParameters)
+            payload[key] = ParseParamValue(rawValue);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         if (isAzure)
@@ -124,6 +133,15 @@ public class LlmClientService
         }
 
         return ExtractContent(json);
+    }
+
+    private static object ParseParamValue(string value)
+    {
+        var v = value.Trim();
+        if (bool.TryParse(v, out var b)) return b;
+        if (long.TryParse(v, out var l)) return l;
+        if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var d)) return d;
+        return v;
     }
 
     private static string ExtractContent(string json)

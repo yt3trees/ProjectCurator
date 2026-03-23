@@ -93,6 +93,10 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string llmApiVersion = "2024-12-01-preview";
 
+    // LLM 追加パラメータ (key = value 形式、1行1パラメータ)
+    [ObservableProperty]
+    private string llmParametersText = "";
+
     [ObservableProperty]
     private string llmStatus = "";
 
@@ -166,6 +170,8 @@ public partial class SettingsViewModel : ObservableObject
             LlmModel       = settings.LlmModel;
             LlmEndpoint    = settings.LlmEndpoint;
             LlmApiVersion  = settings.LlmApiVersion;
+            LlmParametersText = string.Join("\n",
+                settings.LlmParameters.Select(kv => $"{kv.Key} = {kv.Value}"));
             LlmIsAzure         = settings.LlmProvider.Equals("azure_openai", StringComparison.OrdinalIgnoreCase);
             LlmStatus          = "";
             AiEnabled          = settings.AiEnabled;
@@ -214,12 +220,13 @@ public partial class SettingsViewModel : ObservableObject
         settings.BoxProjectsRoot = BoxProjectsRoot.Trim();
         settings.ObsidianVaultRoot = ObsidianVaultRoot.Trim();
         // LLM 設定も同時に保存 (どちらの Save ボタンを押してもすべて反映される)
-        settings.LlmProvider   = LlmProvider.Trim();
-        settings.LlmApiKey     = LlmApiKey.Trim();
-        settings.LlmModel      = LlmModel.Trim();
-        settings.LlmEndpoint   = LlmEndpoint.Trim();
-        settings.LlmApiVersion = LlmApiVersion.Trim();
-        settings.AiEnabled     = AiEnabled;
+        settings.LlmProvider    = LlmProvider.Trim();
+        settings.LlmApiKey      = LlmApiKey.Trim();
+        settings.LlmModel       = LlmModel.Trim();
+        settings.LlmEndpoint    = LlmEndpoint.Trim();
+        settings.LlmApiVersion  = LlmApiVersion.Trim();
+        settings.LlmParameters  = ParseLlmParametersText(LlmParametersText);
+        settings.AiEnabled      = AiEnabled;
         _configService.SaveSettings(settings);
         UpdateWorkspacePathsWarning();
     }
@@ -228,12 +235,13 @@ public partial class SettingsViewModel : ObservableObject
     public void SaveLlm()
     {
         var settings = _configService.LoadSettings();
-        settings.LlmProvider   = LlmProvider.Trim();
-        settings.LlmApiKey     = LlmApiKey.Trim();
-        settings.LlmModel      = LlmModel.Trim();
-        settings.LlmEndpoint   = LlmEndpoint.Trim();
-        settings.LlmApiVersion = LlmApiVersion.Trim();
-        settings.AiEnabled     = AiEnabled;
+        settings.LlmProvider    = LlmProvider.Trim();
+        settings.LlmApiKey      = LlmApiKey.Trim();
+        settings.LlmModel       = LlmModel.Trim();
+        settings.LlmEndpoint    = LlmEndpoint.Trim();
+        settings.LlmApiVersion  = LlmApiVersion.Trim();
+        settings.LlmParameters  = ParseLlmParametersText(LlmParametersText);
+        settings.AiEnabled      = AiEnabled;
         _configService.SaveSettings(settings);
         LlmStatus = $"Saved {DateTime.Now:HH:mm:ss}";
     }
@@ -344,6 +352,21 @@ public partial class SettingsViewModel : ObservableObject
     {
         if (_loading) return;
         UpdateWorkspacePathsWarning();
+    }
+
+    private static Dictionary<string, string> ParseLlmParametersText(string text)
+    {
+        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var idx = line.IndexOf('=');
+            if (idx <= 0) continue;
+            var key = line[..idx].Trim();
+            var val = line[(idx + 1)..].Trim();
+            if (key.Length > 0)
+                dict[key] = val;
+        }
+        return dict;
     }
 
     private void UpdateWorkspacePathsWarning()

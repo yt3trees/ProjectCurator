@@ -327,6 +327,23 @@
                                  BorderBrush="{DynamicResource AppSurface2}"/>
                     </StackPanel>
 
+                    <!-- Extra Parameters -->
+                    <TextBlock Text="Extra Parameters" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
+                    <TextBlock Text="One parameter per line: key = value  (e.g. reasoning_effort = medium)" FontSize="11"
+                               Foreground="{DynamicResource AppSubtext0}" Margin="0,1,0,4"/>
+                    <TextBox Text="{Binding LlmParametersText, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,0,10" Padding="6,4"
+                             AcceptsReturn="True"
+                             MinHeight="60"
+                             TextWrapping="NoWrap"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             FontFamily="Consolas, Courier New"
+                             FontSize="12"
+                             Background="{DynamicResource AppSurface1}"
+                             Foreground="{DynamicResource AppText}"
+                             BorderBrush="{DynamicResource AppSurface2}"/>
+
                     <StackPanel Orientation="Horizontal" Margin="0,4,0,6">
                         <ui:Button Content="Save LLM Settings"
                                    Command="{Binding SaveLlmCommand}"

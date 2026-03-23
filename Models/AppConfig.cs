@@ -68,4 +68,6 @@ public class AppSettings
     public string LlmEndpoint { get; set; } = "";              // Azure OpenAI のエンドポイント URL
     public string LlmApiVersion { get; set; } = "2024-12-01-preview"; // Azure OpenAI の API バージョン
     public bool AiEnabled { get; set; } = false;               // AI 機能を有効にするか
+    // 追加パラメータ (reasoning_effort, temperature, max_tokens 等)
+    public Dictionary<string, string> LlmParameters { get; set; } = [];
 }
