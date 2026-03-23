@@ -1411,6 +1411,14 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             Owner = Window.GetWindow(this), ShowInTaskbar = false,
             Background = surface
         };
+        System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight         = 0,
+                ResizeBorderThickness = new Thickness(4),
+                GlassFrameThickness   = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
 
         // ---- イベント ----
         void Complete(bool apply, string? content)

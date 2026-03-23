@@ -114,6 +114,18 @@ When adding modal dialogs, follow the patterns in `DashboardPage.xaml.cs` (canon
 ### WPF Control Best Practices
 
 - ComboBox: do not set an explicit `Height`. Use `Padding` instead (e.g., `Padding = new Thickness(6, 4, 4, 4)`) and let the control auto-size. A fixed height causes the text to be clipped at the bottom.
+- Frameless resizable windows: when using `WindowStyle = WindowStyle.None` with `ResizeMode = ResizeMode.CanResize`, the DWM adds a white resize border. Apply `WindowChrome` immediately after window creation to remove it while keeping resize functionality:
+
+```csharp
+System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
+    new System.Windows.Shell.WindowChrome
+    {
+        CaptionHeight         = 0,
+        ResizeBorderThickness = new Thickness(4),
+        GlassFrameThickness   = new Thickness(0),
+        UseAeroCaptionButtons = false
+    });
+```
 
 ## NuGet Dependencies
 
