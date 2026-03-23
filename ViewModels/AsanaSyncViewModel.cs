@@ -80,6 +80,16 @@ public partial class AsanaSyncViewModel : ObservableObject
         _asanaSyncService = asanaSyncService;
     }
 
+    public void StartScheduler()
+    {
+        var settings = _configService.LoadSettings();
+        if (settings.AsanaSync != null)
+        {
+            IntervalMin = settings.AsanaSync.IntervalMin > 0 ? settings.AsanaSync.IntervalMin : 60;
+            ScheduleEnabled = settings.AsanaSync.Enabled;  // OnScheduleEnabledChanged でタイマー開始
+        }
+    }
+
     public async Task InitAsync()
     {
         if (_initialized) return;
@@ -90,14 +100,7 @@ public partial class AsanaSyncViewModel : ObservableObject
         Projects.Clear();
         foreach (var p in infos) Projects.Add(p);
 
-        // スケジュール設定読み込み
-        var settings = _configService.LoadSettings();
-        if (settings.AsanaSync != null)
-        {
-            IntervalMin = settings.AsanaSync.IntervalMin > 0 ? settings.AsanaSync.IntervalMin : 60;
-            ScheduleEnabled = settings.AsanaSync.Enabled;  // OnScheduleEnabledChanged でタイマー開始
-        }
-
+        // スケジュール設定は StartScheduler() で読み込み済み
     }
 
     [RelayCommand]
@@ -227,7 +230,7 @@ public partial class AsanaSyncViewModel : ObservableObject
 
         try
         {
-            await _asanaSyncService.RunAsync(AppendOutput);
+            await Task.Run(async () => await _asanaSyncService.RunAsync(AppendOutput));
             AppendOutput("\n--- Done (exit: 0) ---\n");
             LastSyncTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         }
@@ -261,7 +264,7 @@ public partial class AsanaSyncViewModel : ObservableObject
 
     private void AppendOutput(string text)
     {
-        Application.Current.Dispatcher.Invoke(() => OutputLog += text);
+        Application.Current.Dispatcher.InvokeAsync(() => OutputLog += text);
     }
 
     private static (string ProjectGid, string WorkstreamId)? ParseWorkstreamMapLine(string line)

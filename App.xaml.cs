@@ -43,6 +43,10 @@ public partial class App : WpfApplication
         var standup = _serviceProvider.GetRequiredService<StandupGeneratorService>();
         standup.StartScheduler();
 
+        // Asana Sync スケジュールタイマー起動
+        var asanaSync = _serviceProvider.GetRequiredService<AsanaSyncViewModel>();
+        asanaSync.StartScheduler();
+
         // MainWindow 表示
         var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         // 画面外に配置してから Show() することで、DWM 初期化時のフラッシュを防ぐ。
