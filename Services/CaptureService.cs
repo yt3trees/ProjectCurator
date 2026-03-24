@@ -333,21 +333,31 @@ public class CaptureService
 
     /// <summary>
     /// 選択中 project の asana_config.json から GID マッピングを読み込む。
+    /// asana_global.json の personal_project_gids も含めて返す (重複除去済み)。
     /// </summary>
     public (List<string> projectGids, Dictionary<string, string> workstreamMap) LoadAsanaProjectGids(ProjectInfo project)
     {
+        AsanaProjectConfig cfg = new();
         var path = ResolveAsanaConfigPath(project);
-        if (!File.Exists(path)) return ([], []);
-        try
+        if (File.Exists(path))
         {
-            var (content, _) = _encoding.ReadFile(path);
-            var cfg = JsonSerializer.Deserialize<AsanaProjectConfig>(content, JsonOpts) ?? new AsanaProjectConfig();
-            return (cfg.AsanaProjectGids, cfg.WorkstreamProjectMap);
+            try
+            {
+                var (content, _) = _encoding.ReadFile(path);
+                cfg = JsonSerializer.Deserialize<AsanaProjectConfig>(content, JsonOpts) ?? cfg;
+            }
+            catch { }
         }
-        catch
-        {
-            return ([], []);
-        }
+
+        // asana_global.json の personal_project_gids を追加
+        var personalGids = _configService.LoadAsanaGlobalConfig().PersonalProjectGids ?? [];
+        var mergedGids = cfg.AsanaProjectGids
+            .Concat(personalGids)
+            .Where(g => !string.IsNullOrWhiteSpace(g))
+            .Distinct()
+            .ToList();
+
+        return (mergedGids, cfg.WorkstreamProjectMap);
     }
 
     /// <summary>
