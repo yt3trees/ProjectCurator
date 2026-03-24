@@ -59,6 +59,7 @@ public class AsanaTaskCreatePreview
     public string TaskName { get; set; } = "";
     public string Notes { get; set; } = "";
     public string DueOn { get; set; } = "";
+    public string DueAt { get; set; } = "";   // ISO 8601 with timezone, e.g. "2024-01-15T09:00:00.000+09:00"
     public string RequestJson { get; set; } = "";   // 実際に送信する JSON (Authorization 除く)
 }
 

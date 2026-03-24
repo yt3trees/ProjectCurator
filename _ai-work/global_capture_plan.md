@@ -618,8 +618,11 @@ UI 依存コードに選定ロジックを埋め込まない。
 | `MainWindow.xaml.cs` | キャプチャホットキーハンドラ、ShowCaptureWindow、NavigateToEditorAndTriggerFocusUpdate 追加 |
 | `Services/FocusUpdateService.cs` | GenerateProposalAsync / BuildUserPrompt に capturedContext 引数追加。Quick Capture からの入力をプロンプトに組み込む |
 | `ViewModels/EditorViewModel.cs` | RequestFocusUpdateOnOpen(capturedText)、_capturedContextForFocusUpdate フィールド、UpdateStatus() での自動発火ロジック追加 |
-| `Views/Pages/SettingsPage.xaml` | キャプチャホットキー設定 UI (未実装) |
-| `ViewModels/SettingsViewModel.cs` | キャプチャホットキー設定の保存/読み込み (未実装) |
+| `Views/Pages/SettingsPage.xaml` | キャプチャホットキー設定 UI + 補助ログトグル追加 |
+| `ViewModels/SettingsViewModel.cs` | キャプチャホットキー設定の保存/読み込み + CaptureTaskLogEnabled |
+| `Services/TrayService.cs` | OnCaptureActivated Action + Quick Capture メニュー項目追加 |
+| `Views/Pages/DashboardPage.xaml` | キャプチャ履歴ボタン (Note24) 追加 |
+| `Views/Pages/DashboardPage.xaml.cs` | ConfigService DI 追加 + ShowCaptureLogDialogAsync 実装 |
 
 ## 実装順序
 
@@ -650,13 +653,52 @@ Phase 2 + Phase 3 (task は Asana API 直接起票, tension/memo) + Phase 4 (4-1
 
 Global Capture は他機能と独立して実装可能。decision ルートは AI Decision Log と連携するが、必須ではない (後から接続可能)。
 
+## 追加実装済み機能 (Phase 7)
+
+### 7-1. キャプチャホットキー Settings UI (1-4 の完成)
+- `Views/Pages/SettingsPage.xaml`: "Quick Capture Hotkey" セクション追加 (Global Hotkey 直後)
+  - Ctrl/Shift/Alt/Win チェックボックス + キー入力 + Apply ボタン
+  - "Append to asana-tasks.md on task creation" トグル (CaptureTaskLogEnabled) も同セクションに配置
+- `ViewModels/SettingsViewModel.cs`: CaptureHotkeyCtrl/Shift/Alt/Win/Key プロパティ + ApplyCaptureHotkeyCommand + CaptureTaskLogEnabled
+- `Views/Pages/SettingsPage.xaml.cs`: OnApplyCaptureHotkey ハンドラ追加
+
+### 7-2. Asana 起票補助ログ (3-3 の完成)
+- `Models/AppConfig.cs`: CaptureTaskLogEnabled プロパティ追加 (デフォルト false)
+- `Services/CaptureService.cs`: CreateAsanaTaskAsync 成功時に AppendTaskToAsanaLogAsync を呼び出し
+  - asana-tasks.md へ `- [ ] {name} [id:gid] (Due: date)` 形式で追記
+
+### 7-3. ファイル書き込み失敗時のフォールバック (6-4 の完成)
+- `Services/CaptureService.cs`:
+  - AppendToTensionsAsync: try-catch 追加。失敗時は `[tension]` プレフィックス付きで capture_log.md へフォールバック。親ディレクトリ不存在時は Directory.CreateDirectory で作成
+  - AppendToCaptureLogAsync: try-catch 追加。失敗時はエラーメッセージを返す
+
+### 7-4. Asana API 起票失敗時の in-window エラー + Retry/Save as memo (6-5 の完成)
+- `Views/CaptureWindow.cs`:
+  - TaskApproval パネルにエラー TextBlock (OrangeRed) + Save as memo ボタンを追加
+  - OnApproveClick: MessageBox 廃止 → インライン表示。失敗時は Approve ボタンが "Retry" に変わり Save as memo が表示される
+  - OnSaveAsMemoClick: memo ルートに振り直す
+
+### 7-5. トレイアイコン Quick Capture 導線
+- `Services/TrayService.cs`: OnCaptureActivated Action 追加。コンテキストメニューに "Quick Capture" アイテムを "Show" 直後に挿入
+- `MainWindow.xaml.cs`: _trayService.OnCaptureActivated = ShowCaptureWindow を追加
+
+### 7-6. Dashboard キャプチャ履歴ボタン
+- `Views/Pages/DashboardPage.xaml`: Lightbulb ボタン右隣に Note24 アイコンのボタンを常時表示
+- `Views/Pages/DashboardPage.xaml.cs`:
+  - ConfigService を DI で追加
+  - ShowCaptureLogDialogAsync(): capture_log.md をパースして最新順 ListBox + フルコンテンツ TextBox のダイアログ表示
+  - "Open in Editor" は OS のデフォルトエディタで開く (capture_log.md はプロジェクト外ファイルのため)
+
+---
+
 ## 将来の拡張案
 
 - 音声入力対応 (Windows Speech Recognition API でテキスト変換後に同じフローに流す)
-- キャプチャ履歴の閲覧 (capture_log.md を Timeline ページで時系列表示)
+- キャプチャ履歴の閲覧をさらに強化 (capture_log.md を Timeline ページで時系列表示)
 - Asana API 直接書き戻し時の追加属性対応 (custom_fields 等)
 - コンテキスト添付 (クリップボードの画像やURLを入力と一緒にキャプチャ)
 - キーワードベースの即時ルーティング (「TODO:」で始まれば AI 不要で task に直接ルーティング)
+- クリップボード自動入力 (ホットキー起動時に選択テキストを入力欄にセット)
 
 ## 処理ロジック (Mermaid)
 

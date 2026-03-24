@@ -71,7 +71,11 @@ public class CaptureWindow : Window
     private StackPanel _asanaSectionRow = null!;
     private System.Windows.Controls.ComboBox _asanaSectionCombo = null!;
     private StackPanel _dueDateRow = null!;
-    private System.Windows.Controls.TextBox _dueDateBox = null!;
+    private StackPanel _timePickerRow = null!;
+    private System.Windows.Controls.DatePicker _dueDatePicker = null!;
+    private System.Windows.Controls.CheckBox _setTimeCheckBox = null!;
+    private System.Windows.Controls.ComboBox _hourCombo = null!;
+    private System.Windows.Controls.ComboBox _minuteCombo = null!;
     private System.Windows.Controls.TextBlock _confirmErrorText = null!;
 
     // ── Task Approval screen ──────────────────────────────────────────────
@@ -414,29 +418,51 @@ public class CaptureWindow : Window
         // Due Date (task のみ)
         _dueDateRow = BuildFieldRow("Due Date");
         _dueDateRow.Visibility = Visibility.Collapsed;
-        _dueDateBox = new System.Windows.Controls.TextBox
+        _dueDatePicker = new System.Windows.Controls.DatePicker
         {
             Width = 140,
             Background = Surface1,
             Foreground = Text,
-            CaretBrush = Text,
             BorderBrush = Surface2,
             BorderThickness = new Thickness(1),
-            Padding = new Thickness(6, 4, 6, 4),
+            Padding = new Thickness(4, 2, 4, 2),
             FontSize = 12,
-            ToolTip = "YYYY-MM-DD  (leave empty for no due date)"
+            ToolTip = "Select a due date (optional)"
         };
-        var dueDateHint = new System.Windows.Controls.TextBlock
+        _setTimeCheckBox = new System.Windows.Controls.CheckBox
         {
-            Text = "YYYY-MM-DD",
+            Content = "Set time",
             Foreground = Subtext,
             FontSize = 11,
             VerticalAlignment = WpfVA.Center,
-            Margin = new Thickness(6, 0, 0, 0)
+            Margin = new Thickness(10, 0, 0, 0)
         };
-        _dueDateRow.Children.Add(_dueDateBox);
-        _dueDateRow.Children.Add(dueDateHint);
+        _setTimeCheckBox.Checked   += (_, _) => _timePickerRow.Visibility = Visibility.Visible;
+        _setTimeCheckBox.Unchecked += (_, _) => _timePickerRow.Visibility = Visibility.Collapsed;
+        _dueDateRow.Children.Add(_dueDatePicker);
+        _dueDateRow.Children.Add(_setTimeCheckBox);
         fields.Children.Add(_dueDateRow);
+
+        // Time pickers (task のみ、"Set time" チェック時のみ表示)
+        _timePickerRow = BuildFieldRow("Time");
+        _timePickerRow.Visibility = Visibility.Collapsed;
+        _hourCombo = BuildComboBox(
+            Enumerable.Range(0, 24).Select(h => h.ToString("00")), 60);
+        _hourCombo.SelectedIndex = 9;  // default 09:00
+        var colonLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = ":",
+            Foreground = Text,
+            FontSize = 13,
+            VerticalAlignment = WpfVA.Center,
+            Margin = new Thickness(4, 0, 4, 0)
+        };
+        _minuteCombo = BuildComboBox(["00", "15", "30", "45"], 60);
+        _minuteCombo.SelectedIndex = 0;
+        _timePickerRow.Children.Add(_hourCombo);
+        _timePickerRow.Children.Add(colonLabel);
+        _timePickerRow.Children.Add(_minuteCombo);
+        fields.Children.Add(_timePickerRow);
 
         Grid.SetRow(fields, 2);
         _confirmPanel.Children.Add(fields);
@@ -802,11 +828,31 @@ public class CaptureWindow : Window
 
         // payload 組み立て (最終確定値から)
         var notes = _classification.Body;
-        var dueOn = _dueDateBox.Text.Trim();
-        if (!string.IsNullOrWhiteSpace(dueOn) && !IsValidDate(dueOn))
+        var selectedDate = _dueDatePicker.SelectedDate;
+        var hasTime = _setTimeCheckBox.IsChecked == true;
+
+        if (hasTime && selectedDate == null)
         {
-            SetConfirmError($"Invalid due date format: \"{dueOn}\". Use YYYY-MM-DD or leave empty.");
+            SetConfirmError("Please select a due date when setting a time.");
             return;
+        }
+
+        var dueOn = "";
+        var dueAt = "";
+        if (selectedDate.HasValue)
+        {
+            if (hasTime)
+            {
+                var h = int.Parse((string)_hourCombo.SelectedItem!);
+                var m = int.Parse((string)_minuteCombo.SelectedItem!);
+                var dto = new DateTimeOffset(selectedDate.Value.Year, selectedDate.Value.Month, selectedDate.Value.Day,
+                    h, m, 0, DateTimeOffset.Now.Offset);
+                dueAt = dto.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+            }
+            else
+            {
+                dueOn = selectedDate.Value.ToString("yyyy-MM-dd");
+            }
         }
 
         var preview = new AsanaTaskCreatePreview
@@ -817,7 +863,8 @@ public class CaptureWindow : Window
             SectionGid = selectedSection?.Gid ?? "",
             TaskName = _classification.Summary,
             Notes = notes,
-            DueOn = dueOn
+            DueOn = dueOn,
+            DueAt = dueAt
         };
 
         // request JSON 組み立て (機密除外)
@@ -827,7 +874,9 @@ public class CaptureWindow : Window
             ["notes"] = preview.Notes,
             ["projects"] = new[] { preview.ProjectGid }
         };
-        if (!string.IsNullOrWhiteSpace(preview.DueOn))
+        if (!string.IsNullOrWhiteSpace(preview.DueAt))
+            requestData["due_at"] = preview.DueAt;
+        else if (!string.IsNullOrWhiteSpace(preview.DueOn))
             requestData["due_on"] = preview.DueOn;
         if (!string.IsNullOrWhiteSpace(preview.SectionGid))
             requestData["memberships"] = new[]
@@ -925,6 +974,7 @@ public class CaptureWindow : Window
         _asanaProjectRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
         _asanaSectionRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
         _dueDateRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
+        if (!isTask) _timePickerRow.Visibility = Visibility.Collapsed;
 
         if (isTask)
             _ = LoadAsanaProjectsForCurrentProjectAsync();
@@ -1016,9 +1066,15 @@ public class CaptureWindow : Window
         _asanaProjectRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
         _asanaSectionRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
         _dueDateRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
+        _timePickerRow.Visibility = Visibility.Collapsed;
 
         // AI が提案した期限を初期値にセット
-        _dueDateBox.Text = isTask ? (_classification.DueOn ?? "") : "";
+        if (isTask && !string.IsNullOrWhiteSpace(_classification.DueOn) &&
+            System.DateTime.TryParse(_classification.DueOn, out var parsedDate))
+            _dueDatePicker.SelectedDate = parsedDate;
+        else
+            _dueDatePicker.SelectedDate = null;
+        _setTimeCheckBox.IsChecked = false;
 
         SetConfirmError("");
 

@@ -20,12 +20,14 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
 
     private readonly LlmClientService _llmClientService;
     private readonly FileEncodingService _fileEncodingService;
+    private readonly ConfigService _configService;
 
-    public DashboardPage(DashboardViewModel viewModel, LlmClientService llmClientService, FileEncodingService fileEncodingService)
+    public DashboardPage(DashboardViewModel viewModel, LlmClientService llmClientService, FileEncodingService fileEncodingService, ConfigService configService)
     {
         ViewModel = viewModel;
         _llmClientService = llmClientService;
         _fileEncodingService = fileEncodingService;
+        _configService = configService;
         DataContext = ViewModel;
 
         ViewModel.OnOpenInEditor = project =>
@@ -200,6 +202,255 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         }
 
         public string DisplayLabel => $"{RelativePath}  ({SummaryText})";
+    }
+
+    private async void OnShowCaptureLogClick(object sender, RoutedEventArgs e)
+        => await ShowCaptureLogDialogAsync();
+
+    private async Task ShowCaptureLogDialogAsync()
+    {
+        var logPath = Path.Combine(_configService.ConfigDir, "capture_log.md");
+
+        List<CaptureLogEntry> entries;
+        if (!File.Exists(logPath))
+        {
+            entries = [];
+        }
+        else
+        {
+            var (content, _) = await _fileEncodingService.ReadFileAsync(logPath);
+            entries = ParseCaptureLog(content);
+        }
+
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var accent   = appResources.Contains("AppPeach")
+            ? (System.Windows.Media.Brush)appResources["AppPeach"]
+            : text;
+
+        // タイトルバー
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "●",
+            Foreground = accent,
+            FontSize = 11,
+            Margin = new Thickness(12, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Capture Log",
+            Foreground = text,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+
+        var closeBtn = new System.Windows.Controls.Button
+        {
+            Content = "✕",
+            Width = 34,
+            Height = 26,
+            Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Foreground = subtext,
+            FontSize = 13
+        };
+        Grid.SetColumn(closeBtn, 2);
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+        titleBar.Children.Add(closeBtn);
+
+        // エントリリスト
+        var helperText = new System.Windows.Controls.TextBlock
+        {
+            Text = entries.Count == 0
+                ? "No captures yet."
+                : $"{entries.Count} entries (newest first)",
+            Foreground = subtext,
+            FontSize = 12,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+
+        var entryList = new System.Windows.Controls.ListBox
+        {
+            MinHeight = 160,
+            MaxHeight = 200,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            DisplayMemberPath = nameof(CaptureLogEntry.DisplayLabel)
+        };
+        foreach (var entry in entries) entryList.Items.Add(entry);
+
+        // フルコンテンツ表示
+        var detailBox = new System.Windows.Controls.TextBox
+        {
+            Margin = new Thickness(0, 8, 0, 0),
+            MinHeight = 160,
+            MaxHeight = 200,
+            IsReadOnly = true,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            FontSize = 12,
+            Text = entries.Count == 0 ? "(no captures)" : "(select an entry)"
+        };
+
+        entryList.SelectionChanged += (_, _) =>
+        {
+            if (entryList.SelectedItem is CaptureLogEntry sel)
+                detailBox.Text = sel.Content;
+        };
+
+        var contentPanel = new StackPanel
+        {
+            Margin = new Thickness(16, 12, 16, 10),
+            Children = { helperText, entryList, detailBox }
+        };
+
+        // フッター
+        var openEditorBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Open in Editor",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 130,
+            Height = 32,
+            Margin = new Thickness(0, 0, 8, 0),
+            IsEnabled = File.Exists(logPath)
+        };
+        var closeFooterBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Close",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 100,
+            Height = 32,
+            IsCancel = true
+        };
+        var footer = new StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 0, 16, 12),
+            Children = { openEditorBtn, closeFooterBtn }
+        };
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(contentPanel, 1);
+        Grid.SetRow(footer, 2);
+        root.Children.Add(titleBar);
+        root.Children.Add(contentPanel);
+        root.Children.Add(footer);
+
+        var owner = Window.GetWindow(this);
+        var dialogWindow = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStyle = WindowStyle.None,
+            Width = 600,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            SizeToContent = SizeToContent.Height,
+            Content = root
+        };
+
+        System.Windows.Shell.WindowChrome.SetWindowChrome(dialogWindow,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 0,
+                ResizeBorderThickness = new Thickness(0),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
+
+        openEditorBtn.Click += (_, _) =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(logPath) { UseShellExecute = true }); }
+            catch { }
+            dialogWindow.Close();
+        };
+        closeBtn.Click += (_, _) => dialogWindow.Close();
+        closeFooterBtn.Click += (_, _) => dialogWindow.Close();
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == System.Windows.Input.MouseButtonState.Pressed)
+                dialogWindow.DragMove();
+        };
+
+        _ = dialogWindow.ShowDialog();
+    }
+
+    private sealed class CaptureLogEntry
+    {
+        public string Timestamp { get; init; } = "";
+        public string Content { get; init; } = "";
+        public string DisplayLabel
+        {
+            get
+            {
+                var first = Content.Split('\n').FirstOrDefault(l => !string.IsNullOrWhiteSpace(l)) ?? "";
+                var preview = first.Length > 60 ? first[..60] + "…" : first;
+                return string.IsNullOrWhiteSpace(preview) ? $"{Timestamp}  (empty)" : $"{Timestamp}  {preview}";
+            }
+        }
+    }
+
+    private static List<CaptureLogEntry> ParseCaptureLog(string content)
+    {
+        var entries = new List<CaptureLogEntry>();
+        string? ts = null;
+        var body = new StringBuilder();
+
+        foreach (var rawLine in content.Split('\n'))
+        {
+            var line = rawLine.TrimEnd('\r');
+            if (line.StartsWith("## "))
+            {
+                if (ts != null)
+                    entries.Add(new CaptureLogEntry { Timestamp = ts, Content = body.ToString().Trim() });
+                ts = line[3..].Trim();
+                body.Clear();
+            }
+            else
+            {
+                body.AppendLine(line);
+            }
+        }
+        if (ts != null)
+            entries.Add(new CaptureLogEntry { Timestamp = ts, Content = body.ToString().Trim() });
+
+        entries.Reverse(); // 新しい順
+        return entries;
     }
 
     private async Task ShowUncommittedDetailsDialogAsync(ProjectCardViewModel card)

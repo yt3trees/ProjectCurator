@@ -36,6 +36,11 @@
                                Visibility="{Binding IsAiEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <ui:SymbolIcon Symbol="Lightbulb24"/>
                     </ui:Button>
+                    <ui:Button Margin="0,0,6,0" Height="34" Padding="10,0" FontSize="13"
+                               ToolTip="View capture log"
+                               Click="OnShowCaptureLogClick">
+                        <ui:SymbolIcon Symbol="Note24"/>
+                    </ui:Button>
                     <TextBlock Text="Auto:" VerticalAlignment="Center" Margin="0,0,4,0"
                                Foreground="{DynamicResource AppSubtext0}" FontSize="12"/>
                     <ComboBox x:Name="AutoRefreshComboBox"

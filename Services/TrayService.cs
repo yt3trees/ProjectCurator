@@ -15,6 +15,7 @@ public class TrayService : IDisposable
     private bool _disposed;
 
     public Action? OnActivated { get; set; }
+    public Action? OnCaptureActivated { get; set; }
 
     public BitmapSource? DiamondBitmapSource { get; private set; }
 
@@ -35,6 +36,10 @@ public class TrayService : IDisposable
         var showItem = new WinForms.ToolStripMenuItem("Show");
         showItem.Click += (_, _) => OnActivated?.Invoke();
         contextMenu.Items.Add(showItem);
+
+        var quickCaptureItem = new WinForms.ToolStripMenuItem("Quick Capture");
+        quickCaptureItem.Click += (_, _) => OnCaptureActivated?.Invoke();
+        contextMenu.Items.Add(quickCaptureItem);
 
         contextMenu.Items.Add(new WinForms.ToolStripSeparator());
 

@@ -210,6 +210,7 @@ public partial class MainWindow : FluentWindow
 
         // トレイアイコン初期化
         _trayService.OnActivated = ToggleVisibility;
+        _trayService.OnCaptureActivated = ShowCaptureWindow;
         _trayService.Initialize(this);
 
         // ウィンドウアイコンをトレイアイコン (ダイヤモンド) と統一

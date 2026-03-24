@@ -112,7 +112,7 @@ public class CaptureService
         var project = projects.FirstOrDefault(p =>
             string.Equals(p.Name, classification.ProjectName, StringComparison.OrdinalIgnoreCase));
 
-        return classification.Category switch
+        CaptureRouteResult result = classification.Category switch
         {
             "tension" => await AppendToTensionsAsync(classification, project, ct),
             "memo" => await AppendToCaptureLogAsync(classification, originalInput, ct),
@@ -120,6 +120,18 @@ public class CaptureService
             "decision" => BuildDecisionNavigation(classification, project),
             _ => new CaptureRouteResult { Success = false, Message = $"Unknown category: {classification.Category}" }
         };
+
+        // memo は AppendToCaptureLogAsync で書き込み済みのためスキップ。
+        // task は CreateAsanaTaskAsync 内で記録するためスキップ。
+        // その他のカテゴリはここで capture_log.md に副次記録する。
+        if (classification.Category is not ("memo" or "task"))
+        {
+            var proj = string.IsNullOrWhiteSpace(classification.ProjectName) ? "" : $" [{classification.ProjectName}]";
+            await AppendToCaptureLogInternalAsync(
+                $"[{classification.Category}]{proj} {classification.Summary}\n{originalInput}", ct);
+        }
+
+        return result;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -164,7 +176,9 @@ public class CaptureService
         if (!string.IsNullOrWhiteSpace(globalConfig.UserGid))
             dataObj["assignee"] = globalConfig.UserGid;
 
-        if (!string.IsNullOrWhiteSpace(preview.DueOn))
+        if (!string.IsNullOrWhiteSpace(preview.DueAt))
+            dataObj["due_at"] = preview.DueAt;
+        else if (!string.IsNullOrWhiteSpace(preview.DueOn))
             dataObj["due_on"] = preview.DueOn;
 
         if (!string.IsNullOrWhiteSpace(preview.SectionGid) && !string.IsNullOrWhiteSpace(preview.ProjectGid))
@@ -239,6 +253,13 @@ public class CaptureService
         if (settingsForLog.CaptureTaskLogEnabled)
             await AppendTaskToAsanaLogAsync(preview, gid, ct);
 
+        // capture_log.md に常時記録 (category に関わらず全キャプチャを追跡できるようにする)
+        await AppendToCaptureLogInternalAsync(
+            $"[task] {preview.TaskName}\n→ {preview.ProjectName}"
+            + (string.IsNullOrWhiteSpace(preview.SectionName) ? "" : $" / {preview.SectionName}")
+            + (string.IsNullOrWhiteSpace(gid) ? "" : $" (gid:{gid})"),
+            ct);
+
         return new CaptureRouteResult
         {
             Success = true,
@@ -263,7 +284,9 @@ public class CaptureService
         {
             var (content, enc) = await _encoding.ReadFileAsync(outputFile, ct);
             var idTag = string.IsNullOrWhiteSpace(gid) ? "" : $" [id:{gid}]";
-            var dueTag = string.IsNullOrWhiteSpace(preview.DueOn) ? "" : $" (Due: {preview.DueOn})";
+            var dueLabel = !string.IsNullOrWhiteSpace(preview.DueAt) ? preview.DueAt[..16].Replace("T", " ")
+                         : preview.DueOn;
+            var dueTag = string.IsNullOrWhiteSpace(dueLabel) ? "" : $" (Due: {dueLabel})";
             var entry = $"\n- [ ] {preview.TaskName}{idTag}{dueTag}\n";
             await _encoding.WriteFileAsync(outputFile, content.TrimEnd() + entry, enc, ct);
         }
@@ -465,7 +488,18 @@ public class CaptureService
         CancellationToken ct)
     {
         var logPath = Path.Combine(_configService.ConfigDir, "capture_log.md");
+        var ok = await AppendToCaptureLogInternalAsync(originalInput, ct);
+        return ok
+            ? new CaptureRouteResult { Success = true, Message = "Added to capture_log.md", TargetFilePath = logPath }
+            : new CaptureRouteResult { Success = false, Message = "Failed to write capture_log.md" };
+    }
 
+    /// <summary>
+    /// capture_log.md にエントリを追記する共通実装。失敗時は false を返す。
+    /// </summary>
+    private async Task<bool> AppendToCaptureLogInternalAsync(string body, CancellationToken ct)
+    {
+        var logPath = Path.Combine(_configService.ConfigDir, "capture_log.md");
         try
         {
             string existingContent = "";
@@ -475,25 +509,15 @@ public class CaptureService
                 (existingContent, encoding) = await _encoding.ReadFileAsync(logPath, ct);
 
             var ts = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
-            var entry = $"\n## {ts}\n{originalInput}\n";
+            var entry = $"\n## {ts}\n{body}\n";
             var newContent = existingContent.TrimEnd() + entry;
             await _encoding.WriteFileAsync(logPath, newContent, encoding, ct);
-
-            return new CaptureRouteResult
-            {
-                Success = true,
-                Message = "Added to capture_log.md",
-                TargetFilePath = logPath
-            };
+            return true;
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[CaptureService] AppendToCaptureLogAsync failed: {ex.Message}");
-            return new CaptureRouteResult
-            {
-                Success = false,
-                Message = $"Failed to write capture_log.md ({ex.GetType().Name}): {ex.Message}"
-            };
+            Debug.WriteLine($"[CaptureService] AppendToCaptureLogInternalAsync failed: {ex.Message}");
+            return false;
         }
     }
 
