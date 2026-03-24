@@ -64,4 +64,6 @@ public class ProjectInfo
         : (Tier == "mini" ? $"{Name} [Mini]" : Name);
 
     public string HiddenKey => $"{Name}|{Tier}|{Category}";
+
+    public override string ToString() => DisplayName;
 }
