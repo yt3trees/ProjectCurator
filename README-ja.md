@@ -442,6 +442,7 @@ Convert Tier タブ:
 | `Ctrl+S` | Editorで保存 |
 | `Ctrl+F` | Editor検索 |
 | `Ctrl+Shift+P` | アプリ表示/非表示(既定) |
+| `Ctrl+Shift+C` | Quick Capture ウィンドウを開く |
 
 ## 設定ファイル
 
@@ -472,6 +473,20 @@ Convert Tier タブ:
 - AvalonEdit
 - CommunityToolkit.Mvvm
 - Microsoft.Extensions.DependencyInjection
+
+## Quick Capture (グローバルホットキー)
+
+デスクトップのどこからでも `Ctrl+Shift+C` を押すと、軽量キャプチャウィンドウが起動します。フリーテキストを入力して Enter を押すと、AI Features が有効な場合は LLM が内容を分類して自動でルーティングします。
+
+| カテゴリ | 振り分け先 |
+|---|---|
+| `task` | Asana API でタスクを直接起票 (送信前に確認ステップあり) |
+| `tension` | プロジェクトの `tensions.md` に追記 |
+| `focus_update` | Editor を開き、入力内容をコンテキストとして Update Focus from Asana フローを起動 |
+| `decision` | Editor を開き、AI Decision Log フローを起動 |
+| `memo` | `_config/capture_log.md` にタイムスタンプ付きで追記 |
+
+AI Features が無効の場合は、カテゴリとプロジェクトを手動で選択することで引き続き利用できます。
 
 ## 便利な追加機能: Daily Standup
 

@@ -445,6 +445,7 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 | `Ctrl+S` | Save in Editor |
 | `Ctrl+F` | Search in Editor |
 | `Ctrl+Shift+P` | Toggle app visibility (default) |
+| `Ctrl+Shift+C` | Open Quick Capture window |
 
 ## Configuration Files
 
@@ -475,6 +476,20 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 - AvalonEdit
 - CommunityToolkit.Mvvm
 - Microsoft.Extensions.DependencyInjection
+
+## Quick Capture (Global Hotkey)
+
+Press `Ctrl+Shift+C` from anywhere on your desktop to open a lightweight capture window. Type a free-text note and press Enter. If AI Features is enabled, an LLM classifies the input and routes it automatically:
+
+| Category | Destination |
+|---|---|
+| `task` | Creates a task in Asana via API (requires confirmation before submitting) |
+| `tension` | Appends to the project's `tensions.md` |
+| `focus_update` | Opens Editor and triggers the Update Focus from Asana flow with your input as additional context |
+| `decision` | Opens Editor and launches the AI Decision Log flow |
+| `memo` | Appends a timestamped entry to `_config/capture_log.md` |
+
+When AI Features is disabled, you can still use Quick Capture by selecting the category and project manually.
 
 ## Helpful Extra: Daily Standup
 
