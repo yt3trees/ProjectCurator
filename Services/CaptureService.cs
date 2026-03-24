@@ -234,6 +234,11 @@ public class CaptureService
             ["task_name"] = preview.TaskName,
         });
 
+        // 3-3: 補助ログ (設定で有効時のみ)
+        var settingsForLog = _configService.LoadSettings();
+        if (settingsForLog.CaptureTaskLogEnabled)
+            await AppendTaskToAsanaLogAsync(preview, gid, ct);
+
         return new CaptureRouteResult
         {
             Success = true,
@@ -243,6 +248,29 @@ public class CaptureService
                 ? null
                 : $"https://app.asana.com/0/{preview.ProjectGid}/{gid}"
         };
+    }
+
+    /// <summary>
+    /// task 起票成功後の補助ログ追記 (asana-tasks.md)。失敗は無視する。
+    /// </summary>
+    private async Task AppendTaskToAsanaLogAsync(AsanaTaskCreatePreview preview, string gid, CancellationToken ct)
+    {
+        var global = _configService.LoadAsanaGlobalConfig();
+        var outputFile = global.OutputFile;
+        if (string.IsNullOrWhiteSpace(outputFile) || !File.Exists(outputFile)) return;
+
+        try
+        {
+            var (content, enc) = await _encoding.ReadFileAsync(outputFile, ct);
+            var idTag = string.IsNullOrWhiteSpace(gid) ? "" : $" [id:{gid}]";
+            var dueTag = string.IsNullOrWhiteSpace(preview.DueOn) ? "" : $" (Due: {preview.DueOn})";
+            var entry = $"\n- [ ] {preview.TaskName}{idTag}{dueTag}\n";
+            await _encoding.WriteFileAsync(outputFile, content.TrimEnd() + entry, enc, ct);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[CaptureService] AppendTaskToAsanaLogAsync failed: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -383,31 +411,52 @@ public class CaptureService
             return new CaptureRouteResult { Success = false, Message = "Project not found for tension routing." };
 
         var tensionsPath = Path.Combine(project.AiContextContentPath, "tensions.md");
-        string existingContent = "";
-        string encoding = "utf-8";
 
-        if (File.Exists(tensionsPath))
+        try
         {
-            (existingContent, encoding) = await _encoding.ReadFileAsync(tensionsPath, ct);
+            string existingContent;
+            string encoding;
+
+            if (File.Exists(tensionsPath))
+            {
+                (existingContent, encoding) = await _encoding.ReadFileAsync(tensionsPath, ct);
+            }
+            else
+            {
+                // 親ディレクトリが存在しない場合は作成を試みる
+                var dir = Path.GetDirectoryName(tensionsPath);
+                if (!string.IsNullOrWhiteSpace(dir))
+                    Directory.CreateDirectory(dir);
+                existingContent = "# Tensions\n\n";
+                encoding = "utf-8";
+            }
+
+            var entry = string.IsNullOrWhiteSpace(c.Body)
+                ? $"- {c.Summary}"
+                : $"- {c.Summary}: {c.Body.Split('\n')[0].Trim()}";
+
+            var newContent = existingContent.TrimEnd() + "\n" + entry + "\n";
+            await _encoding.WriteFileAsync(tensionsPath, newContent, encoding, ct);
+
+            return new CaptureRouteResult
+            {
+                Success = true,
+                Message = $"Added to {project.Name}/tensions.md",
+                TargetFilePath = tensionsPath
+            };
         }
-        else
+        catch (Exception ex)
         {
-            existingContent = "# Tensions\n\n";
+            Debug.WriteLine($"[CaptureService] AppendToTensionsAsync failed: {ex.Message}");
+            // memo にフォールバック
+            var memoResult = await AppendToCaptureLogAsync(c, $"[tension] {c.Summary}\n{c.Body}", ct);
+            return new CaptureRouteResult
+            {
+                Success = false,
+                Message = $"Failed to write tensions.md ({ex.GetType().Name}). Saved as memo instead.",
+                TargetFilePath = memoResult.TargetFilePath
+            };
         }
-
-        var entry = string.IsNullOrWhiteSpace(c.Body)
-            ? $"- {c.Summary}"
-            : $"- {c.Summary}: {c.Body.Split('\n')[0].Trim()}";
-
-        var newContent = existingContent.TrimEnd() + "\n" + entry + "\n";
-        await _encoding.WriteFileAsync(tensionsPath, newContent, encoding, ct);
-
-        return new CaptureRouteResult
-        {
-            Success = true,
-            Message = $"Added to {project.Name}/tensions.md",
-            TargetFilePath = tensionsPath
-        };
     }
 
     private async Task<CaptureRouteResult> AppendToCaptureLogAsync(
@@ -416,23 +465,36 @@ public class CaptureService
         CancellationToken ct)
     {
         var logPath = Path.Combine(_configService.ConfigDir, "capture_log.md");
-        string existingContent = "";
-        string encoding = "utf-8";
 
-        if (File.Exists(logPath))
-            (existingContent, encoding) = await _encoding.ReadFileAsync(logPath, ct);
-
-        var ts = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
-        var entry = $"\n## {ts}\n{originalInput}\n";
-        var newContent = existingContent.TrimEnd() + entry;
-        await _encoding.WriteFileAsync(logPath, newContent, encoding, ct);
-
-        return new CaptureRouteResult
+        try
         {
-            Success = true,
-            Message = "Added to capture_log.md",
-            TargetFilePath = logPath
-        };
+            string existingContent = "";
+            string encoding = "utf-8";
+
+            if (File.Exists(logPath))
+                (existingContent, encoding) = await _encoding.ReadFileAsync(logPath, ct);
+
+            var ts = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+            var entry = $"\n## {ts}\n{originalInput}\n";
+            var newContent = existingContent.TrimEnd() + entry;
+            await _encoding.WriteFileAsync(logPath, newContent, encoding, ct);
+
+            return new CaptureRouteResult
+            {
+                Success = true,
+                Message = "Added to capture_log.md",
+                TargetFilePath = logPath
+            };
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[CaptureService] AppendToCaptureLogAsync failed: {ex.Message}");
+            return new CaptureRouteResult
+            {
+                Success = false,
+                Message = $"Failed to write capture_log.md ({ex.GetType().Name}): {ex.Message}"
+            };
+        }
     }
 
     private CaptureRouteResult BuildFocusUpdateNavigation(CaptureClassification c, ProjectInfo? project)

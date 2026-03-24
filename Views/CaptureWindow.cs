@@ -78,6 +78,8 @@ public class CaptureWindow : Window
     private Grid _taskApprovalPanel = null!;
     private System.Windows.Controls.TextBox _requestPreviewBox = null!;
     private System.Windows.Controls.Button _approveBtn = null!;
+    private System.Windows.Controls.TextBlock _taskApprovalErrorText = null!;
+    private System.Windows.Controls.Button _saveAsMemoBtn = null!;
 
     // ── Complete screen ───────────────────────────────────────────────────
     private Grid _completePanel = null!;
@@ -485,9 +487,10 @@ public class CaptureWindow : Window
             Margin = new Thickness(12, 10, 12, 12),
             Visibility = Visibility.Collapsed
         };
-        _taskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        _taskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        _taskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        _taskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // header
+        _taskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // preview
+        _taskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // error text
+        _taskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
 
         var header = new System.Windows.Controls.TextBlock
         {
@@ -517,6 +520,17 @@ public class CaptureWindow : Window
         Grid.SetRow(_requestPreviewBox, 1);
         _taskApprovalPanel.Children.Add(_requestPreviewBox);
 
+        _taskApprovalErrorText = new System.Windows.Controls.TextBlock
+        {
+            Foreground = new SolidColorBrush(Colors.OrangeRed),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0),
+            Visibility = Visibility.Collapsed
+        };
+        Grid.SetRow(_taskApprovalErrorText, 2);
+        _taskApprovalPanel.Children.Add(_taskApprovalErrorText);
+
         var btnRow = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -525,16 +539,27 @@ public class CaptureWindow : Window
         };
         _approveBtn = BuildButton("Approve & Create", true);
         _approveBtn.Click += OnApproveClick;
+        _saveAsMemoBtn = BuildButton("Save as memo", false);
+        _saveAsMemoBtn.Margin = new Thickness(6, 0, 0, 0);
+        _saveAsMemoBtn.Visibility = Visibility.Collapsed;
+        _saveAsMemoBtn.Click += OnSaveAsMemoClick;
         var backBtn = BuildButton("Back to Edit", false);
         backBtn.Margin = new Thickness(6, 0, 0, 0);
-        backBtn.Click += (_, _) => ShowScreen(Screen.Confirm);
+        backBtn.Click += (_, _) =>
+        {
+            _taskApprovalErrorText.Visibility = Visibility.Collapsed;
+            _saveAsMemoBtn.Visibility = Visibility.Collapsed;
+            _approveBtn.Content = "Approve & Create";
+            ShowScreen(Screen.Confirm);
+        };
         var cancelBtn = BuildButton("Cancel", false);
         cancelBtn.Margin = new Thickness(6, 0, 0, 0);
         cancelBtn.Click += (_, _) => Close();
         btnRow.Children.Add(_approveBtn);
+        btnRow.Children.Add(_saveAsMemoBtn);
         btnRow.Children.Add(backBtn);
         btnRow.Children.Add(cancelBtn);
-        Grid.SetRow(btnRow, 2);
+        Grid.SetRow(btnRow, 3);
         _taskApprovalPanel.Children.Add(btnRow);
 
         Grid.SetRow(_taskApprovalPanel, 1);
@@ -842,6 +867,8 @@ public class CaptureWindow : Window
         if (_approveBtn.Tag is not AsanaTaskCreatePreview preview) return;
 
         _approveBtn.IsEnabled = false;
+        _taskApprovalErrorText.Visibility = Visibility.Collapsed;
+        _saveAsMemoBtn.Visibility = Visibility.Collapsed;
 
         var idempotencyKey = CaptureService.BuildIdempotencyKey(
             preview.ProjectGid, preview.TaskName, preview.Notes);
@@ -853,11 +880,41 @@ public class CaptureWindow : Window
 
         if (!result.Success)
         {
-            MessageBox.Show(result.Message, "Quick Capture - Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            _taskApprovalErrorText.Text = result.Message;
+            _taskApprovalErrorText.Visibility = Visibility.Visible;
+            _approveBtn.Content = "Retry";
+            _saveAsMemoBtn.Visibility = Visibility.Visible;
             return;
         }
 
         ShowCompleteScreen(result);
+    }
+
+    private async void OnSaveAsMemoClick(object? sender, RoutedEventArgs e)
+    {
+        if (_classification == null) return;
+
+        _saveAsMemoBtn.IsEnabled = false;
+        _cts = new CancellationTokenSource();
+        try
+        {
+            var memoClassification = new CaptureClassification
+            {
+                Category = "memo",
+                Summary = _classification.Summary,
+                Body = _classification.Body
+            };
+            var result = await _captureService.RouteAsync(memoClassification, _inputBox.Text, _cts.Token);
+            ShowCompleteScreen(result);
+        }
+        catch (Exception ex)
+        {
+            _taskApprovalErrorText.Text = $"Save as memo also failed: {ex.Message}";
+        }
+        finally
+        {
+            _saveAsMemoBtn.IsEnabled = true;
+        }
     }
 
     private void OnConfirmCategoryChanged(object sender, SelectionChangedEventArgs e)

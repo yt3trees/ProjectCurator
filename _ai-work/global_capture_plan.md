@@ -219,7 +219,7 @@ public class CaptureRouteResult
   - `CaptureHotkey` プロパティ (HotkeyConfig 型、デフォルト: Ctrl+Shift+C)
   - ファイル: `Models/AppConfig.cs`
 
-- [ ] 1-4. Settings UI にキャプチャホットキー設定を追加
+- [x] 1-4. Settings UI にキャプチャホットキー設定を追加
   - 既存のホットキー設定 UI と同パターン
   - ファイル: `Views/Pages/SettingsPage.xaml`, `ViewModels/SettingsViewModel.cs`
 
@@ -269,7 +269,7 @@ public class CaptureRouteResult
   - 成功時は `gid` / URL を `CaptureRouteResult` に返却
   - ファイル: `Services/CaptureService.cs` (+ 必要なら `Services/AsanaTaskCreateService.cs` 新規)
 
-- [ ] 3-3. Asana 起票の補助ログ (任意) を実装
+- [x] 3-3. Asana 起票の補助ログ (任意) を実装
   - 直接起票成功時のみ、`asana-tasks.md` へ即時追記するかを設定で切り替え
   - デフォルトは OFF (Asana Sync による反映を正とする)
   - ファイル: `Services/CaptureService.cs`, `Models/AppConfig.cs`, `ViewModels/SettingsViewModel.cs`
@@ -410,14 +410,14 @@ public class CaptureRouteResult
   - UI に「Asana project 設定不足」を表示し、`Asana Sync` 設定画面への導線を出す
   - ファイル: `Services/CaptureService.cs`, `Views/CaptureWindow.cs`
 
-- [ ] 6-4. ファイル書き込み失敗時の処理
+- [x] 6-4. ファイル書き込み失敗時の処理
   - パスが存在しない、権限エラー等 → エラーメッセージ + memo にフォールバック
   - ファイル: `Services/CaptureService.cs`
 
-- [ ] 6-5. Asana API 起票失敗時の処理
-  - 4xx/5xx を UI に表示 (status code + メッセージ断片) ← エラー表示のみ実装済み
+- [x] 6-5. Asana API 起票失敗時の処理
+  - 4xx/5xx を UI に表示 (status code + メッセージ断片)
   - 自動で `asana-tasks.md` 追記にはフォールバックしない
-  - [Retry] と [Save as memo] を提示 ← 未実装
+  - [Retry] と [Save as memo] を提示
   - ファイル: `Services/CaptureService.cs`, `Views/CaptureWindow.cs`
 
 - [x] 6-6. 空入力の防止

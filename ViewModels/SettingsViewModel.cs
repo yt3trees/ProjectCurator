@@ -34,6 +34,22 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string hotkeyKey = "P";
 
+    // キャプチャホットキー
+    [ObservableProperty]
+    private bool captureHotkeyCtrl = true;
+
+    [ObservableProperty]
+    private bool captureHotkeyShift = true;
+
+    [ObservableProperty]
+    private bool captureHotkeyAlt;
+
+    [ObservableProperty]
+    private bool captureHotkeyWin;
+
+    [ObservableProperty]
+    private string captureHotkeyKey = "C";
+
     // スタートアップ
     [ObservableProperty]
     private bool startupEnabled;
@@ -110,6 +126,10 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool aiToggleCanEnable;
 
+    // Capture
+    [ObservableProperty]
+    private bool captureTaskLogEnabled;
+
     // About
     public string AppVersion { get; } =
         "v" + (System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0");
@@ -154,6 +174,15 @@ public partial class SettingsViewModel : ObservableObject
             HotkeyWin = mods.Contains("Win", StringComparer.OrdinalIgnoreCase);
             HotkeyKey = hk.Key;
 
+            var chk = settings.CaptureHotkey ?? new HotkeyConfig { Modifiers = "Ctrl+Shift", Key = "C" };
+            var capMods = chk.Modifiers.Split('+',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            CaptureHotkeyCtrl = capMods.Contains("Ctrl", StringComparer.OrdinalIgnoreCase);
+            CaptureHotkeyShift = capMods.Contains("Shift", StringComparer.OrdinalIgnoreCase);
+            CaptureHotkeyAlt = capMods.Contains("Alt", StringComparer.OrdinalIgnoreCase);
+            CaptureHotkeyWin = capMods.Contains("Win", StringComparer.OrdinalIgnoreCase);
+            CaptureHotkeyKey = chk.Key;
+
             StartupEnabled = File.Exists(GetStartupShortcutPath());
 
             var asana = _configService.LoadAsanaGlobalConfig();
@@ -176,6 +205,7 @@ public partial class SettingsViewModel : ObservableObject
             LlmStatus          = "";
             AiEnabled          = settings.AiEnabled;
             AiToggleCanEnable  = settings.AiEnabled; // 既にオンなら再テスト不要
+            CaptureTaskLogEnabled = settings.CaptureTaskLogEnabled;
         }
         finally
         {
@@ -211,6 +241,24 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public void ApplyCaptureHotkey()
+    {
+        var mods = new List<string>();
+        if (CaptureHotkeyCtrl) mods.Add("Ctrl");
+        if (CaptureHotkeyShift) mods.Add("Shift");
+        if (CaptureHotkeyAlt) mods.Add("Alt");
+        if (CaptureHotkeyWin) mods.Add("Win");
+        var modStr = string.Join("+", mods);
+        if (string.IsNullOrWhiteSpace(CaptureHotkeyKey)) return;
+
+        _hotkeyService.ReRegisterCapture(modStr, CaptureHotkeyKey.Trim());
+
+        var settings = _configService.LoadSettings();
+        settings.CaptureHotkey = new HotkeyConfig { Modifiers = modStr, Key = CaptureHotkeyKey.Trim() };
+        _configService.SaveSettings(settings);
+    }
+
+    [RelayCommand]
     public void Save()
     {
         var settings = _configService.LoadSettings();
@@ -227,6 +275,7 @@ public partial class SettingsViewModel : ObservableObject
         settings.LlmApiVersion  = LlmApiVersion.Trim();
         settings.LlmParameters  = ParseLlmParametersText(LlmParametersText);
         settings.AiEnabled      = AiEnabled;
+        settings.CaptureTaskLogEnabled = CaptureTaskLogEnabled;
         _configService.SaveSettings(settings);
         UpdateWorkspacePathsWarning();
     }

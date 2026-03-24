@@ -50,6 +50,63 @@
                 </StackPanel>
             </Border>
 
+            <!-- ===== Quick Capture Hotkey ===== -->
+            <TextBlock Text="Quick Capture Hotkey" FontSize="15" FontWeight="SemiBold"
+                       Foreground="{DynamicResource AppText}" Margin="0,20,0,10"/>
+
+            <Border Background="{DynamicResource AppSurface0}"
+                    BorderBrush="{DynamicResource AppSurface2}"
+                    BorderThickness="1" CornerRadius="6"
+                    Padding="16,12" Margin="0,0,0,6">
+                <StackPanel>
+                    <TextBlock Text="Global shortcut to open the Quick Capture window" FontSize="11"
+                               Foreground="{DynamicResource AppSubtext0}" Margin="0,0,0,10"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <CheckBox Content="Ctrl" IsChecked="{Binding CaptureHotkeyCtrl}"
+                                  Foreground="{DynamicResource AppText}" Margin="0,0,12,0"
+                                  VerticalAlignment="Center"/>
+                        <CheckBox Content="Shift" IsChecked="{Binding CaptureHotkeyShift}"
+                                  Foreground="{DynamicResource AppText}" Margin="0,0,12,0"
+                                  VerticalAlignment="Center"/>
+                        <CheckBox Content="Alt" IsChecked="{Binding CaptureHotkeyAlt}"
+                                  Foreground="{DynamicResource AppText}" Margin="0,0,12,0"
+                                  VerticalAlignment="Center"/>
+                        <CheckBox Content="Win" IsChecked="{Binding CaptureHotkeyWin}"
+                                  Foreground="{DynamicResource AppText}" Margin="0,0,12,0"
+                                  VerticalAlignment="Center"/>
+                        <TextBlock Text="+" Foreground="{DynamicResource AppSubtext0}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox Text="{Binding CaptureHotkeyKey, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="48" MaxLength="10"
+                                 Foreground="{DynamicResource AppText}"
+                                 Background="{DynamicResource AppSurface1}"
+                                 BorderBrush="{DynamicResource AppSurface2}"
+                                 VerticalContentAlignment="Center"
+                                 Padding="4,2"/>
+                    </StackPanel>
+                    <ui:Button Content="Apply" Click="OnApplyCaptureHotkey"
+                               Padding="16,6" FontSize="12" HorizontalAlignment="Left"
+                               Margin="0,0,0,12"/>
+
+                    <Separator Background="{DynamicResource AppSurface2}" Margin="0,0,0,12"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Append to asana-tasks.md on task creation" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppText}"/>
+                            <TextBlock Text="Immediately log new tasks; Asana Sync remains the source of truth" FontSize="11"
+                                       Foreground="{DynamicResource AppSubtext0}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" IsChecked="{Binding CaptureTaskLogEnabled}"
+                                  VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- ===== Workspace Paths ===== -->
             <TextBlock Text="Workspace Paths" FontSize="15" FontWeight="SemiBold"
                        Foreground="{DynamicResource AppText}" Margin="0,20,0,10"/>
