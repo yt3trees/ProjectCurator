@@ -46,6 +46,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         };
+        AddBottomViewportPadding(_editor);
 
         // テキスト変更イベント
         _editor.TextChanged += (s, e) =>
@@ -574,6 +575,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         };
+        AddBottomViewportPadding(_diffViewer);
 
         // テーマ適用
         var bg = Application.Current.Resources["EditorBackground"] as System.Windows.Media.SolidColorBrush;
@@ -585,6 +587,17 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
 
         _diffRenderer = new DiffLineBackgroundRenderer();
         _diffViewer.TextArea.TextView.BackgroundRenderers.Add(_diffRenderer);
+    }
+
+    private static void AddBottomViewportPadding(TextEditor editor)
+    {
+        editor.Options.AllowScrollBelowDocument = false;
+        var margin = editor.TextArea.TextView.Margin;
+        editor.TextArea.TextView.Margin = new Thickness(
+            margin.Left,
+            margin.Top,
+            margin.Right,
+            SystemParameters.HorizontalScrollBarHeight + 2);
     }
 
     private void ShowDiffView()
@@ -1192,6 +1205,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
             Background = editorBg, Foreground = editorFg
         };
+        AddBottomViewportPadding(diffViewer);
         diffViewer.LineNumbersForeground =
             (Application.Current.Resources["AppSubtext0"] as System.Windows.Media.SolidColorBrush)
             ?? new System.Windows.Media.SolidColorBrush(
@@ -1904,6 +1918,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
             Background = editorBg, Foreground = editorFg
         };
+        AddBottomViewportPadding(previewViewer);
         previewViewer.LineNumbersForeground =
             (Application.Current.Resources["AppSubtext0"] as System.Windows.Media.SolidColorBrush)
             ?? new System.Windows.Media.SolidColorBrush(
