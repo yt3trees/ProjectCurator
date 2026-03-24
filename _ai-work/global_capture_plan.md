@@ -364,7 +364,8 @@ public class CaptureRouteResult
   - ファイル: `Views/CaptureWindow.cs`
 
 - [x] 4-8. Due Date フィールドを Confirm 画面に追加 (task のみ)
-  - TextBox (`YYYY-MM-DD`、ヒントテキスト付き)
+  - DatePicker (WPF 標準カレンダーポップアップ付き) + "Set time" チェックボックス
+  - "Set time" をチェックすると Hour (00-23) / Minute (00/15/30/45) ComboBox が表示
   - AI が `due_on` を提案していれば初期値としてセット、空欄なら空のまま
   - Category が task のときのみ表示
   - ファイル: `Views/CaptureWindow.cs`
@@ -623,6 +624,7 @@ UI 依存コードに選定ロジックを埋め込まない。
 | `Services/TrayService.cs` | OnCaptureActivated Action + Quick Capture メニュー項目追加 |
 | `Views/Pages/DashboardPage.xaml` | キャプチャ履歴ボタン (Note24) 追加 |
 | `Views/Pages/DashboardPage.xaml.cs` | ConfigService DI 追加 + ShowCaptureLogDialogAsync 実装 |
+| `Models/CaptureModels.cs` | AsanaTaskCreatePreview に DueAt プロパティ追加 (7-8) |
 
 ## 実装順序
 
@@ -688,6 +690,25 @@ Global Capture は他機能と独立して実装可能。decision ルートは A
   - ConfigService を DI で追加
   - ShowCaptureLogDialogAsync(): capture_log.md をパースして最新順 ListBox + フルコンテンツ TextBox のダイアログ表示
   - "Open in Editor" は OS のデフォルトエディタで開く (capture_log.md はプロジェクト外ファイルのため)
+
+### 7-7. 全カテゴリの capture_log.md 記録
+- `Services/CaptureService.cs`:
+  - AppendToCaptureLogInternalAsync() 共有ヘルパーを追加 (bool 返却)
+  - AppendToCaptureLogAsync() をリファクタして共有ヘルパーを呼ぶように変更
+  - CreateAsanaTaskAsync(): Asana 起票成功後に `[task] {name}\n→ {project} / {section} (gid:{gid})` 形式で capture_log.md に記録
+  - RouteAsync(): task/memo 以外のカテゴリについても `[{category}] [{project}] {summary}\n{originalInput}` 形式で capture_log.md に副次記録
+- 結果: memo は元々 capture_log.md が主保存先。task/tension/focus_update/decision もすべてカテゴリプレフィックス付きで capture_log.md に残る
+
+### 7-8. Due Date DatePicker + 時刻設定
+- `Models/CaptureModels.cs`: AsanaTaskCreatePreview に `DueAt` プロパティ追加 (ISO 8601 + ローカル timezone)
+- `Views/CaptureWindow.cs`:
+  - Due Date の TextBox (手入力) → DatePicker (カレンダーポップアップ付き WPF 標準コントロール) に変更
+  - "Set time" チェックボックス追加。チェック時に Hour (00-23) / Minute (00/15/30/45) の ComboBox 行を表示
+  - 日付のみ → `due_on: "YYYY-MM-DD"` / 日付+時刻 → `due_at: "YYYY-MM-ddTHH:mm:ss.fff+HH:mm"` をローカル timezone 付きで送信
+  - 時刻チェック有りで日付未選択の場合はバリデーションエラー
+- `Services/CaptureService.cs`:
+  - CreateAsanaTaskAsync(): DueAt が非空なら `due_at` を送信、そうでなければ従来通り `due_on`
+  - asana-tasks.md 補助ログの Due 表示: DueAt がある場合は `YYYY-MM-DD HH:mm` 形式で表示
 
 ---
 
