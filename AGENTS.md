@@ -17,6 +17,8 @@ publish.cmd
 # Equivalent: dotnet publish -p:PublishProfile=SingleFile
 ```
 
+For build verification in this app, always use `publish.cmd` as the validation command.
+
 There are no automated tests in this repository.
 
 Requirements: Windows, .NET 9 SDK, Git CLI, PowerShell 7+. Python 3.10+ is optional (Asana sync).
