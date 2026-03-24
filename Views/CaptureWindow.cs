@@ -1029,14 +1029,12 @@ public class CaptureWindow : Window
         _projectCombo.Items.Clear();
         _projectCombo.Items.Add("Auto-detect");
         foreach (var p in _projects) _projectCombo.Items.Add(p);
-        _projectCombo.DisplayMemberPath = nameof(ProjectInfo.DisplayName);
         _projectCombo.SelectedIndex = 0;
 
         // Confirm screen
         _confirmProjectCombo.Items.Clear();
         _confirmProjectCombo.Items.Add("(not specified)");
         foreach (var p in _projects) _confirmProjectCombo.Items.Add(p);
-        _confirmProjectCombo.DisplayMemberPath = nameof(ProjectInfo.DisplayName);
         _confirmProjectCombo.SelectedIndex = 0;
     }
 

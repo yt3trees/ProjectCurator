@@ -8,7 +8,10 @@
       "Bash(wc -l /c/work/GenAI/convert/WpfManager/Views/Pages/*.xaml.cs)",
       "Bash(ls -lhS /c/work/GenAI/convert/WpfManager/Views/Pages/*.xaml)",
       "WebFetch(domain:github.com)",
-      "Bash(dotnet run:*)"
+      "Bash(dotnet run:*)",
+      "Bash(publish.cmd)",
+      "Bash(cmd.exe /c publish.cmd)",
+      "Bash(dotnet publish:*)"
     ]
   }
 }

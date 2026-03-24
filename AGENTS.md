@@ -17,7 +17,7 @@ publish.cmd
 # Equivalent: dotnet publish -p:PublishProfile=SingleFile
 ```
 
-For build verification in this app, always use `publish.cmd` as the validation command.
+For build verification in this app, always use `publish.cmd` as the validation command. Run it from the repository root (the directory containing `publish.cmd`) via `dotnet publish -p:PublishProfile=SingleFile` — the cmd file uses `pause` so invoke the dotnet command directly in non-interactive shells.
 
 There are no automated tests in this repository.
 
