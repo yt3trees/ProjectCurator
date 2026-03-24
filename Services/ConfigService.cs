@@ -55,6 +55,7 @@ public class ConfigService
 
         // デフォルト補正
         settings.Hotkey ??= new HotkeyConfig();
+        settings.CaptureHotkey ??= new HotkeyConfig { Modifiers = "Ctrl+Shift", Key = "C" };
         settings.AsanaSync ??= new AsanaSyncConfig();
         return settings;
     }

@@ -34,7 +34,8 @@ public class FocusUpdateService
     public async Task<FocusUpdateResult> GenerateProposalAsync(
         ProjectInfo project,
         string? workstreamId,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? capturedContext = null)
     {
         // Step 1: パス解決
         var (focusPath, asanaPath, workMode, resolvedWsId) =
@@ -84,7 +85,7 @@ public class FocusUpdateService
 
         // Step 6: LLM に更新提案を生成させる
         var systemPrompt = BuildSystemPrompt();
-        var userPrompt   = BuildUserPrompt(project.Name, workstreamId, currentContent, asanaTasks, projectSummary, workstreamTasks);
+        var userPrompt   = BuildUserPrompt(project.Name, workstreamId, currentContent, asanaTasks, projectSummary, workstreamTasks, capturedContext);
         var proposed     = await _llm.ChatCompletionAsync(systemPrompt, userPrompt, ct);
 
         // サマリ生成
@@ -214,7 +215,8 @@ public class FocusUpdateService
         string currentContent,
         AsanaTaskParseResult asanaTasks,
         string? projectSummary = null,
-        IReadOnlyList<(string id, string label, AsanaTaskParseResult tasks)>? workstreamTasks = null)
+        IReadOnlyList<(string id, string label, AsanaTaskParseResult tasks)>? workstreamTasks = null,
+        string? capturedContext = null)
     {
         var today = DateTime.Now.ToString("yyyy-MM-dd");
         var sb = new StringBuilder();
@@ -225,6 +227,13 @@ public class FocusUpdateService
             sb.AppendLine($"- Workstream: {workstreamId}");
         sb.AppendLine($"- Today: {today}");
         sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(capturedContext))
+        {
+            sb.AppendLine("## User intent captured via Quick Capture (treat as priority context for this update)");
+            sb.AppendLine(capturedContext.Trim());
+            sb.AppendLine();
+        }
 
         if (!string.IsNullOrWhiteSpace(projectSummary))
         {

@@ -7,6 +7,7 @@ using Wpf.Ui.Controls;
 using ProjectCurator.Models;
 using ProjectCurator.Services;
 using ProjectCurator.ViewModels;
+using ProjectCurator.Views;
 using ProjectCurator.Views.Pages;
 using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
 using WpfModifierKeys = System.Windows.Input.ModifierKeys;
@@ -25,7 +26,9 @@ public partial class MainWindow : FluentWindow
     private readonly IPageService _pageService;
     private readonly IContentDialogService _contentDialogService;
     private readonly ConfigService _configService;
+    private readonly CaptureService _captureService;
     private IntPtr _hwnd;
+    private CaptureWindow? _activeCaptureWindow;
 
     // ウィンドウが画面上に表示されているかのフラグ (Hide() を使わない方式)
     private bool _isShownOnScreen = false;
@@ -37,7 +40,8 @@ public partial class MainWindow : FluentWindow
         MainWindowViewModel viewModel,
         IPageService pageService,
         IContentDialogService contentDialogService,
-        ConfigService configService)
+        ConfigService configService,
+        CaptureService captureService)
     {
         _serviceProvider = serviceProvider;
         _hotkeyService = hotkeyService;
@@ -46,6 +50,7 @@ public partial class MainWindow : FluentWindow
         _pageService = pageService;
         _contentDialogService = contentDialogService;
         _configService = configService;
+        _captureService = captureService;
 
         DataContext = _viewModel;
         InitializeComponent();
@@ -200,6 +205,7 @@ public partial class MainWindow : FluentWindow
 
         // ホットキー登録
         _hotkeyService.OnActivated = ToggleVisibility;
+        _hotkeyService.OnCaptureActivated = ShowCaptureWindow;
         _hotkeyService.Register(this);
 
         // トレイアイコン初期化
@@ -340,10 +346,92 @@ public partial class MainWindow : FluentWindow
     }
 
     /// <summary>
+    /// Quick Capture の focus_update ルーティング専用。
+    /// エディタを指定ファイルで開いた後、Update Focus LLM フローを自動発火する。
+    /// </summary>
+    private void NavigateToEditorAndTriggerFocusUpdate(ProjectInfo project, string filePath, string capturedText)
+    {
+        var editorVm = _serviceProvider.GetRequiredService<EditorViewModel>();
+        var match = editorVm.Projects.FirstOrDefault(p => p.HiddenKey == project.HiddenKey);
+        editorVm.RequestFocusUpdateOnOpen(capturedText);
+        editorVm.NavigateToProjectAndOpenFile(match ?? project, filePath);
+        RootNavigation.Navigate(typeof(EditorPage));
+        // ファイル読み込み・LoadProjectsAsync が落ち着いてからトリガー (OpenFileAndSelectNodeAsync 側の
+        // トリガーが何らかの理由でミスした場合のフォールバック)
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+            new System.Action(() => editorVm.TriggerFocusUpdateIfPending()));
+    }
+
+    /// <summary>
     /// SettingsPage からホットキー変更時にトレイアイコンの表示を更新する。
     /// </summary>
     public void UpdateTrayHotkeyDisplay(string displayText)
     {
         _trayService.UpdateHotkeyDisplay(displayText);
+    }
+
+    /// <summary>
+    /// キャプチャホットキーが押されたときに CaptureWindow を表示する。
+    /// </summary>
+    private void ShowCaptureWindow()
+    {
+        if (_activeCaptureWindow != null)
+        {
+            _activeCaptureWindow.Activate();
+            return;
+        }
+
+        var discoveryService = _serviceProvider.GetRequiredService<ProjectDiscoveryService>();
+        var captureWindow = new CaptureWindow(_captureService, discoveryService, _configService);
+        captureWindow.Owner = this;
+        captureWindow.Closed += (_, _) => _activeCaptureWindow = null;
+        _activeCaptureWindow = captureWindow;
+
+        captureWindow.OnNavigateToFile = (projectName, filePath) =>
+        {
+            var project = ResolveProject(projectName);
+            if (project != null)
+                NavigateToEditorAndOpenFile(project, filePath);
+            MoveOnScreen();
+        };
+
+        captureWindow.OnNavigateToFocusUpdate = (projectName, filePath, capturedText) =>
+        {
+            var project = ResolveProject(projectName);
+            if (project != null)
+                NavigateToEditorAndTriggerFocusUpdate(project, filePath, capturedText);
+            MoveOnScreen();
+        };
+
+        captureWindow.OnNavigateToDecision = projectName =>
+        {
+            var project = ResolveProject(projectName);
+            if (project != null)
+                NavigateToEditor(project);
+            MoveOnScreen();
+        };
+
+        captureWindow.ShowDialog();
+    }
+
+    /// <summary>
+    /// プロジェクト名でプロジェクトを解決する。
+    /// EditorViewModel が未ロードの場合は ProjectDiscoveryService のキャッシュから取得する。
+    /// </summary>
+    private ProjectInfo? ResolveProject(string projectName)
+    {
+        var editorVm = _serviceProvider.GetRequiredService<EditorViewModel>();
+        var project = editorVm.Projects.FirstOrDefault(p =>
+            string.Equals(p.Name, projectName, StringComparison.OrdinalIgnoreCase));
+
+        if (project == null)
+        {
+            var discoveryService = _serviceProvider.GetRequiredService<ProjectDiscoveryService>();
+            var allProjects = discoveryService.GetProjectInfoList();
+            project = allProjects.FirstOrDefault(p =>
+                string.Equals(p.Name, projectName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return project;
     }
 }

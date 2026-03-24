@@ -40,9 +40,9 @@ AI が分類:
 
 | カテゴリ | 振り分け先 | 書き込み方式 |
 |---|---|---|
-| task | Asana API (`POST /tasks`) | `projects` / `name` / `notes` を指定して直接起票。成功時のみ必要に応じて補助ログ更新 |
+| task | Asana API (`POST /tasks`) | `projects` / `name` / `notes` / `due_on` / `assignee` を指定して直接起票。担当者は常に自分 (user_gid)。成功時のみ必要に応じて補助ログ更新 |
 | tension | プロジェクトの `tensions.md` | 末尾に箇条書きで追記 |
-| focus_update | プロジェクトの `current_focus.md` | Editor に遷移して差分提案 (FocusUpdate と同パターン) |
+| focus_update | `EditorViewModel.UpdateFocusAsync()` | Editor に遷移 → current_focus.md を開く → `UpdateFocusAsync` を自動発火。キャプチャ入力内容を LLM プロンプトのコンテキストとして渡す |
 | decision | DecisionLogGeneratorService | Editor に遷移して AI Decision Log フローを起動 |
 | memo | `_config/capture_log.md` | タイムスタンプ付きで追記 (どこにも属さないメモ) |
 
@@ -82,8 +82,8 @@ AI が分類:
 └──────────────────────────────────────────────────────────┘
 ```
 
-- ウィンドウサイズ: 520x240 (コンパクト)
-- カーソル位置の近くに表示 (マルチモニター対応)
+- ウィンドウサイズ: 520px 幅、高さは SizeToContent (画面に応じて変化)
+- カーソルがあるモニターの作業領域中央に表示 (マルチモニター対応)
 - Esc で閉じる、Ctrl+Enter で送信
 - Project ドロップダウン: "Auto-detect" (デフォルト) + 全プロジェクトリスト
 - AI 無効時: Project ドロップダウンの隣に Category ドロップダウンも表示
@@ -205,17 +205,17 @@ public class CaptureRouteResult
 
 ### Phase 1: HotkeyService の複数ホットキー対応
 
-- [ ] 1-1. HotkeyService にキャプチャ用ホットキーの登録機能を追加
+- [x] 1-1. HotkeyService にキャプチャ用ホットキーの登録機能を追加
   - 新しい定数: `CAPTURE_HOTKEY_ID = 9001`
   - `RegisterCapture(Window window)` メソッドを追加
   - WndProc で HOTKEY_ID を分岐して異なるコールバックを呼ぶ
   - `OnCaptureActivated` コールバックプロパティを追加
   - ファイル: `Services/HotkeyService.cs`
 
-- [ ] 1-2. Win32Interop に CAPTURE_HOTKEY_ID 定数を追加
+- [x] 1-2. Win32Interop に CAPTURE_HOTKEY_ID 定数を追加
   - ファイル: `Helpers/Win32Interop.cs`
 
-- [ ] 1-3. AppConfig にキャプチャホットキー設定を追加
+- [x] 1-3. AppConfig にキャプチャホットキー設定を追加
   - `CaptureHotkey` プロパティ (HotkeyConfig 型、デフォルト: Ctrl+Shift+C)
   - ファイル: `Models/AppConfig.cs`
 
@@ -225,22 +225,23 @@ public class CaptureRouteResult
 
 ### Phase 2: CaptureService (分類エンジン)
 
-- [ ] 2-1. CaptureClassification / CaptureRouteResult モデルを作成
+- [x] 2-1. CaptureClassification / CaptureRouteResult モデルを作成
   - ファイル: `Models/CaptureModels.cs` (新規)
 
-- [ ] 2-2. CaptureService の骨格を作成
+- [x] 2-2. CaptureService の骨格を作成
   - コンストラクタ DI: LlmClientService, ConfigService, FileEncodingService, ProjectDiscoveryService
   - ファイル: `Services/CaptureService.cs` (新規)
 
-- [ ] 2-3. ClassifyAsync() を実装
+- [x] 2-3. ClassifyAsync() を実装
   - プロジェクト一覧を取得 (ProjectDiscoveryService)
   - System Prompt + User Prompt を構築
+  - BuildUserPrompt 内でフォーカスファイルを同期読み込みするため、`Task.Run()` でバックグラウンド実行 (UI スレッドブロック防止)
   - LlmClientService.ChatCompletionAsync() を呼び出し
   - JSON レスポンスを CaptureClassification に解析
   - パース失敗時: category="memo" にフォールバック
   - ファイル: `Services/CaptureService.cs`
 
-- [ ] 2-4. AI 無効時の手動分類パスを実装
+- [x] 2-4. AI 無効時の手動分類パスを実装
   - ClassifyAsync を呼ばず、ユーザー選択の category + project で CaptureClassification を構築
   - Summary は入力テキストの先頭 50 文字
   - Body は入力テキスト全文
@@ -248,11 +249,11 @@ public class CaptureRouteResult
 
 ### Phase 3: CaptureService (ルーティングエンジン)
 
-- [ ] 3-1. RouteAsync() のディスパッチロジックを実装
+- [x] 3-1. RouteAsync() のディスパッチロジックを実装
   - category に基づいて個別メソッドに振り分け
   - ファイル: `Services/CaptureService.cs`
 
-- [ ] 3-2. CreateAsanaTaskAsync() を実装 (task ルート)
+- [x] 3-2. CreateAsanaTaskAsync() を実装 (task ルート)
   - `asana_config.json` から `asana_project_gids` と `workstream_project_map` を読み込み、投入先 Asana Project GID を決定
   - Asana metadata 取得 API を追加:
     - `GET /projects/{gid}` で表示名を取得
@@ -273,137 +274,161 @@ public class CaptureRouteResult
   - デフォルトは OFF (Asana Sync による反映を正とする)
   - ファイル: `Services/CaptureService.cs`, `Models/AppConfig.cs`, `ViewModels/SettingsViewModel.cs`
 
-- [ ] 3-4. AppendToTensionsAsync() を実装 (tension ルート)
+- [x] 3-4. AppendToTensionsAsync() を実装 (tension ルート)
   - プロジェクトの tensions.md パスを解決 (AiContextContentPath 配下)
   - ファイル末尾に `- {summary}: {body の1行要約}` を追記
   - ファイルが存在しない場合: ヘッダー付きで新規作成
   - ファイル: `Services/CaptureService.cs`
 
-- [ ] 3-5. AppendToCaptureLogAsync() を実装 (memo ルート)
+- [x] 3-5. AppendToCaptureLogAsync() を実装 (memo ルート)
   - `_config/capture_log.md` に追記
   - フォーマット: `## {yyyy-MM-dd HH:mm}\n{original input}\n`
   - ファイル: `Services/CaptureService.cs`
 
-- [ ] 3-6. focus_update / decision ルートの NavigationRequest 生成を実装
-  - focus_update: ターゲットプロジェクトの current_focus.md パスを返す
-  - focus_update で current_focus.md を更新する前に、既存 `FocusUpdateService` と同様に `focus_history/yyyy-MM-dd.md` の存在確認を必ず実施
-  - 当日バックアップが無ければ current_focus.md の現内容をバックアップ作成してから更新処理へ進む
-  - 当日バックアップが既にあれば再作成せず、そのパスを採用する (冪等)
-  - decision: ターゲットプロジェクト名 + 入力テキスト (初期入力として) を返す
+- [x] 3-6. focus_update / decision ルートの NavigationRequest 生成を実装
+  - focus_update: ターゲットプロジェクトの current_focus.md パスを解決し、`RequiresNavigation = true` の CaptureRouteResult を返す
+  - focus_update でナビゲーション前に `focus_history/yyyy-MM-dd.md` のバックアップ存在確認を実施 (冪等)
+  - decision: ターゲットプロジェクト名を返す (NavigationFilePath = null)
   - 実際のファイル編集は既存の EditorViewModel フローに委譲
   - ファイル: `Services/CaptureService.cs`
 
+- [x] 3-7. focus_update ルート: EditorViewModel.UpdateFocusAsync との連携
+  - `CaptureWindow.OnNavigateToFocusUpdate` コールバック (シグネチャ: `Action<string, string, string>`: projectName, filePath, capturedText)
+  - MainWindow が `EditorViewModel.RequestFocusUpdateOnOpen(capturedText)` を呼んでフラグとキャプチャ内容を保存
+  - `EditorViewModel.UpdateStatus()` で `_capturedContextForFocusUpdate != null` かつ current_focus.md が開かれたタイミングで `UpdateFocusAsync()` を自動発火
+  - `FocusUpdateService.GenerateProposalAsync()` の新規パラメータ `capturedContext` にキャプチャ入力を渡す
+  - LLM プロンプトに "User intent captured via Quick Capture" セクションとして追加
+  - 変更ファイル: `Services/FocusUpdateService.cs`, `ViewModels/EditorViewModel.cs`, `Views/CaptureWindow.cs`, `MainWindow.xaml.cs`
+
 ### Phase 4: CaptureWindow (UI)
 
-- [ ] 4-1. CaptureWindow.xaml を作成
+- [x] 4-1. CaptureWindow.xaml を作成
   - WindowStyle=None、最小限のフレームレスウィンドウ
   - ダークモードテーマリソース (AppSurface0/1、AppText)
   - WindowChrome 適用 (白枠防止)
   - サイズ: 520x240、Topmost=true
-  - ファイル: `Views/CaptureWindow.xaml` (新規)
+  - ファイル: `Views/CaptureWindow.cs` (コードビハインドのみ、XAML なし)
 
-- [ ] 4-2. CaptureWindow.xaml.cs の初期入力画面を実装
+- [x] 4-2. CaptureWindow.xaml.cs の初期入力画面を実装
   - TextBox (AcceptsReturn=true、複数行)
   - Project ComboBox ("Auto-detect" + プロジェクトリスト)
   - [Capture] ボタン (Ctrl+Enter) + [Cancel] ボタン (Esc)
-  - ウィンドウ位置: マウスカーソル付近 (画面端からはみ出さないよう調整)
+  - ウィンドウ位置: カーソルがあるモニターの作業領域中央 (System.Windows.Forms.Screen でモニター取得、DPI スケール対応)
   - フォーカス: TextBox に自動フォーカス
-  - ファイル: `Views/CaptureWindow.xaml.cs` (新規)
+  - ファイル: `Views/CaptureWindow.cs`
 
-- [ ] 4-3. 分類結果の確認画面を実装
+- [x] 4-3. 分類結果の確認画面を実装
   - AI 応答後に入力エリアを読み取り専用に切り替え
   - Category ドロップダウン (AI 結果をデフォルト選択、手動変更可能)
   - Project ドロップダウン (AI 結果をデフォルト選択、手動変更可能)
-  - task の場合のみ Asana Project ドロップダウンを表示 (表示形式: `{project name} ({gid})`)
-  - section 候補がある場合は Section ドロップダウンを表示 (表示形式: `{section name} ({gid})`)
+  - task の場合のみ Asana Project / Section / Due Date / の追加行を表示
+  - Asana Project ドロップダウン (表示形式: `{project name} ({gid})`)
+  - Section ドロップダウン (任意。表示形式: `{section name} ({gid})`)
+  - Due Date TextBox (YYYY-MM-DD、AI 提案を初期値、空欄で期限なし)
   - project/section が一意に決まるときは自動選択し、曖昧時だけ選択必須にする
   - Summary TextBox (編集可能)
   - [Route] [Back] [Cancel] ボタン
-  - ファイル: `Views/CaptureWindow.xaml.cs`
+  - 確認画面表示時は Category/Project ComboBox の SelectionChanged を一時アンサブスクライブして `LoadAsanaProjectsForCurrentProjectAsync` の多重呼び出しを防ぐ
+  - ファイル: `Views/CaptureWindow.cs`
 
-- [ ] 4-4. task 起票承認画面を実装
+- [x] 4-4. task 起票承認画面を実装
   - task の [Route] 押下時は即送信せず、承認ダイアログを表示
   - ダイアログに以下を表示:
     - `POST https://app.asana.com/api/1.0/tasks`
-    - Request Body(JSON, 実際の送信内容)
+    - Request Body (JSON, 実際の送信内容)
     - 対象 project/section の表示名 + GID
   - 表示する Body は最終入力値で再構成し、AI の生出力はそのまま表示しない
+  - JSON シリアライズは `JavaScriptEncoder.UnsafeRelaxedJsonEscaping` を使用 (日本語が `\uXXXX` にならないよう対策)
   - [Approve & Create] で送信、[Back to Edit] で編集画面に戻る
-  - ファイル: `Views/CaptureWindow.xaml.cs`
+  - Due Date に不正なフォーマットが入力された場合は Route 時点でバリデーションエラーを表示
+  - ファイル: `Views/CaptureWindow.cs`
 
-- [ ] 4-5. ルーティング完了画面を実装
+- [x] 4-5. ルーティング完了画面を実装
   - 成功メッセージ表示
   - task 成功時は [Open Asana] ボタンを表示
   - [Open File] ボタン (テキスト追記系)
   - focus_update / decision の場合: 自動で Editor に遷移してウィンドウを閉じる
-  - 2秒後に自動で閉じるオプション (追記系の場合)
-  - ファイル: `Views/CaptureWindow.xaml.cs`
+  - ※ 2秒後自動クローズは未実装
+  - ファイル: `Views/CaptureWindow.cs`
 
-- [ ] 4-6. AI 無効時の手動モード UI
+- [x] 4-6. AI 無効時の手動モード UI
   - Category ドロップダウンを入力画面に表示 (AI 分類をスキップ)
   - Project ドロップダウン必須 (Auto-detect なし)
   - [Capture] で分類確認はスキップ可能だが、task の Asana起票承認画面は必ず表示
-  - ファイル: `Views/CaptureWindow.xaml.cs`
+  - ファイル: `Views/CaptureWindow.cs`
 
-- [ ] 4-7. ローディング表示
+- [x] 4-7. ローディング表示
   - AI 分類中にスピナー (ProgressBar IsIndeterminate=true) を表示
   - [Cancel] で CancellationTokenSource をキャンセル
-  - ファイル: `Views/CaptureWindow.xaml.cs`
+  - Window の `MinHeight` を設定しない (SizeToContent で自動縮小)。MinHeight があると Loading 画面のコンテンツより大きいウィンドウが残り背景色のみ見えるバグが発生するため
+  - ファイル: `Views/CaptureWindow.cs`
+
+- [x] 4-8. Due Date フィールドを Confirm 画面に追加 (task のみ)
+  - TextBox (`YYYY-MM-DD`、ヒントテキスト付き)
+  - AI が `due_on` を提案していれば初期値としてセット、空欄なら空のまま
+  - Category が task のときのみ表示
+  - ファイル: `Views/CaptureWindow.cs`
+
+- [x] 4-9. 担当者を常に自分に自動設定
+  - `asana_global.json` の `user_gid` を読んで Asana タスクの `assignee` フィールドに設定
+  - UI での選択は不要 (常に自分固定)
+  - ファイル: `Services/CaptureService.cs`
 
 ### Phase 5: MainWindow / App 統合
 
-- [ ] 5-1. App.xaml.cs に CaptureService と CaptureWindow の DI 登録
+- [x] 5-1. App.xaml.cs に CaptureService と CaptureWindow の DI 登録
   - CaptureService: Singleton
   - CaptureWindow: Transient (毎回新しいインスタンス)
   - ファイル: `App.xaml.cs`
 
-- [ ] 5-2. MainWindow.xaml.cs にキャプチャホットキーハンドラを追加
+- [x] 5-2. MainWindow.xaml.cs にキャプチャホットキーハンドラを追加
   - `_hotkeyService.OnCaptureActivated = ShowCaptureWindow;`
   - ShowCaptureWindow: CaptureWindow を生成して ShowDialog
   - ルーティング結果が NavigationRequest の場合: Editor に遷移
   - ファイル: `MainWindow.xaml.cs`
 
-- [ ] 5-3. CaptureWindow から MainWindow への遷移コールバックを設定
-  - focus_update → MainWindow.NavigateToEditorAndOpenFile(project, focusPath)
-  - decision → MainWindow.NavigateToEditor(project) + DecisionLog フロー起動
+- [x] 5-3. CaptureWindow から MainWindow への遷移コールバックを設定
+  - `OnNavigateToFile`: 通常ファイル遷移 → `NavigateToEditorAndOpenFile(project, filePath)`
+  - `OnNavigateToFocusUpdate` (focus_update 専用、シグネチャ `Action<string, string, string>`): `NavigateToEditorAndTriggerFocusUpdate(project, filePath, capturedText)` を呼び、`EditorViewModel.RequestFocusUpdateOnOpen(capturedText)` → `NavigateToProjectAndOpenFile` → EditorPage 遷移 の順で実行
+  - `OnNavigateToDecision`: `NavigateToEditor(project)` + DecisionLog フロー起動
   - ファイル: `MainWindow.xaml.cs`
 
 ### Phase 6: エラーハンドリングと品質
 
-- [ ] 6-1. LLM API エラー時のフォールバック
+- [x] 6-1. LLM API エラー時のフォールバック
   - API エラー → 手動モードに切り替え (Category/Project ドロップダウンを表示)
   - エラーメッセージをウィンドウ内に表示 (モーダルダイアログではなく)
-  - ファイル: `Views/CaptureWindow.xaml.cs`
+  - ファイル: `Views/CaptureWindow.cs`
 
-- [ ] 6-2. プロジェクト未検出時の処理
+- [x] 6-2. プロジェクト未検出時の処理
   - AI がプロジェクト名を特定できなかった場合 → Project ドロップダウンを必須入力に
   - category が memo の場合はプロジェクト不要
-  - ファイル: `Views/CaptureWindow.xaml.cs`
+  - ファイル: `Views/CaptureWindow.cs`
 
-- [ ] 6-3. Asana 候補解決不可時の処理
+- [x] 6-3. Asana 候補解決不可時の処理
   - `asana_project_gids` が空、または逆引き不一致の場合は task 起票を停止
   - UI に「Asana project 設定不足」を表示し、`Asana Sync` 設定画面への導線を出す
-  - ファイル: `Services/CaptureService.cs`, `Views/CaptureWindow.xaml.cs`
+  - ファイル: `Services/CaptureService.cs`, `Views/CaptureWindow.cs`
 
 - [ ] 6-4. ファイル書き込み失敗時の処理
   - パスが存在しない、権限エラー等 → エラーメッセージ + memo にフォールバック
   - ファイル: `Services/CaptureService.cs`
 
 - [ ] 6-5. Asana API 起票失敗時の処理
-  - 4xx/5xx を UI に表示 (status code + メッセージ断片)
+  - 4xx/5xx を UI に表示 (status code + メッセージ断片) ← エラー表示のみ実装済み
   - 自動で `asana-tasks.md` 追記にはフォールバックしない
-  - [Retry] と [Save as memo] を提示
-  - ファイル: `Services/CaptureService.cs`, `Views/CaptureWindow.xaml.cs`
+  - [Retry] と [Save as memo] を提示 ← 未実装
+  - ファイル: `Services/CaptureService.cs`, `Views/CaptureWindow.cs`
 
-- [ ] 6-6. 空入力の防止
+- [x] 6-6. 空入力の防止
   - TextBox が空の場合 [Capture] ボタンを無効化
-  - ファイル: `Views/CaptureWindow.xaml.cs`
+  - ファイル: `Views/CaptureWindow.cs`
 
-- [ ] 6-7. 連続キャプチャ対応
+- [x] 6-7. 連続キャプチャ対応
   - ルーティング完了後、[New Capture] ボタンで入力画面に戻る (ウィンドウ再生成なし)
-  - ファイル: `Views/CaptureWindow.xaml.cs`
+  - ファイル: `Views/CaptureWindow.cs`
 
-- [ ] 6-8. 重複起票ガード
+- [x] 6-8. 重複起票ガード
   - 同一 summary + project で短時間に連続送信した場合、確認ダイアログを出す
   - `capture_log.md` に `asana_task_gid` を記録し、重複判定に利用
   - ファイル: `Services/CaptureService.cs`
@@ -578,25 +603,23 @@ UI 依存コードに選定ロジックを埋め込まない。
 
 | ファイル | 説明 |
 |---|---|
-| `Models/CaptureModels.cs` | CaptureClassification, CaptureRouteResult モデル |
-| `Services/CaptureService.cs` | AI 分類 + ルーティングのオーケストレーション |
-| `Services/AsanaTaskCreateService.cs` | Asana API 直接起票 (task ルート専用) |
-| `Views/CaptureWindow.xaml` | キャプチャウィンドウの XAML レイアウト |
-| `Views/CaptureWindow.xaml.cs` | キャプチャウィンドウのコードビハインド |
+| `Models/CaptureModels.cs` | CaptureClassification, CaptureRouteResult, AsanaTaskCreatePreview 等のモデル |
+| `Services/CaptureService.cs` | AI 分類 + ルーティング + Asana 起票のオーケストレーション (AsanaTaskCreateService は別ファイルにせず統合) |
+| `Views/CaptureWindow.cs` | キャプチャウィンドウ (コードビハインドのみ。XAML ファイルなし) |
 
 ### 変更ファイル
 
 | ファイル | 変更内容 |
 |---|---|
-| `Services/HotkeyService.cs` | 複数ホットキー対応 (CAPTURE_HOTKEY_ID 追加) |
-| `Helpers/Win32Interop.cs` | CAPTURE_HOTKEY_ID 定数追加 |
-| `Models/AppConfig.cs` | CaptureHotkey 設定追加 |
-| `App.xaml.cs` | CaptureService の DI 登録 |
-| `MainWindow.xaml.cs` | キャプチャホットキーハンドラ + CaptureWindow 表示ロジック |
-| `Views/Pages/SettingsPage.xaml` | キャプチャホットキー設定 UI |
-| `ViewModels/SettingsViewModel.cs` | キャプチャホットキー設定の保存/読み込み |
-| `Views/Pages/AsanaSyncPage.xaml` | (必要なら) Capture task 連携設定を追加 |
-| `ViewModels/AsanaSyncViewModel.cs` | asana_config 利用補助 (workstream map 再利用) |
+| `Services/HotkeyService.cs` | 複数ホットキー対応 (CAPTURE_HOTKEY_ID 追加、OnCaptureActivated コールバック) |
+| `Helpers/Win32Interop.cs` | CAPTURE_HOTKEY_ID = 9001 定数追加 |
+| `Models/AppConfig.cs` | CaptureHotkey 設定追加 (デフォルト: Ctrl+Shift+C) |
+| `App.xaml.cs` | CaptureService の Singleton 登録 |
+| `MainWindow.xaml.cs` | キャプチャホットキーハンドラ、ShowCaptureWindow、NavigateToEditorAndTriggerFocusUpdate 追加 |
+| `Services/FocusUpdateService.cs` | GenerateProposalAsync / BuildUserPrompt に capturedContext 引数追加。Quick Capture からの入力をプロンプトに組み込む |
+| `ViewModels/EditorViewModel.cs` | RequestFocusUpdateOnOpen(capturedText)、_capturedContextForFocusUpdate フィールド、UpdateStatus() での自動発火ロジック追加 |
+| `Views/Pages/SettingsPage.xaml` | キャプチャホットキー設定 UI (未実装) |
+| `ViewModels/SettingsViewModel.cs` | キャプチャホットキー設定の保存/読み込み (未実装) |
 
 ## 実装順序
 
@@ -631,7 +654,7 @@ Global Capture は他機能と独立して実装可能。decision ルートは A
 
 - 音声入力対応 (Windows Speech Recognition API でテキスト変換後に同じフローに流す)
 - キャプチャ履歴の閲覧 (capture_log.md を Timeline ページで時系列表示)
-- Asana API 直接書き戻し時の追加属性対応 (assignee, due_on, custom_fields)
+- Asana API 直接書き戻し時の追加属性対応 (custom_fields 等)
 - コンテキスト添付 (クリップボードの画像やURLを入力と一緒にキャプチャ)
 - キーワードベースの即時ルーティング (「TODO:」で始まれば AI 不要で task に直接ルーティング)
 
@@ -670,13 +693,17 @@ flowchart TD
     F1 --> F2{"focus_history yyyy-MM-dd バックアップ存在?"}
     F2 -->|"No"| F3["バックアップ作成 (encoding保持)"]
     F2 -->|"Yes"| F4["既存バックアップ利用"]
-    F3 --> F5["Editor遷移して更新フローへ"]
+    F3 --> F5["OnNavigateToFocusUpdate コールバック呼び出し (capturedText 付き)"]
     F4 --> F5
+    F5 --> F6["MainWindow: EditorViewModel.RequestFocusUpdateOnOpen(capturedText)"]
+    F6 --> F7["Editor遷移 + current_focus.md を開く"]
+    F7 --> F8["UpdateStatus() 検出 → UpdateFocusAsync() 自動発火"]
+    F8 --> F9["FocusUpdateService: capturedContext をプロンプトに組み込んで LLM 生成"]
 
     N1 --> Z["完了"]
     M1 --> Z
     D1 --> Z
     T7 --> Z
     T10 --> Z
-    F5 --> Z
+    F9 --> Z
 ```

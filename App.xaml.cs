@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Wpf.Ui;
 using ProjectCurator.Services;
 using ProjectCurator.ViewModels;
+using ProjectCurator.Views;
 using ProjectCurator.Views.Pages;
 using AppPageService = ProjectCurator.Services.PageService;
 using WpfApplication = System.Windows.Application;
@@ -73,6 +74,7 @@ public partial class App : WpfApplication
         services.AddSingleton<AsanaTaskParser>();
         services.AddSingleton<FocusUpdateService>();
         services.AddSingleton<DecisionLogGeneratorService>();
+        services.AddSingleton<CaptureService>();
 
         // ViewModels
         services.AddSingleton<MainWindowViewModel>();

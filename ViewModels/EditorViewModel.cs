@@ -49,6 +49,7 @@ public partial class EditorViewModel : ObservableObject
     private bool _suppressAutoFileOpenOnProjectChange;
     private CancellationTokenSource? _focusUpdateCts;
     private CancellationTokenSource? _decisionLogCts;
+    private string? _capturedContextForFocusUpdate;
 
     // ---- 選択プロジェクト ----
     [ObservableProperty]
@@ -171,7 +172,9 @@ public partial class EditorViewModel : ObservableObject
         }
         finally
         {
-            IsLoading = false;
+            // focus update 実行中はローディングを維持する
+            if (_focusUpdateCts == null)
+                IsLoading = false;
         }
     }
 
@@ -479,13 +482,18 @@ public partial class EditorViewModel : ObservableObject
     public async Task OpenFileAndSelectNodeAsync(string path)
     {
         await OpenFileAsync(path);
-        
+
         // ツリー内の該当ノードを探して選択・展開
         foreach (var node in TreeNodes)
         {
             if (TrySelectNodeRecursive(node, path))
                 break;
         }
+
+        // focus_update ルーティング: OpenFileAsync 完了後 (IsLoading リセット済み) に発火
+        // UpdateStatus() からは呼ばない (OpenFileAsync と IsLoading が競合するため)
+        if (_capturedContextForFocusUpdate != null && IsCurrentFocusFile(path) && CanUpdateFocus())
+            _ = UpdateFocusAsync();
     }
 
     private bool TrySelectNodeRecursive(FileTreeNode node, string targetPath)
@@ -1018,9 +1026,36 @@ public partial class EditorViewModel : ObservableObject
     // =====================================================================
     // Update Focus from Asana
     // =====================================================================
+
+    /// <summary>
+    /// Quick Capture の focus_update ルーティングから呼ばれる。
+    /// 次に current_focus.md が開かれたタイミングで UpdateFocusAsync を自動発火し、
+    /// キャプチャ内容を LLM プロンプトの追加コンテキストとして渡す。
+    /// </summary>
+    public void RequestFocusUpdateOnOpen(string capturedText)
+        => _capturedContextForFocusUpdate = capturedText;
+
+    /// <summary>
+    /// Quick Capture focus_update ルーティング後、ApplicationIdle/Background タイミングから呼ばれる。
+    /// current_focus.md が既に開かれていれば UpdateFocusAsync を発火する。
+    /// </summary>
+    public void TriggerFocusUpdateIfPending()
+    {
+        if (_capturedContextForFocusUpdate != null
+            && SelectedProject != null
+            && IsCurrentFocusFile(CurrentFile))
+        {
+            _ = UpdateFocusAsync();
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanUpdateFocus))]
     public async Task UpdateFocusAsync()
     {
+        // Quick Capture コンテキストを即座に取得・クリア (多重発火防止)
+        var capturedContext = _capturedContextForFocusUpdate;
+        _capturedContextForFocusUpdate = null;
+
         if (SelectedProject == null) return;
 
         // API キー未設定チェック
@@ -1035,22 +1070,30 @@ public partial class EditorViewModel : ObservableObject
             return;
         }
 
+        // LLM 処理開始前にローディング開始 (LoadProjectsAsync の finally より先に CTS をセット)
+        IsLoading = true;
+        _focusUpdateCts = new CancellationTokenSource();
+
         // Workstream 選択: 1件でも必ずダイアログで確認 (general or workstream)
         string? workstreamId = null;
         var activeWorkstreams = SelectedProject.Workstreams.Where(w => !w.IsClosed).ToList();
         if (activeWorkstreams.Count > 0 && RequestWorkstreamSelection != null)
         {
             var (ok, wsId) = await RequestWorkstreamSelection(activeWorkstreams);
-            if (!ok) return; // キャンセル
+            if (!ok)
+            {
+                // キャンセル時はローディングを解除して終了
+                IsLoading = false;
+                _focusUpdateCts.Dispose();
+                _focusUpdateCts = null;
+                return;
+            }
             workstreamId = wsId; // null = general
         }
-
-        IsLoading = true;
-        _focusUpdateCts = new CancellationTokenSource();
         try
         {
             var result = await _focusUpdateService.GenerateProposalAsync(
-                SelectedProject, workstreamId, _focusUpdateCts.Token);
+                SelectedProject, workstreamId, _focusUpdateCts.Token, capturedContext);
 
             if (RequestFocusUpdateApproval == null) return;
             var capturedResult = result;
@@ -1179,6 +1222,7 @@ public partial class EditorViewModel : ObservableObject
 
         // メッセンジャー経由で MainWindowViewModel へ通知
         WeakReferenceMessenger.Default.Send(new StatusUpdateMessage(projectLabel, fileLabel, Encoding, IsDirty));
+
     }
 
     private static bool IsCurrentFocusFile(string? path)
