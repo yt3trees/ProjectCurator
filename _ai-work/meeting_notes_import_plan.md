@@ -66,13 +66,26 @@ EditorViewModel / CommandPaletteViewModel
 MeetingNotesService (新規)
   ├── AnalyzeAsync()        会議メモ → 3種類の提案を構造化
   ├── ApplyDecisionsAsync() decision_log ファイルを作成
-  ├── ApplyFocusAsync()     current_focus.md を更新
-  └── ApplyTensionsAsync()  tensions.md に追記
+  ├── ApplyFocusAsync()     current_focus.md を更新 (FocusUpdateService の backup パターンを流用)
+  └── ApplyTensionsAsync()  tensions.md のセクション別追記 (CaptureService のパス解決ロジックを参照)
         │
         ▼
-LlmClientService (既存: そのまま利用)
-FileEncodingService (既存: そのまま利用)
+LlmClientService        (既存: そのまま利用)
+FileEncodingService     (既存: そのまま利用)
+FocusUpdateService      (既存: backup / ProposedContent パターンを参照)
+CaptureService          (既存[実装済み]: tensions.md パス解決・AppendToTensionsAsync のパターンを参照)
+ProjectDiscoveryService (既存: プロジェクト一覧・パス解決)
 ```
+
+### 既存サービスとの役割分担
+
+| 処理 | 既存コード | MeetingNotesService での扱い |
+|---|---|---|
+| tensions.md パス解決 | `CaptureService` の `GetTensionsFilePath()` 相当 | 同じロジックを参照 |
+| tensions.md 末尾への1行追記 | `CaptureService.AppendToTensionsAsync()` | セクション別挿入が必要なため別実装。ただしパス解決・ファイル不在時の新規作成ロジックは共有 |
+| current_focus.md backup | `FocusUpdateService` の `focus_history/` コピー | 同じパターンを流用 |
+| decision_log ファイル命名 | `ContextCompressionLayerService` 配下の既存命名規則 | `YYYY-MM-DD_{topic}.md` + 同日重複時 `_a/_b` サフィックス |
+| LLM 1回呼び出し | `LlmClientService.ChatCompletionAsync()` | そのまま利用 |
 
 ## LLM 呼び出し設計
 
@@ -290,8 +303,46 @@ public class MeetingNotesService
 
 ### エントリーポイント
 
-1. Command Palette: `"meeting"` コマンド → 入力ダイアログを表示
-2. Editor ツールバー: AI 有効時に「Import Meeting Notes」ボタン追加 (プロジェクト選択済みの時のみ有効)
+1. Command Palette: `"meeting"` コマンド → EditorPage に遷移後 `ImportMeetingNotesCommand.ExecuteAsync`
+2. Editor ツールバー: `ImportMeetingNotesButton` を追加
+   - `Visibility={Binding IsAiEnabled, Converter=BoolToVisibility}` で AI 無効時は非表示
+   - `CanExecute`: `SelectedProject != null` (UpdateFocus と異なり current_focus.md を開いていなくても発火可)
+
+### 起動フロー (コードレベル)
+
+```
+[ツールバーボタン / Command Palette]
+        │
+        ▼
+EditorViewModel.ImportMeetingNotesAsync()
+        │
+        ├─ SelectedProject == null → return
+        ├─ LlmApiKey 未設定 → MessageBox → return
+        │
+        ▼ RequestMeetingNotesInput コールバック
+EditorPage.xaml.cs: ShowMeetingNotesInputDialogAsync()
+        │ [Analyze] ボタン押下
+        │ IsLoading = true / [Analyze] 無効化
+        ▼
+MeetingNotesService.AnalyzeAsync()  ← LLM 1回
+        │
+        ▼ RequestMeetingNotesPreview コールバック
+EditorPage.xaml.cs: ShowMeetingNotesPreviewDialogAsync()
+        │ [Apply Selected]
+        ▼
+MeetingNotesService.Apply*Async() (順番: Decisions → Focus → Tensions)
+        │
+        ▼
+BuildFileTree() + OpenFileAndSelectNodeAsync() (先頭の decision_log を優先)
+```
+
+コールバックは `EditorPage.xaml.cs` のコンストラクタで設定する (AI Decision Log と同パターン):
+
+```csharp
+// EditorPage.xaml.cs コンストラクタ
+ViewModel.RequestMeetingNotesInput   = ShowMeetingNotesInputDialogAsync;
+ViewModel.RequestMeetingNotesPreview = ShowMeetingNotesPreviewDialogAsync;
+```
 
 ### ダイアログ1: 入力ダイアログ
 
@@ -347,8 +398,9 @@ Refine ボタンは現在アクティブなタブの内容を対象とする:
   - ファイル: `Models/MeetingNotesModels.cs`
 
 - [ ] 1-2. `MeetingNotesService` を新規作成: AnalyzeAsync()
+  - コンストラクタ DI: `LlmClientService`, `ConfigService`, `FileEncodingService`, `ProjectDiscoveryService`, `FocusUpdateService`
   - プロンプト定数を定義 (System + User Prompt の組み立て)
-  - LLM 呼び出し (1回) → JSON パース
+  - LLM 呼び出し (1回、`ChatCompletionAsync`) → JSON パース
   - JSON パースエラー時のフォールバック (空結果を返す)
   - ファイル: `Services/MeetingNotesService.cs`
 
@@ -361,49 +413,75 @@ Refine ボタンは現在アクティブなタブの内容を対象とする:
 
 - [ ] 1-4. `MeetingNotesService` に TensionsAppend 組み立てロジックを実装
   - tensions.md の3セクション (`## 技術的なオープンクエスチョン`, `## 未解決のトレードオフ`, `## プロジェクト上の懸念・違和感`) を検出
-  - 各セクションの末尾に追記
+  - 各セクションの末尾に項目を追記
   - `Last Update` 行を更新
   - AppendContent / CurrentContent をセット
+  - 注: `CaptureService.AppendToTensionsAsync()` は末尾1行追記のみ。セクション別挿入が必要なここでは別実装とし、tensions.md パス解決のみ CaptureService と同じロジックで実装する
   - ファイル: `Services/MeetingNotesService.cs`
 
 - [ ] 1-5. `MeetingNotesService` に Apply メソッド群を実装
-  - `ApplyDecisionsAsync()`: AI Decision Log 計画と同じファイル保存ロジック (重複確認)
-  - `ApplyFocusAsync()`: FocusUpdateService と同じバックアップ + 保存ロジック
-  - `ApplyTensionsAsync()`: tensions.md への追記保存
+  - `ApplyDecisionsAsync()`: `YYYY-MM-DD_{topic}.md` 命名 + 同日同名の場合 `_a/_b` サフィックス (既存 decision_log 命名規則と同一)
+  - `ApplyFocusAsync()`: `FocusUpdateService` と同じ `focus_history/` バックアップ + 保存ロジック
+  - `ApplyTensionsAsync()`: tensions.md への追記保存 (ファイル不在時は CaptureService と同じテンプレートで新規作成)
   - ファイル: `Services/MeetingNotesService.cs`
 
 - [ ] 1-6. DI 登録
   - `App.xaml.cs` に `MeetingNotesService` をシングルトン登録
+  - `CaptureService` はすでに登録済み
   - ファイル: `App.xaml.cs`
 
 ### Phase 2: ViewModel とコマンド
 
-- [ ] 2-1. `EditorViewModel` に `ImportMeetingNotesCommand` を追加
-  - AI 有効かつプロジェクト選択済みの場合のみ実行可能
-  - コールバック `RequestMeetingNotesInput` / `RequestMeetingNotesPreview` を定義
+- [ ] 2-1. `EditorViewModel` に `ImportMeetingNotesAsync` コマンドと関連を追加
+  - `[RelayCommand(CanExecute = nameof(CanImportMeetingNotes))]` で定義
+  - `CanImportMeetingNotes`: `SelectedProject != null` (current_focus.md を開いていなくても発火可)
+  - `IsAiEnabled` は `AiEnabledChangedMessage` で同期 (UpdateFocusAsync と同パターン)
+  - コールバック定義:
+    ```csharp
+    public Func<ProjectInfo, List<WorkstreamInfo>, Task<MeetingNotesInputResult?>>? RequestMeetingNotesInput;
+    public Func<MeetingAnalysisResult, Func<string, string, Task<MeetingAnalysisResult>>,
+        Task<bool>>? RequestMeetingNotesPreview;
+    public Action<string, string>? ShowScrollableError;  // 既存を共用
+    ```
+  - LlmApiKey 未設定チェック → MessageBox (NewAiDecisionLogAsync と同パターン)
   - ファイル: `ViewModels/EditorViewModel.cs`
 
 - [ ] 2-2. Command Palette に `"meeting"` コマンドを追加
   - ラベル: `"meeting"`, 表示: `"[>]  meeting (Import Meeting Notes)"`
   - AI 有効の場合のみリストに追加 (AI 無効時は非表示)
+  - Action: `w.RootNavigation.Navigate(typeof(EditorPage))` → `await Task.Delay(50)` → `_editorViewModel.ImportMeetingNotesCommand.ExecuteAsync(null)` (update focus コマンドと同パターン)
   - ファイル: `ViewModels/CommandPaletteViewModel.cs`
 
 ### Phase 3: UI - 入力ダイアログ
 
-- [ ] 3-1. 入力ダイアログを実装
+- [ ] 3-1. `EditorPage.xaml.cs` コンストラクタにコールバックを登録
+  - `ViewModel.RequestMeetingNotesInput   = ShowMeetingNotesInputDialogAsync;`
+  - `ViewModel.RequestMeetingNotesPreview = ShowMeetingNotesPreviewDialogAsync;`
+  - ファイル: `Views/Pages/EditorPage.xaml.cs`
+
+- [ ] 3-2. `EditorPage.xaml` のツールバーにボタンを追加
+  - `Visibility={Binding IsAiEnabled, Converter=BoolToVisibility}`
+  - `Command={Binding ImportMeetingNotesCommand}`
+  - `ToolTip="Import Meeting Notes"`
+  - ファイル: `Views/Pages/EditorPage.xaml`
+
+- [ ] 3-3. `ShowMeetingNotesInputDialogAsync()` を実装
   - Pattern B (DashboardPage の multi-section) を参考
-  - プロジェクト・Workstream 表示/選択
-  - 会議メモ入力 TextBox (MultiLine, MinHeight=160)
-  - [Analyze] ボタン → LLM 呼び出し → プレビューダイアログへ
-  - ローディング中はボタンを無効化、インジケータ表示
+  - プロジェクト選択 ComboBox: `CaptureWindow` の Project ドロップダウンと同じパターン (ProjectDiscoveryService からリスト取得)
+  - Workstream 表示/選択 ComboBox
+  - 会議メモ入力 TextBox (MultiLine, AcceptsReturn=true, MinHeight=160)
+  - [Analyze] ボタン: MeetingNotesService.AnalyzeAsync() を呼び出してプレビューへ
+  - ローディング中は ProgressBar IsIndeterminate=true + [Analyze] 無効化 (CaptureWindow 4-7 と同パターン)
+  - 戻り値: `MeetingNotesInputResult?` (null でキャンセル扱い)
   - ファイル: `Views/Pages/EditorPage.xaml.cs`
 
 ### Phase 4: UI - プレビューダイアログ
 
-- [ ] 4-1. プレビューダイアログの骨格を実装
-  - Pattern D (ShowFocusUpdateProposalDialogAsync) をベースに TabControl を追加
+- [ ] 4-1. `ShowMeetingNotesPreviewDialogAsync()` の骨格を実装
+  - `ShowFocusUpdateProposalDialogAsync` をベースに TabControl を追加
   - タブヘッダーに件数バッジ: "Decisions (2)", "Focus", "Tensions (1)"
-  - TaskCompletionSource で非同期返値
+  - `TaskCompletionSource<bool>` で非同期返値 (true = Apply, false = Cancel)
+  - `RequestMeetingNotesPreview` コールバックの第2引数として Refine 関数を渡す
   - ファイル: `Views/Pages/EditorPage.xaml.cs`
 
 - [ ] 4-2. Decisions タブを実装
@@ -476,22 +554,31 @@ Refine ボタンは現在アクティブなタブの内容を対象とする:
 
 | ファイル | 変更内容 |
 |---|---|
-| `App.xaml.cs` | MeetingNotesService の DI 登録 |
+| `App.xaml.cs` | MeetingNotesService の DI 登録 (CaptureService は登録済み) |
 | `ViewModels/EditorViewModel.cs` | ImportMeetingNotesCommand とコールバック追加 |
 | `ViewModels/CommandPaletteViewModel.cs` | "meeting" コマンド追加 |
 | `Views/Pages/EditorPage.xaml` | ツールバーにボタン追加 |
 | `Views/Pages/EditorPage.xaml.cs` | 入力ダイアログ + プレビューダイアログの実装 |
 
+### 参照するが変更しないファイル (パターン参照)
+
+| ファイル | 参照用途 |
+|---|---|
+| `Services/CaptureService.cs` | tensions.md パス解決・ファイル不在時新規作成テンプレート |
+| `Services/FocusUpdateService.cs` | focus_history/ バックアップロジック |
+| `Views/CaptureWindow.cs` | プロジェクト選択 ComboBox・ローディング表示・エラー表示パターン |
+
 ## 他の計画との比較
 
-| 観点 | AI Decision Log | Smart Standup | Meeting Notes Import |
+| 観点 | Global Capture (実装済み) | AI Decision Log | Meeting Notes Import |
 |---|---|---|---|
-| 入力 | ユーザーの1行入力 + focus差分 | 自動収集 | 自由形式のメモ (多) |
-| 出力ファイル数 | 1 (decision_log) | 1 (standup) | 1〜N (decision_log + focus + tensions) |
-| LLM 呼び出し | 1回 + Refine | 1回 | 1回 + Refine (タブ単位) |
-| ユーザー操作 | 入力 → プレビュー → 承認 | 全自動 | 入力 → タブ選択 → 承認 |
-| 新規サービス | DecisionLogGeneratorService | StandupGeneratorService 拡張 | MeetingNotesService |
-| 依存する既存機能 | FocusUpdateService (パターン参照) | TodayQueueService / StandupGeneratorService | FocusUpdateService + DecisionLogGenerator (パターン参照) |
+| 入力 | 1行のフリーテキスト | ユーザーの1行入力 + focus差分 | 自由形式のメモ (多) |
+| 出力ファイル数 | 1 (カテゴリ次第) | 1 (decision_log) | 1〜N (decision_log + focus + tensions) |
+| LLM 呼び出し | 1回 (分類) | 1回 + Refine | 1回 + Refine (タブ単位) |
+| ユーザー操作 | 入力 → 確認 → Route | 入力 → プレビュー → 承認 | 入力 → タブ選択 → 承認 |
+| 新規サービス | CaptureService | DecisionLogGeneratorService | MeetingNotesService |
+| 依存する既存機能 | FileEncodingService / AsanaSyncService | FocusUpdateService (パターン参照) | FocusUpdateService + CaptureService (パターン参照) |
+| tensions.md 書き込み | 末尾への1行追記 | なし | セクション別の複数行追記 |
 
 ## 実装順序
 
