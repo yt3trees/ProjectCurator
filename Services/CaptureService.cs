@@ -446,7 +446,6 @@ public class CaptureService
             }
             else
             {
-                // 親ディレクトリが存在しない場合は作成を試みる
                 var dir = Path.GetDirectoryName(tensionsPath);
                 if (!string.IsNullOrWhiteSpace(dir))
                     Directory.CreateDirectory(dir);
@@ -454,11 +453,7 @@ public class CaptureService
                 encoding = "utf-8";
             }
 
-            var entry = string.IsNullOrWhiteSpace(c.Body)
-                ? $"- {c.Summary}"
-                : $"- {c.Summary}: {c.Body.Split('\n')[0].Trim()}";
-
-            var newContent = existingContent.TrimEnd() + "\n" + entry + "\n";
+            var newContent = BuildTensionAppend(existingContent, c);
             await _encoding.WriteFileAsync(tensionsPath, newContent, encoding, ct);
 
             return new CaptureRouteResult
@@ -471,7 +466,6 @@ public class CaptureService
         catch (Exception ex)
         {
             Debug.WriteLine($"[CaptureService] AppendToTensionsAsync failed: {ex.Message}");
-            // memo にフォールバック
             var memoResult = await AppendToCaptureLogAsync(c, $"[tension] {c.Summary}\n{c.Body}", ct);
             return new CaptureRouteResult
             {
@@ -480,6 +474,132 @@ public class CaptureService
                 TargetFilePath = memoResult.TargetFilePath
             };
         }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Tensions proposal (AI review flow)
+    // ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// AI を使って tensions.md の更新提案を生成する。
+    /// AI 有効時に CaptureWindow から呼び出し、差分確認ダイアログを経由して書き込む。
+    /// </summary>
+    public async Task<(FileUpdateProposal proposal, string encoding)> GenerateTensionsProposalAsync(
+        CaptureClassification c,
+        ProjectInfo project,
+        CancellationToken ct = default)
+    {
+        var tensionsPath = Path.Combine(project.AiContextContentPath, "tensions.md");
+
+        string existingContent;
+        string enc;
+        if (File.Exists(tensionsPath))
+        {
+            (existingContent, enc) = await _encoding.ReadFileAsync(tensionsPath, ct);
+        }
+        else
+        {
+            var dir = Path.GetDirectoryName(tensionsPath);
+            if (!string.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
+            existingContent = "# Tensions\n\n";
+            enc = "utf-8";
+        }
+
+        var systemPrompt = BuildTensionsSystemPrompt();
+        var userPrompt   = BuildTensionsUserPrompt(existingContent, c);
+        var proposed     = await _llm.ChatCompletionAsync(systemPrompt, userPrompt, ct);
+
+        var proposal = new FileUpdateProposal
+        {
+            CurrentContent    = existingContent,
+            ProposedContent   = proposed.Trim(),
+            Summary           = c.Summary,
+            DebugSystemPrompt = _llm.LastSystemPrompt,
+            DebugUserPrompt   = _llm.LastUserPrompt,
+            DebugResponse     = _llm.LastResponse,
+        };
+
+        return (proposal, enc);
+    }
+
+    /// <summary>
+    /// 差分確認後に tensions.md へ書き込む。
+    /// </summary>
+    public Task WriteTensionsAsync(string path, string content, string encoding, CancellationToken ct = default)
+        => _encoding.WriteFileAsync(path, content, encoding, ct);
+
+    /// <summary>
+    /// Tensions 提案のリファイン (FocusUpdateService.RefineAsync と同パターン)。
+    /// </summary>
+    public async Task<string> RefineTensionsAsync(
+        string initialUserPrompt,
+        string initialProposed,
+        string instructions,
+        IReadOnlyList<(string instruction, string result)> history,
+        CancellationToken ct = default)
+    {
+        var messages = new List<(string role, string content)>
+        {
+            ("user",      initialUserPrompt),
+            ("assistant", initialProposed)
+        };
+        foreach (var (instr, result) in history)
+        {
+            messages.Add(("user",      instr));
+            messages.Add(("assistant", result));
+        }
+        messages.Add(("user", instructions));
+
+        var refined = await _llm.ChatWithHistoryAsync(BuildTensionsSystemPrompt(), messages, ct);
+        return refined.Trim();
+    }
+
+    /// <summary>
+    /// capture_log.md に任意のエントリを追記する (CaptureWindow から呼び出す)。
+    /// </summary>
+    public Task AppendCaptureLogEntryAsync(string body, CancellationToken ct = default)
+        => AppendToCaptureLogInternalAsync(body, ct);
+
+    private static string BuildTensionAppend(string existingContent, CaptureClassification c)
+    {
+        var entry = string.IsNullOrWhiteSpace(c.Body)
+            ? $"- {c.Summary}"
+            : $"- {c.Summary}: {c.Body.Split('\n')[0].Trim()}";
+        return existingContent.TrimEnd() + "\n" + entry + "\n";
+    }
+
+    private static string BuildTensionsSystemPrompt() => """
+        You are an assistant that maintains a tensions.md file for a project management system.
+        A "tension" is an unresolved question, concern, trade-off, or risk — not yet a decision.
+
+        ## Output rules
+        - Output ONLY the full updated content of tensions.md. No explanations, no preamble, no markdown fences.
+        - Never truncate. Always output the complete file from the first line to the last.
+
+        ## Update rules
+        1. PRESERVE the existing Markdown heading/section structure exactly (do not add, remove, or rename sections).
+        2. If the new tension is essentially the same as an existing item, merge them naturally rather than duplicating.
+        3. If the new tension is closely related to an existing item, insert it near that item with appropriate context.
+        4. If the new tension is distinct, insert it at the most semantically appropriate location — not necessarily at the end.
+        5. Rephrase the new tension to match the document's existing writing style and tone.
+        6. Do not fabricate or remove existing tensions. Only add the new tension.
+        """;
+
+    private static string BuildTensionsUserPrompt(string existingContent, CaptureClassification c)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("## Current tensions.md");
+        sb.AppendLine(existingContent);
+        sb.AppendLine();
+        sb.AppendLine("## New tension to integrate");
+        sb.AppendLine($"Summary: {c.Summary}");
+        if (!string.IsNullOrWhiteSpace(c.Body))
+            sb.AppendLine($"Detail: {c.Body}");
+        sb.AppendLine();
+        sb.AppendLine("## Instruction");
+        sb.AppendLine("Integrate the new tension into tensions.md following the update rules.");
+        sb.AppendLine("Output the full file content only. Do not include any explanation.");
+        return sb.ToString();
     }
 
     private async Task<CaptureRouteResult> AppendToCaptureLogAsync(

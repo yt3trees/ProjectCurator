@@ -785,7 +785,15 @@ public class CaptureWindow : Window
             return;
         }
 
-        // focus_update / decision / tension / memo
+        // tension + AI: 差分確認ダイアログ
+        if (_classification.Category == "tension" && _configService.LoadSettings().AiEnabled)
+        {
+            _cts = new CancellationTokenSource();
+            await HandleTensionWithReviewAsync(_classification, _cts.Token);
+            return;
+        }
+
+        // focus_update / decision / tension(AI無効) / memo
         _cts = new CancellationTokenSource();
         CaptureRouteResult result;
         try
@@ -799,6 +807,88 @@ public class CaptureWindow : Window
         }
 
         HandleRouteResult(result);
+    }
+
+    private async Task HandleTensionWithReviewAsync(CaptureClassification classification, CancellationToken ct)
+    {
+        var projects = await _discoveryService.GetProjectInfoListAsync(ct: ct);
+        var project  = projects.FirstOrDefault(p =>
+            string.Equals(p.Name, classification.ProjectName, StringComparison.OrdinalIgnoreCase));
+
+        if (project == null)
+        {
+            SetConfirmError("Project not found.");
+            return;
+        }
+
+        ShowScreen(Screen.Loading);
+
+        FileUpdateProposal proposal;
+        string encoding;
+        try
+        {
+            (proposal, encoding) = await _captureService.GenerateTensionsProposalAsync(classification, project, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            ShowScreen(Screen.Confirm);
+            return;
+        }
+        catch (Exception ex)
+        {
+            ShowScreen(Screen.Confirm);
+            SetConfirmError($"Failed to generate proposal: {ex.Message}");
+            return;
+        }
+
+        // リファイン用の状態
+        var refineHistory     = new List<(string instruction, string result)>();
+        var initialUserPrompt = proposal.DebugUserPrompt;
+        var initialProposed   = proposal.ProposedContent;
+
+        Func<string, string, Task<string>> refineFunc = async (_, instructions) =>
+        {
+            var refined = await _captureService.RefineTensionsAsync(
+                initialUserPrompt, initialProposed, instructions, refineHistory, ct);
+            refineHistory.Add((instructions, refined));
+            return refined;
+        };
+
+        var (apply, content) = await ProposalReviewDialog.ShowAsync(
+            this, proposal,
+            titleText:  "Review Tension",
+            titleIcon:  "⚡",
+            refineFunc: refineFunc);
+
+        if (!apply || content == null)
+        {
+            ShowScreen(Screen.Confirm);
+            return;
+        }
+
+        var tensionsPath = System.IO.Path.Combine(project.AiContextContentPath, "tensions.md");
+        try
+        {
+            await _captureService.WriteTensionsAsync(tensionsPath, content, encoding, ct);
+        }
+        catch (Exception ex)
+        {
+            ShowScreen(Screen.Confirm);
+            SetConfirmError($"Failed to write: {ex.Message}");
+            return;
+        }
+
+        // capture_log.md に副次記録
+        var proj = $" [{classification.ProjectName}]";
+        _ = _captureService.AppendCaptureLogEntryAsync(
+            $"[tension]{proj} {classification.Summary}\n{_inputBox.Text}", ct);
+
+        HandleRouteResult(new CaptureRouteResult
+        {
+            Success        = true,
+            Message        = $"Added to {project.Name}/tensions.md",
+            TargetFilePath = tensionsPath
+        });
     }
 
     private async Task ShowTaskApprovalScreenAsync()

@@ -52,6 +52,18 @@ public partial class SetupViewModel : ObservableObject
     // --- New タブ ---
 
     [ObservableProperty]
+    private bool isDetectingBoxProjects;
+
+    public ObservableCollection<BoxOnlyProjectCandidate> BoxOnlyProjects { get; } = [];
+
+    [ObservableProperty]
+    private BoxOnlyProjectCandidate? selectedBoxOnlyProject;
+
+    public bool HasBoxOnlyProjects => BoxOnlyProjects.Count > 0;
+
+    public bool CanDetectBoxProjects => !IsRunning && !IsDetectingBoxProjects;
+
+    [ObservableProperty]
     private string newProjectName = "";
 
     [ObservableProperty]
@@ -525,6 +537,45 @@ public partial class SetupViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(NewAiContextForceEnabled));
         OnPropertyChanged(nameof(CanManageWorkstreams));
+        OnPropertyChanged(nameof(CanDetectBoxProjects));
+    }
+
+    partial void OnIsDetectingBoxProjectsChanged(bool value)
+        => OnPropertyChanged(nameof(CanDetectBoxProjects));
+
+    partial void OnSelectedBoxOnlyProjectChanged(BoxOnlyProjectCandidate? value)
+    {
+        if (value == null) return;
+        NewProjectName         = value.Name;
+        NewTier                = value.Tier;
+        NewCategory            = value.Category;
+        NewExternalSharedPaths = string.Join("\n", value.ExternalSharedPaths);
+    }
+
+    [RelayCommand]
+    private async Task DetectBoxProjects()
+    {
+        IsDetectingBoxProjects = true;
+        try
+        {
+            var candidates = await _discoveryService.ScanBoxOnlyProjectsAsync();
+            BoxOnlyProjects.Clear();
+            foreach (var c in candidates)
+                BoxOnlyProjects.Add(c);
+            OnPropertyChanged(nameof(HasBoxOnlyProjects));
+
+            AppendOutput(candidates.Count == 0
+                ? "[Detect from BOX] No BOX-only projects found."
+                : $"[Detect from BOX] Found {candidates.Count} project(s). Select one to auto-fill.");
+        }
+        catch (Exception ex)
+        {
+            AppendOutput($"[ERROR] Detect from BOX: {ex.Message}");
+        }
+        finally
+        {
+            IsDetectingBoxProjects = false;
+        }
     }
 
     partial void OnManageProjectNameChanged(string value)

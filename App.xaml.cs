@@ -1,6 +1,7 @@
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Wpf.Ui;
+using Wpf.Ui.Appearance;
 using ProjectCurator.Services;
 using ProjectCurator.ViewModels;
 using ProjectCurator.Views;
@@ -19,6 +20,12 @@ public partial class App : WpfApplication
     protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // アクセントカラーを固定値 (#0078D4) に設定し、PC ごとのシステム設定に左右されないようにする
+        ApplicationAccentColorManager.Apply(
+            System.Windows.Media.Color.FromRgb(0x00, 0x78, 0xD4),
+            ApplicationTheme.Dark,
+            false);
 
         // シングルインスタンス制御
         _mutex = new Mutex(true, MutexName, out bool createdNew);

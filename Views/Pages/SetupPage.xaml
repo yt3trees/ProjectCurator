@@ -92,6 +92,27 @@
                                        TextWrapping="Wrap" MaxWidth="600" HorizontalAlignment="Left"
                                        Margin="0,0,0,10"/>
 
+                            <!-- Detect from BOX -->
+                            <ui:Button Content="Detect from BOX"
+                                       Command="{Binding DetectBoxProjectsCommand}"
+                                       Appearance="Secondary"
+                                       IsEnabled="{Binding CanDetectBoxProjects}"
+                                       HorizontalAlignment="Left"
+                                       Margin="0,0,0,6"/>
+                            <ComboBox ItemsSource="{Binding BoxOnlyProjects}"
+                                      SelectedItem="{Binding SelectedBoxOnlyProject}"
+                                      DisplayMemberPath="DisplayName"
+                                      IsEnabled="{Binding HasBoxOnlyProjects}"
+                                      MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
+                                      Margin="0,0,0,4"
+                                      Visibility="{Binding HasBoxOnlyProjects,
+                                                   Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <TextBlock Text="Select a BOX-only project to auto-fill the fields below."
+                                       FontSize="11" Foreground="{DynamicResource AppSubtext0}"
+                                       Margin="0,0,0,10"
+                                       Visibility="{Binding HasBoxOnlyProjects,
+                                                    Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
                             <!-- Tier / Category -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <StackPanel Margin="0,0,24,0">
