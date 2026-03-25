@@ -124,8 +124,8 @@ public partial class MainWindow : FluentWindow
             {
                 Left = Left,
                 Top = Top,
-                Width = Width,
-                Height = Height,
+                Width = 0,   // サイズは保存しない (再起動後は固定値に戻す)
+                Height = 0,
             });
         }
 
@@ -150,12 +150,7 @@ public partial class MainWindow : FluentWindow
         var workArea = SystemParameters.WorkArea;
         var saved = _configService.LoadWindowPlacement();
 
-        if (saved != null)
-        {
-            Width = saved.Width;
-            Height = saved.Height;
-        }
-
+        // サイズは再起動後も固定値に戻す (XAML の Width/Height をそのまま使う)
         // ウィンドウが作業領域より大きい場合はサイズを縮小する (MinWidth/MinHeight は守る)
         if (Width > workArea.Width)
             Width = Math.Max(MinWidth, workArea.Width);
