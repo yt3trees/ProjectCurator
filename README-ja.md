@@ -181,6 +181,53 @@ flowchart TD
     G --> H["Update Focus from Asana(任意、AI)"]
 ```
 
+## AI機能
+
+すべての AI 機能は `Settings > LLM API` で `Enable AI Features` をオンにする必要があります。対応プロバイダー: OpenAI / Azure OpenAI。
+
+### 初期設定
+
+1. `Settings > LLM API` を開く
+2. プロバイダーを選択し、API Key と Model を入力 (Azure の場合は Endpoint / API Version も)
+3. `Test Connection` をクリック
+4. テスト成功後、`Enable AI Features` をオンにして保存
+
+### ユーザープロフィール
+
+`Settings > LLM API > User Profile` に自分の役割・優先軸・文体などを自由記述で入力します。ここで設定したテキストは、すべての LLM 呼び出しのシステムプロンプト先頭に `## User Profile` セクションとして自動付与されます。毎回プロンプトに書かなくても、モデルがあなたの文脈を把握した状態で回答します。
+
+記入例:
+
+```
+役割: エンジニアリングマネージャー。3〜4件のプロジェクトを並行管理。
+箇条書きで簡潔に。タスクを詰め込むより過負荷の日をフラグしてほしい。
+current_focus.md の更新は既存のトーンを維持すること。
+```
+
+### What's Next (Dashboard)
+
+Dashboard ツールバーの 💡 をクリックすると、全プロジェクト横断で優先度順の 3〜5 件のアクション提案を取得できます。期限超過タスク・focus ファイルの鮮度・未コミット変更・未記録の決定事項などを LLM が分析し、緊急度順にランキングします。各提案の [Open] ボタンで該当ファイルへ直接移動できます。
+
+### Update Focus from Asana (Editor)
+
+Editor ツールバーの `Update Focus from Asana` ボタンをクリックすると、開いている `current_focus.md` の差分ベース更新提案を生成します。モデルは Asana タスクデータと既存ファイルを読み込み、見出し構造と文体を保持しながら変更案を提示します。バックアップは `focus_history/` に自動保存。Workstream 絞り込み・自然言語による再指示・デバッグ表示に対応しています。
+
+### AI Decision Log (Editor)
+
+Editor ツールバーの `Dec Log` ボタン (AI モード) で意思決定ログ作成ダイアログを開きます。決定内容を記述すると、モデルが Options / Why / Risk / Revisit Trigger を含む構造化ドラフトを生成します。自然言語による再指示に対応し、`tensions.md` の解決済み項目の削除も可能。`decision_log/YYYY-MM-DD_{topic}.md` として保存されます。
+
+### Quick Capture AI ルーティング
+
+AI Features が有効な場合、Quick Capture ウィンドウ (`Ctrl+Shift+C`) で入力したテキストは LLM が自動分類してルーティングします。
+
+| カテゴリ | 振り分け先 |
+|---|---|
+| `task` | Asana API でタスクを起票 (送信前に確認あり) |
+| `tension` | `tensions.md` に追記 |
+| `focus_update` | Editor を開き、入力内容をコンテキストとして Update Focus from Asana を起動 |
+| `decision` | Editor を開き、AI Decision Log フローを起動 |
+| `memo` | `_config/capture_log.md` にタイムスタンプ付きで追記 |
+
 ## AIエージェント協業 (Claude Code / Codex CLI)
 
 ProjectCurator は Claude Code や Codex CLI などの AI コーディングエージェントとの協業を前提に設計されています。

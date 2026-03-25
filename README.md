@@ -184,6 +184,53 @@ flowchart TD
     G --> H["Update Focus from Asana (optional, AI)"]
 ```
 
+## AI Features
+
+All AI features require `Enable AI Features` to be on (Settings > LLM API). Supported providers: OpenAI and Azure OpenAI.
+
+### Setup
+
+1. Open `Settings > LLM API`
+2. Choose provider, enter API Key and Model (and Endpoint / API Version for Azure)
+3. Click `Test Connection`
+4. Once the test passes, toggle `Enable AI Features` on and save
+
+### User Profile
+
+Enter a free-text description of your role, priorities, and working style in `Settings > LLM API > User Profile`. This text is prepended as a `## User Profile` section to the system prompt of every LLM call, so the model has your context without repeating it in each prompt.
+
+Example:
+
+```
+Role: Engineering manager. I work across 3-4 parallel projects.
+Prefer concise bullet points. Flag overloaded days rather than packing in tasks.
+Language: respond in Japanese unless the document is already in English.
+```
+
+### What's Next (Dashboard)
+
+Click 💡 in the Dashboard toolbar to get 3-5 AI-prioritized action suggestions across all projects. The model analyzes overdue tasks, stale focus files, uncommitted changes, and unrecorded decisions, then ranks actions by urgency. Each suggestion has an Open button to navigate directly to the relevant file.
+
+### Update Focus from Asana (Editor)
+
+Click the `Update Focus from Asana` button in the Editor toolbar to generate a diff-based update proposal for the open `current_focus.md`. The model reads Asana task data and the existing file, then proposes changes while preserving your heading structure and writing style. A backup is saved to `focus_history/` automatically. Supports workstream filtering, natural-language refinement, and a debug view.
+
+### AI Decision Log (Editor)
+
+Click `Dec Log` in the Editor toolbar (AI mode) to open the decision log assistant. Describe what was decided; the model generates a structured draft with Options / Why / Risk / Revisit Trigger sections. Supports natural-language refinement and optionally removes the resolved item from `tensions.md`. Saves as `decision_log/YYYY-MM-DD_{topic}.md`.
+
+### Quick Capture AI Routing
+
+When AI Features is enabled, text entered in the Quick Capture window (`Ctrl+Shift+C`) is automatically classified and routed:
+
+| Category | Destination |
+|---|---|
+| `task` | Creates a task in Asana (confirmation required) |
+| `tension` | Appends to `tensions.md` |
+| `focus_update` | Opens Editor and starts Update Focus from Asana with your input as context |
+| `decision` | Opens Editor and starts AI Decision Log |
+| `memo` | Appends a timestamped entry to `_config/capture_log.md` |
+
 ## AI Agent Collaboration (Claude Code / Codex CLI)
 
 ProjectCurator is designed to work alongside AI coding agents such as Claude Code and Codex CLI.
