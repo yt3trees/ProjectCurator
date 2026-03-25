@@ -401,6 +401,22 @@
                              Foreground="{DynamicResource AppText}"
                              BorderBrush="{DynamicResource AppSurface2}"/>
 
+                    <!-- User Profile -->
+                    <TextBlock Text="User Profile" FontSize="12"
+                               Foreground="{DynamicResource AppSubtext0}"
+                               Margin="0,10,0,0"/>
+                    <TextBlock Text="Prepended to every LLM system prompt as a ## User Profile section." FontSize="11"
+                               Foreground="{DynamicResource AppSubtext0}" Margin="0,1,0,4"/>
+                    <TextBox Text="{Binding LlmUserProfile, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,0,10" Padding="6,4"
+                             AcceptsReturn="True"
+                             MinHeight="72"
+                             TextWrapping="Wrap"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             Background="{DynamicResource AppSurface1}"
+                             Foreground="{DynamicResource AppText}"
+                             BorderBrush="{DynamicResource AppSurface2}"/>
+
                     <StackPanel Orientation="Horizontal" Margin="0,4,0,6">
                         <ui:Button Content="Save LLM Settings"
                                    Command="{Binding SaveLlmCommand}"

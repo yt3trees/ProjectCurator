@@ -71,6 +71,7 @@ public class AppSettings
     public bool AiEnabled { get; set; } = false;               // AI 機能を有効にするか
     // 追加パラメータ (reasoning_effort, temperature, max_tokens 等)
     public Dictionary<string, string> LlmParameters { get; set; } = [];
+    public string LlmUserProfile { get; set; } = "";
     // Capture 設定
     public bool CaptureTaskLogEnabled { get; set; } = false;   // task 起票成功時に asana-tasks.md へ即時追記するか
 }

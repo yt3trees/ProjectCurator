@@ -113,6 +113,10 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string llmParametersText = "";
 
+    // LLM ユーザープロフィール (全 LLM 呼び出しのシステムプロンプトに付与)
+    [ObservableProperty]
+    private string llmUserProfile = "";
+
     [ObservableProperty]
     private string llmStatus = "";
 
@@ -201,6 +205,7 @@ public partial class SettingsViewModel : ObservableObject
             LlmApiVersion  = settings.LlmApiVersion;
             LlmParametersText = string.Join("\n",
                 settings.LlmParameters.Select(kv => $"{kv.Key} = {kv.Value}"));
+            LlmUserProfile     = settings.LlmUserProfile;
             LlmIsAzure         = settings.LlmProvider.Equals("azure_openai", StringComparison.OrdinalIgnoreCase);
             LlmStatus          = "";
             AiEnabled          = settings.AiEnabled;
@@ -274,6 +279,7 @@ public partial class SettingsViewModel : ObservableObject
         settings.LlmEndpoint    = LlmEndpoint.Trim();
         settings.LlmApiVersion  = LlmApiVersion.Trim();
         settings.LlmParameters  = ParseLlmParametersText(LlmParametersText);
+        settings.LlmUserProfile = LlmUserProfile;
         settings.AiEnabled      = AiEnabled;
         settings.CaptureTaskLogEnabled = CaptureTaskLogEnabled;
         _configService.SaveSettings(settings);
@@ -290,6 +296,7 @@ public partial class SettingsViewModel : ObservableObject
         settings.LlmEndpoint    = LlmEndpoint.Trim();
         settings.LlmApiVersion  = LlmApiVersion.Trim();
         settings.LlmParameters  = ParseLlmParametersText(LlmParametersText);
+        settings.LlmUserProfile = LlmUserProfile;
         settings.AiEnabled      = AiEnabled;
         _configService.SaveSettings(settings);
         LlmStatus = $"Saved {DateTime.Now:HH:mm:ss}";
