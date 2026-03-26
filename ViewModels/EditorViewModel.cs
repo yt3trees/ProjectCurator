@@ -45,6 +45,7 @@ public partial class EditorViewModel : ObservableObject
     private readonly LlmClientService _llmClient;
     private readonly ConfigService _configService;
     private readonly DecisionLogGeneratorService _decisionLogService;
+    private readonly MeetingNotesService _meetingNotesService;
     private string? _pendingFileToOpen;
     private bool _suppressAutoFileOpenOnProjectChange;
     private CancellationTokenSource? _focusUpdateCts;
@@ -123,6 +124,10 @@ public partial class EditorViewModel : ObservableObject
     public Func<DecisionLogDraftResult, Func<string, string, Task<string>>,
         Task<(bool save, string? content, string? fileName, bool removeTension)>>? RequestDecisionLogPreview;
 
+    // ---- Meeting Notes Import コールバック ----
+    public Func<ProjectInfo, List<WorkstreamInfo>, Task<MeetingNotesInputResult?>>? RequestMeetingNotesInput;
+    public Func<MeetingAnalysisResult, ProjectInfo, string?, Task<bool>>? RequestMeetingNotesPreview;
+
     public string OriginalContent => _originalContent;
 
     public EditorViewModel(
@@ -131,7 +136,8 @@ public partial class EditorViewModel : ObservableObject
         FocusUpdateService focusUpdateService,
         LlmClientService llmClient,
         ConfigService configService,
-        DecisionLogGeneratorService decisionLogService)
+        DecisionLogGeneratorService decisionLogService,
+        MeetingNotesService meetingNotesService)
     {
         _encodingService = encodingService;
         _discoveryService = discoveryService;
@@ -139,6 +145,7 @@ public partial class EditorViewModel : ObservableObject
         _llmClient = llmClient;
         _configService = configService;
         _decisionLogService = decisionLogService;
+        _meetingNotesService = meetingNotesService;
 
         IsAiEnabled = _configService.LoadSettings().AiEnabled;
         WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
@@ -188,6 +195,7 @@ public partial class EditorViewModel : ObservableObject
         BuildFileTree(value);
         UpdateStatus();
         UpdateFocusCommand.NotifyCanExecuteChanged();
+        ImportMeetingNotesCommand.NotifyCanExecuteChanged();
 
         if (_suppressAutoFileOpenOnProjectChange)
             return;
@@ -612,6 +620,123 @@ public partial class EditorViewModel : ObservableObject
         }
         catch { }
     }
+
+    // =====================================================================
+    // Import Meeting Notes
+    // =====================================================================
+    [RelayCommand(CanExecute = nameof(CanImportMeetingNotes))]
+    public async Task ImportMeetingNotesAsync()
+    {
+        if (SelectedProject == null) return;
+
+        var settings = _configService.LoadSettings();
+        if (string.IsNullOrWhiteSpace(settings.LlmApiKey))
+        {
+            MessageBox.Show(
+                "LLM API key is not configured.\nPlease open Settings and set the API key under \"LLM API\".",
+                "Import Meeting Notes",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (RequestMeetingNotesInput == null) return;
+
+        var activeWorkstreams = SelectedProject.Workstreams.Where(w => !w.IsClosed).ToList();
+        var input = await RequestMeetingNotesInput(SelectedProject, activeWorkstreams);
+        if (input == null) return;
+
+        IsLoading = true;
+        MeetingAnalysisResult result;
+        try
+        {
+            result = await _meetingNotesService.AnalyzeAsync(
+                input.MeetingNotes, SelectedProject, input.WorkstreamId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            IsLoading = false;
+            if (ShowScrollableError != null)
+                ShowScrollableError("Meeting Notes analysis failed", ex.Message);
+            else
+                MessageBox.Show($"Analysis failed:\n{ex.Message}", "Import Meeting Notes",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+
+        if (RequestMeetingNotesPreview == null) return;
+        var apply = await RequestMeetingNotesPreview(result, SelectedProject, input.WorkstreamId);
+        if (!apply) return;
+
+        IsLoading = true;
+        var createdFiles = new List<string>();
+        MeetingAsanaApplyResult asanaApply = new();
+        try
+        {
+            var decisions = await _meetingNotesService.ApplyDecisionsAsync(
+                result, SelectedProject, input.WorkstreamId);
+            createdFiles.AddRange(decisions);
+
+            var focusPath = await _meetingNotesService.ApplyFocusAsync(
+                result, SelectedProject, input.WorkstreamId);
+            if (focusPath != null) createdFiles.Add(focusPath);
+
+            var tensionsPath = await _meetingNotesService.ApplyTensionsAsync(
+                result, SelectedProject, input.WorkstreamId);
+            if (tensionsPath != null) createdFiles.Add(tensionsPath);
+
+            asanaApply = await _meetingNotesService.ApplyAsanaTasksAsync(
+                result, SelectedProject, input.WorkstreamId, CancellationToken.None);
+            if (asanaApply.FilePath != null) createdFiles.Add(asanaApply.FilePath);
+        }
+        catch (Exception ex)
+        {
+            IsLoading = false;
+            MessageBox.Show($"Apply failed:\n{ex.Message}", "Import Meeting Notes",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+
+        if (SelectedProject != null)
+            BuildFileTree(SelectedProject);
+
+        // 作成したファイルを順番に開く (decision_log 優先)
+        var firstFile = createdFiles.FirstOrDefault(f => f.Contains("decision_log"))
+                     ?? createdFiles.FirstOrDefault();
+        if (firstFile != null)
+            await OpenFileAndSelectNodeAsync(firstFile);
+
+        var msgParts = new System.Text.StringBuilder();
+        msgParts.AppendLine($"{createdFiles.Count} file(s) created/updated.");
+        if (asanaApply.HasApiResult)
+        {
+            msgParts.Append($"{asanaApply.ApiSuccessCount} task(s) created in Asana");
+            if (asanaApply.ApiFailCount > 0)
+                msgParts.Append($", {asanaApply.ApiFailCount} failed");
+            msgParts.AppendLine(".");
+        }
+        if (asanaApply.Errors.Count > 0)
+        {
+            msgParts.AppendLine("Errors:");
+            foreach (var err in asanaApply.Errors)
+                msgParts.AppendLine($"  - {err}");
+        }
+        MessageBox.Show(
+            msgParts.ToString().TrimEnd(),
+            "Import Meeting Notes",
+            MessageBoxButton.OK,
+            asanaApply.ApiFailCount > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+    }
+
+    private bool CanImportMeetingNotes() => SelectedProject != null && IsAiEnabled;
 
     // =====================================================================
     // 新規 decision_log 作成

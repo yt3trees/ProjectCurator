@@ -42,11 +42,6 @@ public class FocusUpdateService
             ResolvePaths(project, workstreamId);
 
         // Step 2: ファイル存在チェック
-        if (!File.Exists(asanaPath))
-            throw new FileNotFoundException(
-                $"asana-tasks.md が見つかりませんでした: {asanaPath}\n" +
-                "Asana sync を先に実行してください。");
-
         if (!File.Exists(focusPath))
             throw new FileNotFoundException(
                 $"current_focus.md が見つかりませんでした: {focusPath}\n" +
@@ -55,8 +50,10 @@ public class FocusUpdateService
         // Step 3: バックアップ
         var (backupPath, backupStatus) = await CreateBackupAsync(focusPath);
 
-        // Step 4: Asana タスク解析
-        var asanaTasks = _parser.ParseFile(asanaPath);
+        // Step 4: Asana タスク解析 (ファイルが存在しない場合は空として扱う)
+        var asanaTasks = File.Exists(asanaPath)
+            ? _parser.ParseFile(asanaPath)
+            : new AsanaTaskParseResult();
 
         // Whole project モード: アクティブな各 workstream のタスクも収集
         var obsidianNotes = Path.Combine(project.AiContextPath, "obsidian_notes");

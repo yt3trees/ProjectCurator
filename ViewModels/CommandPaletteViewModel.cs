@@ -107,6 +107,47 @@ public partial class CommandPaletteViewModel : ObservableObject
             }
         });
 
+        var settings = _configService.LoadSettings();
+        if (settings.AiEnabled)
+        {
+            commands.Add(new CommandItem
+            {
+                Label = "briefing",
+                Category = "project",
+                Display = "[>]  briefing (Context Briefing)",
+                Action = async (w) =>
+                {
+                    var selected = _editorViewModel.SelectedProject;
+                    if (selected != null)
+                    {
+                        await w.NavigateToDashboardAndShowBriefingAsync(selected);
+                        return;
+                    }
+
+                    w.RootNavigation.Navigate(typeof(DashboardPage));
+                    System.Windows.MessageBox.Show(
+                        "Select a project in Editor first, then run 'briefing'.",
+                        "Briefing",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+            });
+
+            commands.Add(new CommandItem
+            {
+                Label = "meeting",
+                Category = "project",
+                Display = "[>]  meeting (Import Meeting Notes)",
+                Action = async (w) =>
+                {
+                    w.RootNavigation.Navigate(typeof(EditorPage));
+                    await Task.Delay(50);
+                    if (_editorViewModel.ImportMeetingNotesCommand.CanExecute(null))
+                        await _editorViewModel.ImportMeetingNotesCommand.ExecuteAsync(null);
+                }
+            });
+        }
+
         commands.Add(new CommandItem
         {
             Label = "standup",

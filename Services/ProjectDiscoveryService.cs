@@ -6,6 +6,18 @@ using ProjectCurator.Models;
 
 namespace ProjectCurator.Services;
 
+public record BoxOnlyProjectCandidate(
+    string Name,
+    string Tier,
+    string Category,
+    string BoxPath,
+    List<string> ExternalSharedPaths)
+{
+    public string DisplayName => Category == "domain"
+        ? (Tier == "mini" ? $"{Name} [Domain][Mini]" : $"{Name} [Domain]")
+        : (Tier == "mini" ? $"{Name} [Mini]" : Name);
+}
+
 public class ProjectDiscoveryService
 {
     private readonly ConfigService _configService;
@@ -513,6 +525,93 @@ public class ProjectDiscoveryService
             return (string.IsNullOrEmpty(target) || !Directory.Exists(target)) ? "Broken" : "OK";
         }
         return "Not a Junction";
+    }
+
+    public Task<List<BoxOnlyProjectCandidate>> ScanBoxOnlyProjectsAsync(CancellationToken ct = default)
+    {
+        return Task.Run(() =>
+        {
+            var settings  = _configService.LoadSettings();
+            var localRoot = settings.LocalProjectsRoot;
+            var boxRoot   = settings.BoxProjectsRoot;
+
+            if (!Directory.Exists(boxRoot)) return [];
+
+            var results = new List<BoxOnlyProjectCandidate>();
+
+            // tier=full, category=project (root 直下, ScanProjects と同ルール)
+            foreach (var dir in SafeEnumerateDirectories(boxRoot))
+            {
+                var name = Path.GetFileName(dir);
+                if (name != "_INHOUSE" && (name.StartsWith('_') || name.StartsWith('.'))) continue;
+                if (!Directory.Exists(Path.Combine(localRoot, name)))
+                    results.Add(MakeBoxCandidate(name, "full", "project", dir));
+            }
+
+            // tier=mini, category=project
+            var boxMini = Path.Combine(boxRoot, "_mini");
+            if (Directory.Exists(boxMini))
+            {
+                foreach (var dir in SafeEnumerateDirectories(boxMini))
+                {
+                    var name = Path.GetFileName(dir);
+                    if (name.StartsWith('_') || name.StartsWith('.')) continue;
+                    if (!Directory.Exists(Path.Combine(localRoot, "_mini", name)))
+                        results.Add(MakeBoxCandidate(name, "mini", "project", dir));
+                }
+            }
+
+            // tier=full, category=domain
+            var boxDomains = Path.Combine(boxRoot, "_domains");
+            if (Directory.Exists(boxDomains))
+            {
+                foreach (var dir in SafeEnumerateDirectories(boxDomains))
+                {
+                    var name = Path.GetFileName(dir);
+                    if (name.StartsWith('_') || name.StartsWith('.')) continue;
+                    if (!Directory.Exists(Path.Combine(localRoot, "_domains", name)))
+                        results.Add(MakeBoxCandidate(name, "full", "domain", dir));
+                }
+            }
+
+            return results
+                .OrderBy(c => c.Name == "_INHOUSE" ? 0 : c.Category == "domain" ? 1 : 2)
+                .ThenBy(c => c.Name)
+                .ToList();
+        }, ct);
+    }
+
+    private static BoxOnlyProjectCandidate MakeBoxCandidate(
+        string name, string tier, string category, string boxPath) =>
+        new(name, tier, category, boxPath, ReadExternalSharedPathsFromBox(boxPath));
+
+    private static List<string> ReadExternalSharedPathsFromBox(string boxProjectPath)
+    {
+        var candidates = new[]
+        {
+            Path.Combine(boxProjectPath, "external_shared_paths"),
+            Path.Combine(boxProjectPath, ".external_shared_paths")
+        };
+        try
+        {
+            foreach (var file in candidates)
+                if (File.Exists(file))
+                    return File.ReadAllLines(file)
+                               .Where(l => !string.IsNullOrWhiteSpace(l))
+                               .ToList();
+        }
+        catch (Exception ex) { Debug.WriteLine($"[ReadExternalSharedPathsFromBox] {ex.Message}"); }
+        return [];
+    }
+
+    private static IEnumerable<string> SafeEnumerateDirectories(string path)
+    {
+        try { return Directory.EnumerateDirectories(path); }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SafeEnumerateDirectories] {path}: {ex.Message}");
+            return [];
+        }
     }
 
     private List<ProjectInfo> ScanProjects()

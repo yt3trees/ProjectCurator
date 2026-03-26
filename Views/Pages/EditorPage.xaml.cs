@@ -16,6 +16,8 @@ using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
 using Wpf.Ui.Controls;
 using ProjectCurator.ViewModels;
+using ProjectCurator.Views;
+using ProjectCurator.Services;
 using WpfUserControl = System.Windows.Controls.UserControl;
 using WpfKeyEventHandler = System.Windows.Input.KeyEventHandler;
 using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
@@ -30,10 +32,12 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     private TextEditor? _diffViewer;
     private DiffLineBackgroundRenderer? _diffRenderer;
     private IHighlightingDefinition? _markdownDefinition;
+    private readonly CaptureService _captureService;
 
-    public EditorPage(EditorViewModel viewModel)
+    public EditorPage(EditorViewModel viewModel, CaptureService captureService)
     {
         ViewModel = viewModel;
+        _captureService = captureService;
         DataContext = ViewModel;
 
         // AvalonEdit インスタンスを生成
@@ -81,6 +85,11 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         ViewModel.RequestAiDecisionLogInput = ShowAiDecisionLogInputDialogAsync;
         ViewModel.RequestDecisionLogPreview = (draft, refineFunc) =>
             ShowDecisionLogPreviewDialogAsync(draft, refineFunc);
+
+        // Meeting Notes Import ダイアログ
+        ViewModel.RequestMeetingNotesInput   = ShowMeetingNotesInputDialogAsync;
+        ViewModel.RequestMeetingNotesPreview = (result, project, workstreamId) =>
+            ShowMeetingNotesPreviewDialogAsync(result, project, workstreamId);
 
         // キーバインド:
         // handledEventsToo=true で子コントロールが処理済みのキーも捕捉する。
@@ -875,55 +884,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         DiffToggleButton.Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary;
     }
 
-    private sealed class DiffLineBackgroundRenderer : IBackgroundRenderer
-    {
-        public KnownLayer Layer => KnownLayer.Background;
-        private Dictionary<int, ChangeType> _lineTypes = new();
-
-        private static readonly System.Windows.Media.SolidColorBrush InsertedBrush =
-            new(MediaColor.FromRgb(0x1a, 0x2f, 0x1e)) { Opacity = 1.0 };
-        private static readonly System.Windows.Media.SolidColorBrush DeletedBrush =
-            new(MediaColor.FromRgb(0x3b, 0x1a, 0x1a)) { Opacity = 1.0 };
-        private static readonly System.Windows.Media.SolidColorBrush ModifiedBrush =
-            new(MediaColor.FromRgb(0x2a, 0x24, 0x12)) { Opacity = 1.0 };
-
-        static DiffLineBackgroundRenderer()
-        {
-            InsertedBrush.Freeze();
-            DeletedBrush.Freeze();
-            ModifiedBrush.Freeze();
-        }
-
-        public void SetLineTypes(Dictionary<int, ChangeType> lineTypes)
-        {
-            _lineTypes = new Dictionary<int, ChangeType>(lineTypes);
-        }
-
-        public void Draw(TextView textView, DrawingContext drawingContext)
-        {
-            if (_lineTypes.Count == 0) return;
-
-            foreach (var visualLine in textView.VisualLines)
-            {
-                var lineNumber = visualLine.FirstDocumentLine.LineNumber;
-                if (!_lineTypes.TryGetValue(lineNumber, out var changeType)) continue;
-
-                System.Windows.Media.Brush? brush = changeType switch
-                {
-                    ChangeType.Inserted => InsertedBrush,
-                    ChangeType.Deleted => DeletedBrush,
-                    ChangeType.Modified => ModifiedBrush,
-                    _ => null
-                };
-
-                if (brush == null) continue;
-
-                var y = visualLine.VisualTop - textView.ScrollOffset.Y;
-                var height = visualLine.Height;
-                drawingContext.DrawRectangle(brush, null, new System.Windows.Rect(0, y, textView.ActualWidth, height));
-            }
-        }
-    }
+    // DiffLineBackgroundRenderer は Views/ProposalReviewDialog.cs に移動済み
 
     private void OnDeleteDecisionLog(object sender, RoutedEventArgs e)
     {
@@ -1173,336 +1134,23 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         return Task.FromResult((ok, ok ? result : (string?)null));
     }
 
-    private async Task<(bool apply, string? content)> ShowFocusUpdateProposalDialogAsync(
+    private Task<(bool apply, string? content)> ShowFocusUpdateProposalDialogAsync(
         ProjectCurator.Models.FocusUpdateResult proposal,
         Func<string, string, Task<string>> refineFunc)
     {
-        var tcs = new TaskCompletionSource<(bool apply, string? content)>();
+        var backupInfo = proposal.BackupStatus == ProjectCurator.Models.BackupStatus.Created
+            ? $"Backup created: {System.IO.Path.GetFileName(proposal.BackupPath)}"
+            : "Backup already exists (skipped)";
 
-        var appResources = Application.Current.Resources;
-        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
-        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
-        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
-        var text     = (System.Windows.Media.Brush)appResources["AppText"];
-        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
-        var accent   = appResources.Contains("AppGreen")
-            ? (System.Windows.Media.Brush)appResources["AppGreen"] : text;
-        var editorBg = (Application.Current.Resources["EditorBackground"] as System.Windows.Media.SolidColorBrush)
-            ?? new System.Windows.Media.SolidColorBrush(
-                (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#0d1117"));
-        var editorFg = (Application.Current.Resources["EditorForeground"] as System.Windows.Media.SolidColorBrush)
-            ?? new System.Windows.Media.SolidColorBrush(
-                (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#c9d1d9"));
-
-        string currentProposed = proposal.ProposedContent;
-
-        // ---- diff viewer (AvalonEdit + DiffLineBackgroundRenderer) ----
-        var diffViewer = new ICSharpCode.AvalonEdit.TextEditor
-        {
-            FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
-            FontSize = 12, WordWrap = false, ShowLineNumbers = true, IsReadOnly = true,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
-            Background = editorBg, Foreground = editorFg
-        };
-        AddBottomViewportPadding(diffViewer);
-        diffViewer.LineNumbersForeground =
-            (Application.Current.Resources["AppSubtext0"] as System.Windows.Media.SolidColorBrush)
-            ?? new System.Windows.Media.SolidColorBrush(
-                (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#8b949e"));
-        var diffRenderer = new DiffLineBackgroundRenderer();
-        diffViewer.TextArea.TextView.BackgroundRenderers.Add(diffRenderer);
-        diffViewer.PreviewMouseWheel += (s, e) =>
-        {
-            if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) return;
-            var sv = FindVisualChild<ScrollViewer>(diffViewer);
-            if (sv == null || sv.ScrollableWidth <= 0) return;
-            const double step = 48d;
-            sv.ScrollToHorizontalOffset(sv.HorizontalOffset + (e.Delta > 0 ? -step : step));
-            e.Handled = true;
-        };
-
-        void RefreshDiff(string proposed)
-        {
-            var builder    = new InlineDiffBuilder(new Differ());
-            var diffResult = builder.BuildDiffModel(proposal.CurrentContent, proposed);
-            var sb         = new StringBuilder();
-            var lineTypes  = new Dictionary<int, ChangeType>();
-            int lineNum    = 0;
-            foreach (var line in diffResult.Lines)
-            {
-                lineNum++;
-                switch (line.Type)
-                {
-                    case ChangeType.Inserted:
-                        sb.AppendLine("+ " + line.Text);
-                        lineTypes[lineNum] = ChangeType.Inserted;
-                        break;
-                    case ChangeType.Deleted:
-                        sb.AppendLine("- " + line.Text);
-                        lineTypes[lineNum] = ChangeType.Deleted;
-                        break;
-                    case ChangeType.Modified:
-                        sb.AppendLine("~ " + line.Text);
-                        lineTypes[lineNum] = ChangeType.Modified;
-                        break;
-                    default:
-                        sb.AppendLine("  " + line.Text);
-                        break;
-                }
-            }
-            diffRenderer.SetLineTypes(lineTypes);
-            diffViewer.Text = sb.ToString();
-        }
-        RefreshDiff(currentProposed);
-
-        // ---- タイトルバー ----
-        var titleBar = new Grid { Background = surface1, Height = 38 };
-        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var titleIcon = new System.Windows.Controls.TextBlock
-        {
-            Text = "⟳", Foreground = accent, FontSize = 15,
-            Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center
-        };
-        Grid.SetColumn(titleIcon, 0);
-        var titleText = new System.Windows.Controls.TextBlock
-        {
-            Text = "Update Focus from Asana", Foreground = text, FontSize = 14,
-            FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center
-        };
-        Grid.SetColumn(titleText, 1);
-        var closeBtn = new System.Windows.Controls.Button
-        {
-            Content = "✕", Width = 34, Height = 26,
-            Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
-            Background = System.Windows.Media.Brushes.Transparent,
-            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
-        };
-        Grid.SetColumn(closeBtn, 2);
-        titleBar.Children.Add(titleIcon);
-        titleBar.Children.Add(titleText);
-        titleBar.Children.Add(closeBtn);
-
-        // ---- サマリ + バックアップ状態 ----
-        var infoPanel = new StackPanel { Margin = new Thickness(16, 10, 16, 6) };
-        infoPanel.Children.Add(new System.Windows.Controls.TextBlock
-        {
-            Text = proposal.Summary, Foreground = subtext, FontSize = 11, TextWrapping = TextWrapping.Wrap
-        });
-        infoPanel.Children.Add(new System.Windows.Controls.TextBlock
-        {
-            Text = proposal.BackupStatus == ProjectCurator.Models.BackupStatus.Created
-                ? $"Backup created: {System.IO.Path.GetFileName(proposal.BackupPath)}"
-                : "Backup already exists (skipped)",
-            Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 2, 0, 0)
-        });
-
-        // ---- 差分ヘッダー ----
-        var diffHeader = new System.Windows.Controls.TextBlock
-        {
-            Text = "Proposed changes  (+ added  - removed)", Foreground = subtext,
-            FontSize = 11, Margin = new Thickness(16, 4, 16, 4)
-        };
-
-        // ---- 自然言語リファイン ----
-        var instructionsBox = new System.Windows.Controls.TextBox
-        {
-            Margin = new Thickness(0), Padding = new Thickness(8, 6, 8, 6),
-            Background = surface1, Foreground = text, BorderBrush = surface2,
-            BorderThickness = new Thickness(1), FontSize = 12,
-            VerticalContentAlignment = VerticalAlignment.Center
-        };
-        var refineButton = new Wpf.Ui.Controls.Button
-        {
-            Content = "Refine", Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
-            MinWidth = 80, Height = 32, Margin = new Thickness(8, 0, 0, 0)
-        };
-        var refineStatus = new System.Windows.Controls.TextBlock
-        {
-            Foreground = subtext, FontSize = 11, VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(10, 0, 0, 0), TextWrapping = TextWrapping.Wrap
-        };
-        // プレースホルダー (instructionsBox が空のとき表示)
-        var placeholder = new System.Windows.Controls.TextBlock
-        {
-            Text = "Refinement instructions (e.g. \"Move X to Next up\")",
-            Foreground = subtext, FontSize = 12, IsHitTestVisible = false,
-            Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center
-        };
-        instructionsBox.TextChanged += (s, e) =>
-            placeholder.Visibility = string.IsNullOrEmpty(instructionsBox.Text)
-                ? Visibility.Visible : Visibility.Collapsed;
-        instructionsBox.KeyDown += (s, e) =>
-        {
-            if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
-            {
-                refineButton.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-                e.Handled = true;
-            }
-        };
-        var inputHost = new Grid();
-        inputHost.Children.Add(instructionsBox);
-        inputHost.Children.Add(placeholder);
-
-        var refineRow = new Grid { Margin = new Thickness(16, 6, 16, 6) };
-        refineRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        refineRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        refineRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        Grid.SetColumn(inputHost,    0);
-        Grid.SetColumn(refineButton, 1);
-        Grid.SetColumn(refineStatus, 2);
-        refineRow.Children.Add(inputHost);
-        refineRow.Children.Add(refineButton);
-        refineRow.Children.Add(refineStatus);
-
-        // ---- フッター ----
-        var applyButton = new Wpf.Ui.Controls.Button
-        {
-            Content = "Apply", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
-            MinWidth = 90, Height = 32, Margin = new Thickness(0, 0, 8, 0)
-        };
-        var skipButton = new Wpf.Ui.Controls.Button
-        {
-            Content = "Skip", Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
-            MinWidth = 80, Height = 32, Margin = new Thickness(0, 0, 8, 0)
-        };
-        var debugButton = new Wpf.Ui.Controls.Button
-        {
-            Content = "View Debug", Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
-            MinWidth = 90, Height = 32
-        };
-        var footerLeft = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
-            Children = { debugButton }
-        };
-        var footerRight = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
-            Children = { applyButton, skipButton }
-        };
-        var footerGrid = new Grid { Margin = new Thickness(16, 4, 16, 10) };
-        footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(footerLeft,  0);
-        Grid.SetColumn(footerRight, 2);
-        footerGrid.Children.Add(footerLeft);
-        footerGrid.Children.Add(footerRight);
-        var footer = footerGrid;
-
-        // ---- レイアウト ----
-        var root = new Grid();
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // title
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // info
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // diff header
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // diff
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // refine
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // footer
-        Grid.SetRow(titleBar,    0);
-        Grid.SetRow(infoPanel,   1);
-        Grid.SetRow(diffHeader,  2);
-        Grid.SetRow(diffViewer,  3);
-        Grid.SetRow(refineRow,   4);
-        Grid.SetRow(footer,      5);
-        root.Children.Add(titleBar);
-        root.Children.Add(infoPanel);
-        root.Children.Add(diffHeader);
-        root.Children.Add(diffViewer);
-        root.Children.Add(refineRow);
-        root.Children.Add(footer);
-
-        var dialog = new Window
-        {
-            Content = root, Width = 760, Height = 580,
-            MinWidth = 500, MinHeight = 380,
-            WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.CanResize,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Owner = Window.GetWindow(this), ShowInTaskbar = false,
-            Background = surface
-        };
-        System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
-            new System.Windows.Shell.WindowChrome
-            {
-                CaptionHeight         = 0,
-                ResizeBorderThickness = new Thickness(4),
-                GlassFrameThickness   = new Thickness(0),
-                UseAeroCaptionButtons = false
-            });
-
-        // ---- イベント ----
-        void Complete(bool apply, string? content)
-        {
-            if (!tcs.Task.IsCompleted) tcs.SetResult((apply, content));
-            dialog.Close();
-            dialog.Owner?.Activate();
-        }
-
-        titleBar.MouseLeftButtonDown += (s, e) => dialog.DragMove();
-        closeBtn.Click   += (s, e) => Complete(false, null);
-        skipButton.Click += (s, e) => Complete(false, null);
-        applyButton.Click += (s, e) => Complete(true, currentProposed);
-        dialog.Closed += (s, e) =>
-        {
-            if (!tcs.Task.IsCompleted) tcs.SetResult((false, null));
-            dialog.Owner?.Activate();
-        };
-
-        debugButton.Click += (s, e) =>
-        {
-            var debugText = new StringBuilder();
-            debugText.AppendLine("=== SYSTEM PROMPT ===");
-            debugText.AppendLine(proposal.DebugSystemPrompt);
-            debugText.AppendLine();
-            debugText.AppendLine("=== USER PROMPT ===");
-            debugText.AppendLine(proposal.DebugUserPrompt);
-            debugText.AppendLine();
-            debugText.AppendLine("=== RESPONSE ===");
-            debugText.AppendLine(proposal.DebugResponse);
-            ShowScrollableErrorDialog("LLM Debug Log", debugText.ToString(),
-                Wpf.Ui.Controls.SymbolRegular.Bug24);
-        };
-
-        refineButton.Click += async (s, e) =>
-        {
-            var instructions = instructionsBox.Text.Trim();
-            if (string.IsNullOrEmpty(instructions))
-            {
-                refineStatus.Text = "Enter refinement instructions above.";
-                return;
-            }
-
-            refineButton.IsEnabled   = false;
-            instructionsBox.IsEnabled = false;
-            applyButton.IsEnabled    = false;
-            refineStatus.Text        = "Refining...";
-            try
-            {
-                var refined = await refineFunc(currentProposed, instructions);
-                currentProposed = refined;
-                RefreshDiff(currentProposed);
-                instructionsBox.Clear();
-                refineStatus.Text = "Done.";
-            }
-            catch (Exception ex)
-            {
-                refineStatus.Text = $"Error: {ex.Message}";
-            }
-            finally
-            {
-                refineButton.IsEnabled   = true;
-                instructionsBox.IsEnabled = true;
-                applyButton.IsEnabled    = true;
-            }
-        };
-
-        dialog.Show();
-        return await tcs.Task;
+        return ProposalReviewDialog.ShowAsync(
+            Window.GetWindow(this),
+            proposal,
+            titleText:  "Update Focus from Asana",
+            titleIcon:  "⟳",
+            extraInfo:  backupInfo,
+            refineFunc: refineFunc);
     }
+
 
     private Task<string?> ShowNewDecisionLogDialog()
     {
@@ -2158,6 +1806,1034 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                 refineBox.IsEnabled    = true;
                 saveButton.IsEnabled   = true;
             }
+        };
+
+        dialog.Show();
+        return await tcs.Task;
+    }
+
+    // -------------------------------------------------------------------------
+    // Meeting Notes Import - 入力ダイアログ
+    // -------------------------------------------------------------------------
+    private Task<ProjectCurator.Models.MeetingNotesInputResult?> ShowMeetingNotesInputDialogAsync(
+        ProjectCurator.Models.ProjectInfo project,
+        List<ProjectCurator.Models.WorkstreamInfo> workstreams)
+    {
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var accent   = appResources.Contains("AppBlue")
+            ? (System.Windows.Media.Brush)appResources["AppBlue"] : text;
+
+        ProjectCurator.Models.MeetingNotesInputResult? result = null;
+
+        // ---- タイトルバー ----
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "📋", FontSize = 14,
+            Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Import Meeting Notes", Foreground = text, FontSize = 14,
+            FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+        var closeBtn = new System.Windows.Controls.Button
+        {
+            Content = "✕", Width = 34, Height = 26,
+            Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
+        };
+        Grid.SetColumn(closeBtn, 2);
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+        titleBar.Children.Add(closeBtn);
+
+        // ---- プロジェクト表示 ----
+        var projectLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = $"Project: {project.Name}",
+            Foreground = subtext, FontSize = 12,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+
+        // ---- Workstream 選択 ----
+        System.Windows.Controls.ComboBox? wsCombo = null;
+        FrameworkElement wsControl;
+        if (workstreams.Count > 0)
+        {
+            wsCombo = new System.Windows.Controls.ComboBox
+            {
+                Background = surface1, Foreground = text, BorderBrush = surface2,
+                FontSize = 12, Padding = new Thickness(6, 4, 4, 4),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            wsCombo.Items.Add(new System.Windows.Controls.ComboBoxItem
+                { Content = "General", Tag = (string?)null });
+            foreach (var ws in workstreams)
+                wsCombo.Items.Add(new System.Windows.Controls.ComboBoxItem
+                    { Content = ws.Label, Tag = ws.Id });
+            wsCombo.SelectedIndex = 0;
+            wsControl = wsCombo;
+        }
+        else
+        {
+            wsControl = new System.Windows.Controls.TextBlock
+            {
+                Text = "Workstream: General",
+                Foreground = subtext, FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+        }
+
+        // ---- メモ入力 ----
+        var notesLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Paste meeting notes here...",
+            Foreground = subtext, FontSize = 11,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        var notesBox = new System.Windows.Controls.TextBox
+        {
+            Padding = new Thickness(8, 6, 8, 6),
+            Background = surface1, Foreground = text, BorderBrush = surface2,
+            BorderThickness = new Thickness(1), FontSize = 13,
+            TextWrapping = TextWrapping.Wrap,
+            AcceptsReturn = true, Height = 180,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        };
+        var hintText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Decisions, next actions, and open questions will be detected.",
+            Foreground = subtext, FontSize = 11,
+            Margin = new Thickness(0, 4, 0, 0), TextWrapping = TextWrapping.Wrap
+        };
+
+        var contentPanel = new StackPanel { Margin = new Thickness(16, 12, 16, 8) };
+        contentPanel.Children.Add(projectLabel);
+        contentPanel.Children.Add(wsControl);
+        contentPanel.Children.Add(notesLabel);
+        contentPanel.Children.Add(notesBox);
+        contentPanel.Children.Add(hintText);
+
+        // ---- フッター ----
+        var analyzeButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Analyze",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 100, Height = 32, Margin = new Thickness(0, 0, 8, 0)
+        };
+        analyzeButton.IsEnabled = false;
+        var cancelButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 80, Height = 32, IsCancel = true
+        };
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 4, 16, 12),
+            Children = { analyzeButton, cancelButton }
+        };
+
+        notesBox.TextChanged += (s, e) =>
+            analyzeButton.IsEnabled = !string.IsNullOrWhiteSpace(notesBox.Text);
+
+        notesBox.PreviewKeyDown += (s, e) =>
+        {
+            if (e.Key == Key.Enter
+                && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
+                && analyzeButton.IsEnabled)
+            {
+                analyzeButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+                e.Handled = true;
+            }
+        };
+
+        // ---- レイアウト ----
+        var root = new Grid();
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar,      0);
+        Grid.SetRow(contentPanel,  1);
+        Grid.SetRow(footer,        2);
+        root.Children.Add(titleBar);
+        root.Children.Add(contentPanel);
+        root.Children.Add(footer);
+
+        var dialog = new Window
+        {
+            Content = root, Width = 600,
+            SizeToContent = SizeToContent.Height,
+            MinHeight = 300,
+            MaxHeight = SystemParameters.WorkArea.Height - 40,
+            WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = Window.GetWindow(this), ShowInTaskbar = false,
+            Background = surface
+        };
+
+        titleBar.MouseLeftButtonDown += (s, e) => dialog.DragMove();
+        closeBtn.Click    += (s, e) => dialog.DialogResult = false;
+        cancelButton.Click += (s, e) => dialog.DialogResult = false;
+
+        analyzeButton.Click += (s, e) =>
+        {
+            string? wsId = null;
+            if (wsCombo != null && wsCombo.SelectedItem is System.Windows.Controls.ComboBoxItem item)
+                wsId = item.Tag as string;
+
+            result = new ProjectCurator.Models.MeetingNotesInputResult
+            {
+                MeetingNotes = notesBox.Text.Trim(),
+                WorkstreamId = wsId,
+            };
+            dialog.DialogResult = true;
+        };
+
+        dialog.ShowDialog();
+        return Task.FromResult(result);
+    }
+
+    // -------------------------------------------------------------------------
+    // Meeting Notes Import - プレビューダイアログ
+    // -------------------------------------------------------------------------
+    private async Task<bool> ShowMeetingNotesPreviewDialogAsync(
+        ProjectCurator.Models.MeetingAnalysisResult analysisResult,
+        ProjectCurator.Models.ProjectInfo project,
+        string? workstreamId)
+    {
+        // Asana プロジェクト一覧を事前ロード
+        var (gids, wsMap) = _captureService.LoadAsanaProjectGids(project);
+        var asanaProjectMetas = new List<ProjectCurator.Models.AsanaProjectMeta>();
+        if (gids.Count > 0)
+        {
+            using var metaCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+            foreach (var gid in gids)
+            {
+                var m = await _captureService.FetchProjectMetaAsync(gid, metaCts.Token)
+                        ?? new ProjectCurator.Models.AsanaProjectMeta { Gid = gid, Name = "" };
+                asanaProjectMetas.Add(m);
+            }
+        }
+        // デフォルト選択 GID: Personal Project の先頭を優先
+        var personalGids = _captureService.GetPersonalProjectGids();
+        string? defaultProjectGid = personalGids.Count > 0
+            ? personalGids[0]
+            : null;
+        // workstream_project_map に一致があればそちらを優先
+        if (!string.IsNullOrWhiteSpace(workstreamId) && wsMap.TryGetValue(workstreamId, out var wgid))
+            defaultProjectGid = wgid;
+
+        // デフォルトプロジェクトのセクションを事前ロード
+        var sectionCache = new Dictionary<string, List<ProjectCurator.Models.AsanaSectionMeta>>();
+        if (defaultProjectGid != null)
+        {
+            using var secCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var defaultSections = await _captureService.FetchSectionsAsync(defaultProjectGid, secCts.Token);
+            sectionCache[defaultProjectGid] = defaultSections;
+        }
+        var defaultProjectMeta = defaultProjectGid != null
+            ? asanaProjectMetas.FirstOrDefault(m => m.Gid == defaultProjectGid)
+            : null;
+
+        // プロジェクトの AnkenAliases (+ プロジェクト名) をセクション自動選択の候補に使う
+        var ankenAliases = _captureService.LoadAnkenAliases(project);
+
+        var tcs = new TaskCompletionSource<bool>();
+
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var accent   = appResources.Contains("AppBlue")
+            ? (System.Windows.Media.Brush)appResources["AppBlue"] : text;
+        var accentGreen = appResources.Contains("AppGreen")
+            ? (System.Windows.Media.Brush)appResources["AppGreen"] : text;
+        var editorBg = (Application.Current.Resources["EditorBackground"] as System.Windows.Media.SolidColorBrush)
+            ?? new System.Windows.Media.SolidColorBrush(
+                (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#0d1117"));
+        var editorFg = (Application.Current.Resources["EditorForeground"] as System.Windows.Media.SolidColorBrush)
+            ?? new System.Windows.Media.SolidColorBrush(
+                (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#c9d1d9"));
+
+        // ---- タイトルバー ----
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "📋", FontSize = 14,
+            Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+        var decisionCount   = analysisResult.Decisions.Count;
+        var tensionCount    = analysisResult.Tensions.TechnicalQuestions.Count
+                            + analysisResult.Tensions.Tradeoffs.Count
+                            + analysisResult.Tensions.Concerns.Count;
+        var asanaTaskCount  = analysisResult.AsanaTasks.Tasks.Count;
+        var titleTextBlock = new System.Windows.Controls.TextBlock
+        {
+            Text = $"Meeting Analysis — {DateTime.Now:yyyy-MM-dd}",
+            Foreground = text, FontSize = 14,
+            FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleTextBlock, 1);
+        var closeBtn = new System.Windows.Controls.Button
+        {
+            Content = "✕", Width = 34, Height = 26,
+            Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
+        };
+        Grid.SetColumn(closeBtn, 2);
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleTextBlock);
+        titleBar.Children.Add(closeBtn);
+
+        // ---- サマリーバー ----
+        var summaryText = new StringBuilder();
+        summaryText.Append($"{decisionCount} decision(s)");
+        var focusCount = analysisResult.FocusUpdate.RecentContext.Count + analysisResult.FocusUpdate.NextActions.Count;
+        if (focusCount > 0) summaryText.Append($"  ·  {focusCount} focus item(s)");
+        if (tensionCount > 0) summaryText.Append($"  ·  {tensionCount} tension(s)");
+        if (asanaTaskCount > 0) summaryText.Append($"  ·  {asanaTaskCount} task(s)");
+        var summaryBar = new System.Windows.Controls.TextBlock
+        {
+            Text = summaryText.ToString(),
+            Foreground = subtext, FontSize = 12,
+            Margin = new Thickness(16, 6, 16, 4)
+        };
+
+        // ====================================================================
+        // TabControl
+        // ====================================================================
+        var tabControl = new System.Windows.Controls.TabControl
+        {
+            Background = surface, BorderBrush = surface2, BorderThickness = new Thickness(0, 1, 0, 0),
+            Margin = new Thickness(0)
+        };
+
+        // ---- Tab 1: Decisions ----
+        var decisionsTab = new System.Windows.Controls.TabItem
+        {
+            Header = $"Decisions ({decisionCount})",
+            Foreground = text, Background = surface1
+        };
+        var decisionsPanel = new StackPanel { Margin = new Thickness(12, 8, 12, 8) };
+        var decisionCheckboxes = new List<(System.Windows.Controls.CheckBox chk, ProjectCurator.Models.MeetingDecision decision)>();
+        var decisionExpanders  = new Dictionary<ProjectCurator.Models.MeetingDecision, ICSharpCode.AvalonEdit.TextEditor>();
+
+        if (decisionCount == 0)
+        {
+            decisionsPanel.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = "No decisions detected.",
+                Foreground = subtext, FontSize = 12, Margin = new Thickness(0, 8, 0, 0)
+            });
+        }
+        else
+        {
+            foreach (var dec in analysisResult.Decisions)
+            {
+                var chk = new System.Windows.Controls.CheckBox
+                {
+                    Content = $"{dec.Title}  [{dec.Status}]",
+                    IsChecked = dec.IsSelected,
+                    Foreground = text, FontSize = 13,
+                    Margin = new Thickness(0, 6, 0, 0)
+                };
+                chk.Checked   += (s, e) => dec.IsSelected = true;
+                chk.Unchecked += (s, e) => dec.IsSelected = false;
+                decisionCheckboxes.Add((chk, dec));
+
+                var expandBtn = new System.Windows.Controls.Button
+                {
+                    Content = "Show draft ▼",
+                    Background = System.Windows.Media.Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    Foreground = accent, FontSize = 11,
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+                    Margin = new Thickness(20, 2, 0, 0), Padding = new Thickness(0)
+                };
+
+                var draftViewer = new ICSharpCode.AvalonEdit.TextEditor
+                {
+                    FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+                    FontSize = 12, IsReadOnly = true,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
+                    Background = editorBg, Foreground = editorFg,
+                    MaxHeight = 200, MinHeight = 80,
+                    Visibility = Visibility.Collapsed,
+                    Margin = new Thickness(20, 4, 0, 4)
+                };
+                AddBottomViewportPadding(draftViewer);
+                if (_markdownDefinition != null)
+                    draftViewer.SyntaxHighlighting = _markdownDefinition;
+                draftViewer.Text = ProjectCurator.Services.MeetingNotesService.BuildDecisionLogContent(dec);
+
+                var capturedViewer = draftViewer;
+                var capturedBtn    = expandBtn;
+                bool isExpanded    = false;
+                expandBtn.Click += (s, e) =>
+                {
+                    isExpanded = !isExpanded;
+                    capturedViewer.Visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed;
+                    capturedBtn.Content       = isExpanded ? "Hide draft ▲" : "Show draft ▼";
+                };
+
+                decisionExpanders[dec] = draftViewer;
+                decisionsPanel.Children.Add(chk);
+                decisionsPanel.Children.Add(expandBtn);
+                decisionsPanel.Children.Add(draftViewer);
+            }
+        }
+
+        var decisionsScroll = new ScrollViewer
+        {
+            Content = decisionsPanel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        decisionsTab.Content = decisionsScroll;
+
+        // ---- Tab 2: Focus ----
+        var focusTab = new System.Windows.Controls.TabItem
+        {
+            Header = $"Focus ({focusCount})",
+            Foreground = text, Background = surface1
+        };
+
+        var focusChk = new System.Windows.Controls.CheckBox
+        {
+            Content = "Apply focus update to current_focus.md",
+            IsChecked = analysisResult.FocusUpdate.IsSelected && focusCount > 0,
+            IsEnabled = focusCount > 0,
+            Foreground = text, FontSize = 13,
+            Margin = new Thickness(12, 8, 12, 4)
+        };
+        focusChk.Checked   += (s, e) => analysisResult.FocusUpdate.IsSelected = true;
+        focusChk.Unchecked += (s, e) => analysisResult.FocusUpdate.IsSelected = false;
+
+        var focusDiffHeader = new System.Windows.Controls.TextBlock
+        {
+            Text = "Proposed changes  (+ added  - removed)",
+            Foreground = subtext, FontSize = 11,
+            Margin = new Thickness(12, 2, 12, 4)
+        };
+
+        // diff ビュー
+        var focusDiffViewer = new ICSharpCode.AvalonEdit.TextEditor
+        {
+            FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+            FontSize = 12, IsReadOnly = true,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
+            Background = editorBg, Foreground = editorFg,
+        };
+        focusDiffViewer.LineNumbersForeground =
+            (Application.Current.Resources["AppSubtext0"] as System.Windows.Media.SolidColorBrush)
+            ?? new System.Windows.Media.SolidColorBrush(
+                (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString("#8b949e"));
+        AddBottomViewportPadding(focusDiffViewer);
+        var focusDiffRenderer = new DiffLineBackgroundRenderer();
+        focusDiffViewer.TextArea.TextView.BackgroundRenderers.Add(focusDiffRenderer);
+
+        void RefreshFocusDiff()
+        {
+            if (string.IsNullOrWhiteSpace(analysisResult.FocusUpdate.ProposedContent))
+            {
+                focusDiffViewer.Text = focusCount == 0 ? "No focus updates detected." : "";
+                return;
+            }
+            var builder    = new DiffPlex.DiffBuilder.InlineDiffBuilder(new DiffPlex.Differ());
+            var diffResult = builder.BuildDiffModel(
+                analysisResult.FocusUpdate.CurrentContent,
+                analysisResult.FocusUpdate.ProposedContent);
+            var sb        = new StringBuilder();
+            var lineTypes = new Dictionary<int, DiffPlex.DiffBuilder.Model.ChangeType>();
+            int lineNum   = 0;
+            foreach (var line in diffResult.Lines)
+            {
+                lineNum++;
+                switch (line.Type)
+                {
+                    case DiffPlex.DiffBuilder.Model.ChangeType.Inserted:
+                        sb.AppendLine("+ " + line.Text);
+                        lineTypes[lineNum] = DiffPlex.DiffBuilder.Model.ChangeType.Inserted;
+                        break;
+                    case DiffPlex.DiffBuilder.Model.ChangeType.Deleted:
+                        sb.AppendLine("- " + line.Text);
+                        lineTypes[lineNum] = DiffPlex.DiffBuilder.Model.ChangeType.Deleted;
+                        break;
+                    case DiffPlex.DiffBuilder.Model.ChangeType.Modified:
+                        sb.AppendLine("~ " + line.Text);
+                        lineTypes[lineNum] = DiffPlex.DiffBuilder.Model.ChangeType.Modified;
+                        break;
+                    default:
+                        sb.AppendLine("  " + line.Text);
+                        break;
+                }
+            }
+            focusDiffRenderer.SetLineTypes(lineTypes);
+            focusDiffViewer.Text = sb.ToString();
+        }
+        RefreshFocusDiff();
+
+        var focusRoot = new Grid();
+        focusRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        focusRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        focusRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        Grid.SetRow(focusChk,        0);
+        Grid.SetRow(focusDiffHeader, 1);
+        Grid.SetRow(focusDiffViewer, 2);
+        focusRoot.Children.Add(focusChk);
+        focusRoot.Children.Add(focusDiffHeader);
+        focusRoot.Children.Add(focusDiffViewer);
+
+        focusTab.Content = focusRoot;
+
+        // ---- Tab 3: Tensions ----
+        var tensionsTab = new System.Windows.Controls.TabItem
+        {
+            Header = $"Tensions ({tensionCount})",
+            Foreground = text, Background = surface1
+        };
+        var tensionsPanel = new StackPanel { Margin = new Thickness(12, 8, 12, 8) };
+
+        var tensionsChk = new System.Windows.Controls.CheckBox
+        {
+            Content = "Add to tensions.md",
+            IsChecked = analysisResult.Tensions.IsSelected && analysisResult.Tensions.HasItems,
+            IsEnabled = analysisResult.Tensions.HasItems,
+            Foreground = text, FontSize = 13,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        tensionsChk.Checked   += (s, e) => analysisResult.Tensions.IsSelected = true;
+        tensionsChk.Unchecked += (s, e) => analysisResult.Tensions.IsSelected = false;
+        tensionsPanel.Children.Add(tensionsChk);
+
+        if (!analysisResult.Tensions.HasItems)
+        {
+            tensionsPanel.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = "No tensions detected.",
+                Foreground = subtext, FontSize = 12
+            });
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(analysisResult.Tensions.AppendContent))
+            {
+                var tensionsViewer = new ICSharpCode.AvalonEdit.TextEditor
+                {
+                    FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+                    FontSize = 12, IsReadOnly = true,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
+                    Background = editorBg, Foreground = editorFg,
+                    MaxHeight = 300
+                };
+                AddBottomViewportPadding(tensionsViewer);
+                if (_markdownDefinition != null)
+                    tensionsViewer.SyntaxHighlighting = _markdownDefinition;
+                tensionsViewer.Text = analysisResult.Tensions.AppendContent;
+                tensionsPanel.Children.Add(tensionsViewer);
+            }
+
+            if (!File.Exists(System.IO.Path.Combine(
+                string.IsNullOrWhiteSpace(analysisResult.Tensions.CurrentContent)
+                    ? "" : "")))
+            {
+                // tensions.md が存在しない場合のヒント
+            }
+
+            if (string.IsNullOrWhiteSpace(analysisResult.Tensions.CurrentContent))
+            {
+                tensionsPanel.Children.Add(new System.Windows.Controls.TextBlock
+                {
+                    Text = "tensions.md not found — will be created",
+                    Foreground = accent, FontSize = 11, Margin = new Thickness(0, 4, 0, 0)
+                });
+            }
+        }
+
+        var tensionsScroll = new ScrollViewer
+        {
+            Content = tensionsPanel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        tensionsTab.Content = tensionsScroll;
+
+        // ---- Tab 4: Asana Tasks ----
+        var asanaTab = new System.Windows.Controls.TabItem
+        {
+            Header = $"Asana Tasks ({asanaTaskCount})",
+            Foreground = text, Background = surface1
+        };
+        var asanaPanel = new StackPanel { Margin = new Thickness(12, 8, 12, 8) };
+
+        var asanaChk = new System.Windows.Controls.CheckBox
+        {
+            Content = "Add tasks to asana-tasks.md",
+            IsChecked = analysisResult.AsanaTasks.IsSelected && analysisResult.AsanaTasks.HasItems,
+            IsEnabled = analysisResult.AsanaTasks.HasItems,
+            Foreground = text, FontSize = 13,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        asanaChk.Checked   += (s, e) => analysisResult.AsanaTasks.IsSelected = true;
+        asanaChk.Unchecked += (s, e) => analysisResult.AsanaTasks.IsSelected = false;
+        asanaPanel.Children.Add(asanaChk);
+
+        // ---- タスクリスト (タスクごとのプロジェクト/セクション/期限設定) ----
+
+        // セクションを async でロード・キャッシュするローカル関数
+        async Task<List<ProjectCurator.Models.AsanaSectionMeta>> LoadSectionsAsync(string projectGid)
+        {
+            if (sectionCache.TryGetValue(projectGid, out var cached)) return cached;
+            using var cts2 = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var sections = await _captureService.FetchSectionsAsync(projectGid, cts2.Token);
+            sectionCache[projectGid] = sections;
+            return sections;
+        }
+
+        void PopulateTaskSectionCombo(System.Windows.Controls.ComboBox secCb,
+                                      List<ProjectCurator.Models.AsanaSectionMeta> sections,
+                                      ProjectCurator.Models.MeetingAsanaTask t)
+        {
+            secCb.Items.Clear();
+            secCb.Items.Add(new ProjectCurator.Models.AsanaSectionMeta { Gid = "", Name = "(none)" });
+            foreach (var sec in sections) secCb.Items.Add(sec);
+            secCb.IsEnabled = true;
+
+            // AnkenAliases でセクション名マッチング → 自動選択
+            var match = sections.FirstOrDefault(s =>
+                ankenAliases.Any(a => string.Equals(s.Name, a, StringComparison.OrdinalIgnoreCase)));
+            if (match != null)
+            {
+                secCb.SelectedItem = match;
+                t.SectionGid  = match.Gid;
+                t.SectionName = match.Name;
+            }
+            else
+            {
+                secCb.SelectedIndex = 0;
+            }
+        }
+
+        if (!analysisResult.AsanaTasks.HasItems)
+        {
+            asanaPanel.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = "No tasks detected.",
+                Foreground = subtext, FontSize = 12
+            });
+        }
+        else
+        {
+            foreach (var task in analysisResult.AsanaTasks.Tasks)
+            {
+                var capturedTask = task;
+
+                // タスク行 (チェックボックス + ノート + 設定行)
+                var priorityTag = task.Priority is "High" or "Medium" or "Low"
+                    ? $"  [{task.Priority}]" : "";
+                var taskChk = new System.Windows.Controls.CheckBox
+                {
+                    Content = $"{task.Title}{priorityTag}",
+                    IsChecked = task.IsSelected,
+                    Foreground = text, FontSize = 13,
+                    Margin = new Thickness(0, 6, 0, 0)
+                };
+                taskChk.Checked   += (s, e) => capturedTask.IsSelected = true;
+                taskChk.Unchecked += (s, e) => capturedTask.IsSelected = false;
+                asanaPanel.Children.Add(taskChk);
+
+                if (!string.IsNullOrWhiteSpace(task.Notes))
+                {
+                    asanaPanel.Children.Add(new System.Windows.Controls.TextBlock
+                    {
+                        Text = task.Notes,
+                        Foreground = subtext, FontSize = 11,
+                        Margin = new Thickness(20, 1, 0, 0),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                }
+
+                // ---- タスクごとの設定行 ----
+                var settingsGrid = new Grid { Margin = new Thickness(20, 4, 0, 6) };
+                settingsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 120 });
+                settingsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 100 });
+                settingsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                settingsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                settingsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                settingsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                settingsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                // Project label + ComboBox
+                var projLabel = new System.Windows.Controls.TextBlock
+                {
+                    Text = "Project", Foreground = subtext, FontSize = 10,
+                    Margin = new Thickness(0, 0, 8, 1)
+                };
+                Grid.SetColumn(projLabel, 0); Grid.SetRow(projLabel, 0);
+
+                var taskProjectCombo = new System.Windows.Controls.ComboBox
+                {
+                    Foreground = text, Background = surface1,
+                    Padding = new Thickness(6, 3, 4, 3),
+                    Margin = new Thickness(0, 0, 8, 0)
+                };
+                taskProjectCombo.DisplayMemberPath = nameof(ProjectCurator.Models.AsanaProjectMeta.DisplayLabel);
+                Grid.SetColumn(taskProjectCombo, 0); Grid.SetRow(taskProjectCombo, 1);
+
+                // Section label + ComboBox
+                var secLabel = new System.Windows.Controls.TextBlock
+                {
+                    Text = "Section", Foreground = subtext, FontSize = 10,
+                    Margin = new Thickness(0, 0, 8, 1)
+                };
+                Grid.SetColumn(secLabel, 1); Grid.SetRow(secLabel, 0);
+
+                var taskSectionCombo = new System.Windows.Controls.ComboBox
+                {
+                    Foreground = text, Background = surface1,
+                    Padding = new Thickness(6, 3, 4, 3),
+                    IsEnabled = false,
+                    Margin = new Thickness(0, 0, 8, 0)
+                };
+                taskSectionCombo.DisplayMemberPath = nameof(ProjectCurator.Models.AsanaSectionMeta.DisplayLabel);
+                Grid.SetColumn(taskSectionCombo, 1); Grid.SetRow(taskSectionCombo, 1);
+
+                // Due Date label + DatePicker (Row 0-1, Col 2)
+                var dateLabel = new System.Windows.Controls.TextBlock
+                {
+                    Text = "Due Date", Foreground = subtext, FontSize = 10,
+                    Margin = new Thickness(0, 0, 8, 1)
+                };
+                Grid.SetColumn(dateLabel, 2); Grid.SetRow(dateLabel, 0);
+
+                var taskDatePicker = new System.Windows.Controls.DatePicker
+                {
+                    Width = 120, Foreground = text,
+                    Background = surface1,
+                    Margin = new Thickness(0, 0, 8, 0)
+                };
+                Grid.SetColumn(taskDatePicker, 2); Grid.SetRow(taskDatePicker, 1);
+
+                // "Set time" CheckBox (Row 1, Col 3) — チェックで時刻行を表示
+                var setTimeChk = new System.Windows.Controls.CheckBox
+                {
+                    Content = "Set time", Foreground = subtext, FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 0)
+                };
+                Grid.SetColumn(setTimeChk, 3); Grid.SetRow(setTimeChk, 1);
+
+                // Time picker Row (Row 2, Col 2-3) — 初期非表示
+                var timePickerRow = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Visibility = Visibility.Collapsed,
+                    Margin = new Thickness(0, 4, 0, 0)
+                };
+                var taskHourCombo = new System.Windows.Controls.ComboBox
+                {
+                    Width = 60, Foreground = text, Background = surface1,
+                    Padding = new Thickness(6, 3, 4, 3)
+                };
+                foreach (var h in Enumerable.Range(0, 24)) taskHourCombo.Items.Add(h.ToString("00"));
+                taskHourCombo.SelectedIndex = 9;  // default 09:00
+                var colonLbl = new System.Windows.Controls.TextBlock
+                {
+                    Text = ":", Foreground = text, FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(4, 0, 4, 0)
+                };
+                var taskMinCombo = new System.Windows.Controls.ComboBox
+                {
+                    Width = 60, Foreground = text, Background = surface1,
+                    Padding = new Thickness(6, 3, 4, 3)
+                };
+                foreach (var m in new[] { "00", "15", "30", "45" }) taskMinCombo.Items.Add(m);
+                taskMinCombo.SelectedIndex = 0;
+                timePickerRow.Children.Add(taskHourCombo);
+                timePickerRow.Children.Add(colonLbl);
+                timePickerRow.Children.Add(taskMinCombo);
+                Grid.SetColumn(timePickerRow, 2); Grid.SetRow(timePickerRow, 2);
+                Grid.SetColumnSpan(timePickerRow, 2);
+
+                setTimeChk.Checked   += (s, e) => timePickerRow.Visibility = Visibility.Visible;
+                setTimeChk.Unchecked += (s, e) =>
+                {
+                    timePickerRow.Visibility = Visibility.Collapsed;
+                    capturedTask.DueTime = "";
+                };
+
+                settingsGrid.Children.Add(projLabel);
+                settingsGrid.Children.Add(taskProjectCombo);
+                settingsGrid.Children.Add(secLabel);
+                settingsGrid.Children.Add(taskSectionCombo);
+                settingsGrid.Children.Add(dateLabel);
+                settingsGrid.Children.Add(taskDatePicker);
+                settingsGrid.Children.Add(setTimeChk);
+                settingsGrid.Children.Add(timePickerRow);
+                asanaPanel.Children.Add(settingsGrid);
+
+                // Project ComboBox をプロジェクト一覧で初期化
+                if (asanaProjectMetas.Count == 0)
+                {
+                    taskProjectCombo.Items.Add(new ProjectCurator.Models.AsanaProjectMeta { Gid = "", Name = "No Asana config" });
+                    taskProjectCombo.SelectedIndex = 0;
+                    taskProjectCombo.IsEnabled = false;
+                }
+                else
+                {
+                    foreach (var pm in asanaProjectMetas) taskProjectCombo.Items.Add(pm);
+
+                    // プロジェクト選択変更 → セクションをロード
+                    taskProjectCombo.SelectionChanged += async (s, e) =>
+                    {
+                        var selProj = taskProjectCombo.SelectedItem as ProjectCurator.Models.AsanaProjectMeta;
+                        if (selProj == null || string.IsNullOrEmpty(selProj.Gid))
+                        {
+                            taskSectionCombo.Items.Clear();
+                            taskSectionCombo.Items.Add(new ProjectCurator.Models.AsanaSectionMeta { Gid = "", Name = "(none)" });
+                            taskSectionCombo.SelectedIndex = 0;
+                            taskSectionCombo.IsEnabled = false;
+                            capturedTask.ProjectGid  = "";
+                            capturedTask.ProjectName = "";
+                            return;
+                        }
+                        capturedTask.ProjectGid  = selProj.Gid;
+                        capturedTask.ProjectName = selProj.Name;
+                        capturedTask.SectionGid  = "";
+                        capturedTask.SectionName = "";
+
+                        taskSectionCombo.IsEnabled = false;
+                        taskSectionCombo.Items.Clear();
+                        taskSectionCombo.Items.Add(new ProjectCurator.Models.AsanaSectionMeta { Gid = "", Name = "Loading..." });
+                        taskSectionCombo.SelectedIndex = 0;
+
+                        var sections = await LoadSectionsAsync(selProj.Gid);
+                        PopulateTaskSectionCombo(taskSectionCombo, sections, capturedTask);
+                    };
+
+                    taskSectionCombo.SelectionChanged += (s, e) =>
+                    {
+                        var sel = taskSectionCombo.SelectedItem as ProjectCurator.Models.AsanaSectionMeta;
+                        capturedTask.SectionGid  = sel?.Gid ?? "";
+                        capturedTask.SectionName = sel?.Name ?? "";
+                    };
+
+                    taskDatePicker.SelectedDateChanged += (s, e) =>
+                    {
+                        capturedTask.DueOn = taskDatePicker.SelectedDate.HasValue
+                            ? taskDatePicker.SelectedDate.Value.ToString("yyyy-MM-dd") : "";
+                    };
+
+                    void UpdateDueTime()
+                    {
+                        if (setTimeChk.IsChecked == true)
+                            capturedTask.DueTime = $"{taskHourCombo.SelectedItem}:{taskMinCombo.SelectedItem}";
+                    }
+                    taskHourCombo.SelectionChanged += (s, e) => UpdateDueTime();
+                    taskMinCombo.SelectionChanged  += (s, e) => UpdateDueTime();
+
+                    // デフォルトプロジェクトを事前選択
+                    if (defaultProjectMeta != null)
+                    {
+                        taskProjectCombo.SelectedItem = defaultProjectMeta;
+                        capturedTask.ProjectGid  = defaultProjectMeta.Gid;
+                        capturedTask.ProjectName = defaultProjectMeta.Name;
+                        // キャッシュ済みセクションで即時初期化
+                        if (sectionCache.TryGetValue(defaultProjectMeta.Gid, out var cachedSections))
+                            PopulateTaskSectionCombo(taskSectionCombo, cachedSections, capturedTask);
+                    }
+                }
+            }
+        }
+
+        var asanaScroll = new ScrollViewer
+        {
+            Content = asanaPanel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        asanaTab.Content = asanaScroll;
+
+        tabControl.Items.Add(decisionsTab);
+        tabControl.Items.Add(focusTab);
+        tabControl.Items.Add(tensionsTab);
+        tabControl.Items.Add(asanaTab);
+
+        // ---- フッター ----
+        var applyButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Apply Selected",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 120, Height = 32, Margin = new Thickness(0, 0, 8, 0)
+        };
+        var cancelFooterBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 80, Height = 32, IsCancel = true
+        };
+        var debugFooterBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "View Debug",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 90, Height = 32
+        };
+        var footerLeft  = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Left,  Children = { debugFooterBtn } };
+        var footerRight = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Children = { applyButton, cancelFooterBtn } };
+        var footer = new Grid { Margin = new Thickness(16, 6, 16, 12) };
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(footerLeft,  0);
+        Grid.SetColumn(footerRight, 2);
+        footer.Children.Add(footerLeft);
+        footer.Children.Add(footerRight);
+
+        // ---- レイアウト ----
+        var root = new Grid();
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar,   0);
+        Grid.SetRow(summaryBar, 1);
+        Grid.SetRow(tabControl, 2);
+        Grid.SetRow(footer,     3);
+        root.Children.Add(titleBar);
+        root.Children.Add(summaryBar);
+        root.Children.Add(tabControl);
+        root.Children.Add(footer);
+
+        var dialog = new Window
+        {
+            Content = root, Width = 780, Height = 580,
+            MinWidth = 500, MinHeight = 400,
+            WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.CanResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = Window.GetWindow(this), ShowInTaskbar = false,
+            Background = surface
+        };
+        System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight         = 0,
+                ResizeBorderThickness = new Thickness(4),
+                GlassFrameThickness   = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
+
+        void Complete(bool apply)
+        {
+            if (!tcs.Task.IsCompleted)
+                tcs.SetResult(apply);
+            dialog.Close();
+            dialog.Owner?.Activate();
+        }
+
+        titleBar.MouseLeftButtonDown += (s, e) => dialog.DragMove();
+        closeBtn.Click              += (s, e) => Complete(false);
+        cancelFooterBtn.Click       += (s, e) => Complete(false);
+        applyButton.Click += (s, e) => Complete(true);
+        dialog.Closed += (s, e) =>
+        {
+            if (!tcs.Task.IsCompleted) tcs.SetResult(false);
+            dialog.Owner?.Activate();
+        };
+
+        debugFooterBtn.Click += (s, e) =>
+        {
+            var debugText = new StringBuilder();
+            debugText.AppendLine("=== SYSTEM PROMPT ===");
+            debugText.AppendLine(analysisResult.DebugSystemPrompt);
+            debugText.AppendLine();
+            debugText.AppendLine("=== USER PROMPT ===");
+            debugText.AppendLine(analysisResult.DebugUserPrompt);
+            debugText.AppendLine();
+            debugText.AppendLine("=== RESPONSE ===");
+            debugText.AppendLine(analysisResult.DebugResponse);
+
+            var dbTitleBar = new Grid { Background = surface1, Height = 38 };
+            dbTitleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            dbTitleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var dbTitleBlock = new System.Windows.Controls.TextBlock
+            {
+                Text = "LLM Debug Log", Foreground = text, FontSize = 14, FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0)
+            };
+            Grid.SetColumn(dbTitleBlock, 0);
+            var dbCloseBtn = new System.Windows.Controls.Button
+            {
+                Content = "✕", Width = 34, Height = 26,
+                Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
+                Background = System.Windows.Media.Brushes.Transparent,
+                BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
+            };
+            Grid.SetColumn(dbCloseBtn, 1);
+            dbTitleBar.Children.Add(dbTitleBlock);
+            dbTitleBar.Children.Add(dbCloseBtn);
+
+            var dbTextBox = new System.Windows.Controls.TextBox
+            {
+                Text = debugText.ToString(), IsReadOnly = true, TextWrapping = TextWrapping.NoWrap,
+                AcceptsReturn = true,
+                VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Background = surface1, Foreground = text,
+                BorderBrush = surface2, BorderThickness = new Thickness(1),
+                Padding = new Thickness(8),
+                FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+                FontSize = 11
+            };
+
+            var dbRoot = new Grid();
+            dbRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            dbRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            Grid.SetRow(dbTitleBar, 0); Grid.SetRow(dbTextBox, 1);
+            dbRoot.Children.Add(dbTitleBar); dbRoot.Children.Add(dbTextBox);
+
+            var dbDialog = new Window
+            {
+                Content = dbRoot, Width = 640, Height = 500, MinWidth = 400, MinHeight = 300,
+                WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.CanResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = dialog, ShowInTaskbar = false, Background = surface
+            };
+            System.Windows.Shell.WindowChrome.SetWindowChrome(dbDialog,
+                new System.Windows.Shell.WindowChrome
+                {
+                    CaptionHeight = 0, ResizeBorderThickness = new Thickness(4),
+                    GlassFrameThickness = new Thickness(0), UseAeroCaptionButtons = false
+                });
+            dbTitleBar.MouseLeftButtonDown += (_, _) => dbDialog.DragMove();
+            dbCloseBtn.Click += (_, _) => dbDialog.Close();
+            dbDialog.Show();
         };
 
         dialog.Show();

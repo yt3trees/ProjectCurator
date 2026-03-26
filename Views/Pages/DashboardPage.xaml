@@ -620,8 +620,16 @@
                                         <ui:Button Padding="8,3"
                                                    Tag="{Binding}"
                                                    Click="OnPinGeneralWorkFolderClick"
+                                                   Margin="0,0,4,0"
                                                    ToolTip="Pin a general work folder">
                                             <ui:SymbolIcon Symbol="Pin24" FontSize="16"/>
+                                        </ui:Button>
+                                        <ui:Button Padding="8,3"
+                                                   Tag="{Binding}"
+                                                   Click="OnBriefingClickAsync"
+                                                   ToolTip="Context briefing (AI)"
+                                                   Visibility="{Binding DataContext.IsAiEnabled, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <ui:SymbolIcon Symbol="Lightbulb24" FontSize="16"/>
                                         </ui:Button>
                                     </StackPanel>
                                 </StackPanel>

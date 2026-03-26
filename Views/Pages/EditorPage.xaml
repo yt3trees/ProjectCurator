@@ -105,6 +105,25 @@
                         <ui:SymbolIcon Symbol="Search24" FontSize="18" Filled="False"/>
                     </ui:Button>
                     -->
+                    <!-- Import Meeting Notes -->
+                    <ui:Button x:Name="ImportMeetingNotesButton"
+                               Padding="6,4"
+                               Margin="0,0,4,0"
+                               Command="{Binding ImportMeetingNotesCommand}"
+                               ToolTip="Import Meeting Notes"
+                               Visibility="{Binding IsAiEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ui:Button.Style>
+                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                <Setter Property="Opacity" Value="1"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Opacity" Value="0.45"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:Button.Style>
+                        <ui:SymbolIcon Symbol="NotebookAdd24" FontSize="18" Filled="False"/>
+                    </ui:Button>
                     <!-- Update Focus from Asana -->
                     <ui:Button x:Name="UpdateFocusButton"
                                Padding="6,4"

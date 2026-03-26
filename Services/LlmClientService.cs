@@ -33,18 +33,15 @@ public class LlmClientService
         {
             ("user", userPrompt)
         };
-        var response = await ChatWithHistoryAsync(systemPrompt, messages, ct);
-        LastSystemPrompt = systemPrompt;
-        LastUserPrompt   = userPrompt;
-        LastResponse     = response;
-        return response;
+        return await ChatWithHistoryAsync(systemPrompt, messages, ct);
     }
 
     /// <summary>マルチターン (会話履歴付き)</summary>
     public async Task<string> ChatWithHistoryAsync(
         string systemPrompt,
         IReadOnlyList<(string role, string content)> messages,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool injectProfile = true)
     {
         var settings = _configService.LoadSettings();
 
@@ -52,12 +49,16 @@ public class LlmClientService
             throw new InvalidOperationException(
                 "LLM API key is not configured. Please set it in Settings > LLM API.");
 
+        var effectiveSystemPrompt = systemPrompt;
+        if (injectProfile && !string.IsNullOrWhiteSpace(settings.LlmUserProfile))
+            effectiveSystemPrompt = $"## User Profile\n{settings.LlmUserProfile.Trim()}\n\n{systemPrompt}";
+
         var response = settings.LlmProvider.Equals("azure_openai", StringComparison.OrdinalIgnoreCase)
-            ? await SendAsync(settings, systemPrompt, messages, isAzure: true,  ct)
-            : await SendAsync(settings, systemPrompt, messages, isAzure: false, ct);
+            ? await SendAsync(settings, effectiveSystemPrompt, messages, isAzure: true,  ct)
+            : await SendAsync(settings, effectiveSystemPrompt, messages, isAzure: false, ct);
 
         // デバッグログ: 最後のユーザーメッセージを記録
-        LastSystemPrompt = systemPrompt;
+        LastSystemPrompt = effectiveSystemPrompt;
         LastUserPrompt   = messages.LastOrDefault(m => m.role == "user").content ?? "";
         LastResponse     = response;
         return response;
@@ -65,7 +66,8 @@ public class LlmClientService
 
     public async Task<string> TestConnectionAsync(CancellationToken ct = default)
     {
-        return await ChatCompletionAsync("You are a test assistant.", "Reply with exactly 'OK'.", ct);
+        var messages = new List<(string role, string content)> { ("user", "Reply with exactly 'OK'.") };
+        return await ChatWithHistoryAsync("You are a test assistant.", messages, ct, injectProfile: false);
     }
 
     // -----------------------------------------------------------------------
