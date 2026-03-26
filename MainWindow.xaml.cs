@@ -320,6 +320,21 @@ public partial class MainWindow : FluentWindow
         RootNavigation.Navigate(typeof(EditorPage));
     }
 
+    public async Task NavigateToDashboardAndShowBriefingAsync(ProjectInfo project)
+    {
+        RootNavigation.Navigate(typeof(DashboardPage));
+        await Dispatcher.InvokeAsync(async () =>
+        {
+            var dashboard = _serviceProvider.GetRequiredService<DashboardPage>();
+            await dashboard.ShowBriefingForProjectAsync(project);
+        }, System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    public void NavigateToSettings()
+    {
+        RootNavigation.Navigate(typeof(SettingsPage));
+    }
+
     /// <summary>
     /// DashboardPage から TimelinePage へ遷移し、指定プロジェクトを選択する。
     /// </summary>

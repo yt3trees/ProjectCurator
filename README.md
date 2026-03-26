@@ -105,6 +105,7 @@ Required config files are created automatically when you save.
 - Click `Test Connection` to verify the credentials
 - Once the test passes, toggle `Enable AI Features` to on and save
 - The `What's Next` button (💡) will appear in the Dashboard toolbar
+- The `Briefing` button (💡) will appear on each project card in Dashboard
 - The `Update Focus from Asana` button, the `AI Decision Log` button, and the `Import Meeting Notes` button will appear in the Editor toolbar
 
 </details>
@@ -212,6 +213,16 @@ Language: respond in Japanese unless the document is already in English.
 
 Click 💡 in the Dashboard toolbar to get 3-5 AI-prioritized action suggestions across all projects. The model analyzes overdue tasks, stale focus files, uncommitted changes, and unrecorded decisions, then ranks actions by urgency. Each suggestion has an Open button to navigate directly to the relevant file.
 
+### Context Briefing (Dashboard Card)
+
+Click 💡 on a project card to generate a project-specific resume briefing. The model reads `current_focus.md`, recent `decision_log` entries, `tensions.md`, active/completed Asana tasks, and uncommitted repo signals, then outputs:
+
+- `Where you left off` (short narrative summary)
+- `Suggested next steps` (prioritized action list)
+- `Key context` (compact facts to re-enter work quickly)
+
+The dialog supports `Copy`, `Open in Editor`, and `View Debug` (prompt/response inspection).
+
 ### Update Focus from Asana (Editor)
 
 Click the `Update Focus from Asana` button in the Editor toolbar to generate a diff-based update proposal for the open `current_focus.md`. The model reads Asana task data and the existing file, then proposes changes while preserving your heading structure and writing style. A backup is saved to `focus_history/` automatically. Supports workstream filtering, natural-language refinement, and a debug view.
@@ -317,6 +328,7 @@ Overview of all projects with health indicators, update freshness, and Today Que
 
 - Use the top bar to refresh the view (`↻`), set auto refresh (`Off / 10 / 15 / 30 / 60 min`), and show hidden projects.
 - When AI Features is enabled, the What's Next button (💡) appears in the top bar. Click it to get 3–5 AI-prioritized action suggestions across all projects, ranked by urgency (overdue tasks, stale focus files, uncommitted changes, unrecorded decisions, etc.). Each suggestion shows the project name, action, and reason, with an Open button to navigate directly to the relevant project or file. A Copy button exports the list as plain text.
+- When AI Features is enabled, each project card also shows a Briefing button (💡). It generates a project-specific context switch briefing (`Where you left off` / `Suggested next steps` / `Key context`) with quick actions for `Copy`, `Open in Editor`, and `View Debug`.
 - Each project card gives a quick health check: project name, tier (`FULL`/`MINI`), optional `DOMAIN` tag, link status dots, decision log count, and uncommitted repo count.
 - Click the uncommitted badge to see repository-by-repository change details.
 - `Focus` and `Summary` show how old each file is (in days), and the background color changes as files get older.

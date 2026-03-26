@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -1473,6 +1474,1021 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         }
     }
 
+    // ===== Context Briefing =====
+
+    private const string BriefingSystemPrompt = """
+        You are a context-switching assistant for a professional managing multiple projects.
+        The user is about to resume work on a specific project. Your job is to give them a quick briefing so they can get productive immediately.
+
+        ## Output format
+        Write exactly 3 sections in Markdown:
+
+        ## Where you left off
+        A 2-4 sentence narrative summary of the current state of the project. Connect the dots between focus, recent decisions, and open tensions. Do not just list facts.
+
+        ## Suggested next steps
+        3-5 numbered action items, ordered by priority. Each item should be specific and actionable. Include due labels if tasks are overdue or due today.
+
+        ## Key context
+        Bullet points of factual metadata that are relevant now.
+
+        ## Rules
+        - Be concise. The user wants to scan this quickly.
+        - Prioritize what needs attention now: overdue tasks, stale focus, unresolved tensions, uncommitted changes.
+        - If there is a conflict between focus plan and task progress, flag it.
+        - If tensions relate to recent decisions, connect them explicitly.
+        - Write in the same language as the project's context content when possible.
+        - Output ONLY the 3 sections. No preamble, no closing.
+        """;
+
+    private static readonly Regex DecisionFileNameRx =
+        new(@"^(?<date>\d{4}-\d{2}-\d{2})_(?<topic>.+)$", RegexOptions.Compiled);
+
+    private static readonly Regex InProgressHeadingRx =
+        new(@"^\s*#{2,3}\s*(進行中|In\s*progress)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex DoneHeadingRx =
+        new(@"^\s*#{2,3}\s*(完了|Done|Completed)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex AnyHeadingRx =
+        new(@"^\s*#{2,3}\s+\S", RegexOptions.Compiled);
+
+    private static readonly Regex UncheckedTaskRx =
+        new(@"^\s*-\s+\[ \]\s+(.+)$", RegexOptions.Compiled);
+
+    private static readonly Regex CompletedTaskRx =
+        new(@"^\s*-\s+\[x\]\s+(.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex DueRx =
+        new(@"\((?:Due|期限)\s*:\s*([^)]+)\)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex CompletedMarkerRx =
+        new(@"<!--\s*completed:\s*(\d{4}-\d{2}-\d{2})\s*-->", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex MarkdownNumberedRx =
+        new(@"^\d+\.\s+.+$", RegexOptions.Compiled);
+
+    private sealed class BriefingDecisionItem
+    {
+        public DateTime Date { get; init; }
+        public string Topic { get; init; } = "";
+        public string Preview { get; init; } = "";
+    }
+
+    private sealed class BriefingTaskItem
+    {
+        public string Name { get; init; } = "";
+        public string DueLabel { get; init; } = "No due";
+        public bool IsOverdue { get; init; }
+    }
+
+    private sealed class BriefingCompletedTaskItem
+    {
+        public string Name { get; init; } = "";
+        public DateTime CompletedDate { get; init; }
+    }
+
+    private sealed class BriefingWorkstreamItem
+    {
+        public string Label { get; init; } = "";
+        public int? FocusAge { get; init; }
+        public int DecisionLogCount { get; init; }
+        public bool IsClosed { get; init; }
+    }
+
+    private sealed class BriefingData
+    {
+        public required ProjectInfo Project { get; init; }
+        public string FocusContent { get; set; } = "(no focus file)";
+        public string TensionsContent { get; set; } = "(no tensions file)";
+        public List<string> WorkstreamFocusSnippets { get; } = [];
+        public List<BriefingDecisionItem> Decisions { get; } = [];
+        public List<BriefingTaskItem> ActiveTasks { get; } = [];
+        public List<BriefingCompletedTaskItem> CompletedTasks { get; } = [];
+        public List<BriefingWorkstreamItem> Workstreams { get; } = [];
+        public int FocusAgeDays { get; set; } = -1;
+        public int SummaryAgeDays { get; set; } = -1;
+        public int UncommittedRepoCount { get; set; }
+        public int DecisionLogThisMonth { get; set; }
+        public int OpenTensionsCount { get; set; }
+        public int OverdueTaskCount { get; set; }
+        public bool HasCoreContext { get; set; }
+    }
+
+    public async Task ShowBriefingForProjectAsync(ProjectInfo project)
+        => await ShowBriefingForProjectCoreAsync(project);
+
+    private async void OnBriefingClickAsync(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: ProjectCardViewModel card })
+            return;
+        await ShowBriefingForProjectCoreAsync(card.Info);
+    }
+
+    private async Task ShowBriefingForProjectCoreAsync(ProjectInfo project)
+    {
+        if (!ViewModel.IsAiEnabled)
+            return;
+
+        using var cts = new System.Threading.CancellationTokenSource();
+        var loadingWindow = BuildBriefingLoadingWindow(cts);
+        loadingWindow.Show();
+
+        try
+        {
+            var data = await CollectBriefingDataAsync(project, cts.Token);
+            if (!data.HasCoreContext)
+            {
+                if (loadingWindow.IsVisible) loadingWindow.Close();
+                MessageBox.Show(
+                    "No context files found for this project. Create a current_focus.md to get started.",
+                    "Briefing",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var userPrompt = BuildBriefingUserPrompt(data);
+            var lang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+            var systemPrompt = lang == "ja"
+                ? BriefingSystemPrompt + "\n\nRespond in Japanese."
+                : BriefingSystemPrompt;
+
+            var response = await _llmClientService.ChatCompletionAsync(systemPrompt, userPrompt, cts.Token);
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                if (loadingWindow.IsVisible) loadingWindow.Close();
+                MessageBox.Show(
+                    "Could not generate briefing. Please try again.",
+                    "Briefing - Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            if (loadingWindow.IsVisible) loadingWindow.Close();
+            ShowBriefingDialog(project, response.Trim());
+        }
+        catch (OperationCanceledException)
+        {
+            // cancelled
+        }
+        catch (InvalidOperationException ex)
+        {
+            if (loadingWindow.IsVisible) loadingWindow.Close();
+            var result = MessageBox.Show(
+                $"AI features are enabled but API key is not configured.\n\n{ex.Message}\n\nGo to Settings?",
+                "Briefing - Error",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (result == MessageBoxResult.Yes && Window.GetWindow(this) is MainWindow mw)
+                mw.NavigateToSettings();
+        }
+        catch (Exception ex)
+        {
+            if (loadingWindow.IsVisible) loadingWindow.Close();
+            MessageBox.Show(
+                $"Failed to generate briefing: {ex.Message}",
+                "Briefing - Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private async Task<BriefingData> CollectBriefingDataAsync(ProjectInfo project, System.Threading.CancellationToken ct)
+    {
+        var data = new BriefingData { Project = project };
+        data.FocusAgeDays = project.FocusAge ?? -1;
+        data.SummaryAgeDays = project.SummaryAge ?? -1;
+        data.UncommittedRepoCount = project.UncommittedRepoStatuses.Count;
+        data.DecisionLogThisMonth = project.DecisionLogDates.Count(d => d.Year == DateTime.Today.Year && d.Month == DateTime.Today.Month);
+
+        ct.ThrowIfCancellationRequested();
+        if (!string.IsNullOrWhiteSpace(project.FocusFile) && File.Exists(project.FocusFile))
+        {
+            var (focusContent, _) = await _fileEncodingService.ReadFileAsync(project.FocusFile, ct);
+            data.FocusContent = TrimForPrompt(focusContent, 3000);
+            data.HasCoreContext = true;
+        }
+
+        ct.ThrowIfCancellationRequested();
+        var tensionsPath = Path.Combine(project.AiContextContentPath, "tensions.md");
+        if (File.Exists(tensionsPath))
+        {
+            var (tensionsContent, _) = await _fileEncodingService.ReadFileAsync(tensionsPath, ct);
+            data.TensionsContent = TrimForPrompt(tensionsContent, 2000);
+            data.OpenTensionsCount = tensionsContent
+                .Split('\n')
+                .Count(l => l.TrimStart().StartsWith("- ", StringComparison.Ordinal) || l.TrimStart().StartsWith("* ", StringComparison.Ordinal));
+            data.HasCoreContext = true;
+        }
+
+        foreach (var ws in project.Workstreams)
+        {
+            data.Workstreams.Add(new BriefingWorkstreamItem
+            {
+                Label = string.IsNullOrWhiteSpace(ws.Label) ? ws.Id : ws.Label,
+                FocusAge = ws.FocusAge,
+                DecisionLogCount = ws.DecisionLogCount,
+                IsClosed = ws.IsClosed,
+            });
+
+            if (string.IsNullOrWhiteSpace(ws.FocusFile) || !File.Exists(ws.FocusFile))
+                continue;
+
+            try
+            {
+                var (wsFocusContent, _) = await _fileEncodingService.ReadFileAsync(ws.FocusFile, ct);
+                var snippet = TrimForPrompt(wsFocusContent, 500);
+                if (!string.IsNullOrWhiteSpace(snippet))
+                    data.WorkstreamFocusSnippets.Add($"{(string.IsNullOrWhiteSpace(ws.Label) ? ws.Id : ws.Label)}: {snippet}");
+            }
+            catch
+            {
+                // best effort
+            }
+        }
+
+        var decisionFiles = new List<string>();
+        var rootDecisionDir = Path.Combine(project.AiContextContentPath, "decision_log");
+        if (Directory.Exists(rootDecisionDir))
+            decisionFiles.AddRange(Directory.EnumerateFiles(rootDecisionDir, "*.md", SearchOption.TopDirectoryOnly));
+
+        foreach (var ws in project.Workstreams)
+        {
+            var wsDecisionDir = Path.Combine(ws.Path, "decision_log");
+            if (Directory.Exists(wsDecisionDir))
+                decisionFiles.AddRange(Directory.EnumerateFiles(wsDecisionDir, "*.md", SearchOption.TopDirectoryOnly));
+        }
+
+        var decisionItems = new List<(DateTime date, string topic, string path)>();
+        foreach (var file in decisionFiles.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var fileName = Path.GetFileNameWithoutExtension(file);
+            var match = DecisionFileNameRx.Match(fileName);
+            var date = match.Success && DateTime.TryParse(match.Groups["date"].Value, out var parsed)
+                ? parsed
+                : File.GetLastWriteTime(file).Date;
+            var topic = match.Success ? match.Groups["topic"].Value : fileName;
+            decisionItems.Add((date, topic, file));
+        }
+
+        foreach (var item in decisionItems
+            .OrderByDescending(x => x.date)
+            .ThenByDescending(x => File.GetLastWriteTime(x.path))
+            .Take(3))
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var (content, _) = await _fileEncodingService.ReadFileAsync(item.path, ct);
+                data.Decisions.Add(new BriefingDecisionItem
+                {
+                    Date = item.date,
+                    Topic = item.topic,
+                    Preview = TrimForPrompt(content, 300),
+                });
+                data.HasCoreContext = true;
+            }
+            catch
+            {
+                // best effort
+            }
+        }
+
+        var asanaRootPath = Path.Combine(project.AiContextPath, "obsidian_notes", "asana-tasks.md");
+        if (File.Exists(asanaRootPath))
+            await CollectAsanaTaskContextAsync(asanaRootPath, data, ct);
+
+        var workstreamsAsanaRoot = Path.Combine(project.AiContextPath, "obsidian_notes", "workstreams");
+        if (Directory.Exists(workstreamsAsanaRoot))
+        {
+            foreach (var ws in project.Workstreams.Where(w => !w.IsClosed))
+            {
+                ct.ThrowIfCancellationRequested();
+                var wsAsana = Path.Combine(workstreamsAsanaRoot, ws.Id, "asana-tasks.md");
+                if (File.Exists(wsAsana))
+                    await CollectAsanaTaskContextAsync(wsAsana, data, ct);
+            }
+        }
+
+        data.ActiveTasks.Sort((a, b) =>
+        {
+            if (a.IsOverdue && !b.IsOverdue) return -1;
+            if (!a.IsOverdue && b.IsOverdue) return 1;
+            return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+        });
+        data.CompletedTasks.Sort((a, b) => b.CompletedDate.CompareTo(a.CompletedDate));
+
+        data.OverdueTaskCount = data.ActiveTasks.Count(t => t.IsOverdue);
+        if (data.ActiveTasks.Count > 20)
+            data.ActiveTasks.RemoveRange(20, data.ActiveTasks.Count - 20);
+        if (data.CompletedTasks.Count > 5)
+            data.CompletedTasks.RemoveRange(5, data.CompletedTasks.Count - 5);
+
+        return data;
+    }
+
+    private async Task CollectAsanaTaskContextAsync(string asanaPath, BriefingData data, System.Threading.CancellationToken ct)
+    {
+        var (content, _) = await _fileEncodingService.ReadFileAsync(asanaPath, ct);
+        data.ActiveTasks.AddRange(ParseInProgressTasks(content));
+        data.CompletedTasks.AddRange(ParseCompletedTasks(content, DateTime.Today.AddDays(-7)));
+    }
+
+    private static List<BriefingTaskItem> ParseInProgressTasks(string markdown)
+    {
+        var result = new List<BriefingTaskItem>();
+        var lines = markdown.Replace("\r\n", "\n").Split('\n');
+        var inProgress = false;
+
+        foreach (var raw in lines)
+        {
+            var line = raw.TrimEnd('\r');
+            if (InProgressHeadingRx.IsMatch(line))
+            {
+                inProgress = true;
+                continue;
+            }
+            if (inProgress && AnyHeadingRx.IsMatch(line) && !InProgressHeadingRx.IsMatch(line))
+            {
+                inProgress = false;
+                continue;
+            }
+            if (!inProgress) continue;
+
+            var m = UncheckedTaskRx.Match(line);
+            if (!m.Success) continue;
+
+            var body = m.Groups[1].Value.Trim();
+            if (string.IsNullOrWhiteSpace(body) || body.StartsWith("<!--", StringComparison.Ordinal))
+                continue;
+
+            var dueLabel = BuildDueLabel(body, out var isOverdue);
+            var name = NormalizeTaskName(body);
+            if (string.IsNullOrWhiteSpace(name)) continue;
+
+            result.Add(new BriefingTaskItem { Name = name, DueLabel = dueLabel, IsOverdue = isOverdue });
+        }
+
+        return result;
+    }
+
+    private static List<BriefingCompletedTaskItem> ParseCompletedTasks(string markdown, DateTime sinceDate)
+    {
+        var result = new List<BriefingCompletedTaskItem>();
+        var lines = markdown.Replace("\r\n", "\n").Split('\n');
+        var inDone = false;
+
+        foreach (var raw in lines)
+        {
+            var line = raw.TrimEnd('\r');
+            if (DoneHeadingRx.IsMatch(line))
+            {
+                inDone = true;
+                continue;
+            }
+            if (inDone && AnyHeadingRx.IsMatch(line) && !DoneHeadingRx.IsMatch(line))
+            {
+                inDone = false;
+                continue;
+            }
+            if (!inDone || !CompletedTaskRx.IsMatch(line)) continue;
+
+            var completedMarker = CompletedMarkerRx.Match(line);
+            if (!completedMarker.Success) continue;
+            if (!DateTime.TryParse(completedMarker.Groups[1].Value, out var completedDate)) continue;
+            if (completedDate.Date < sinceDate.Date) continue;
+
+            var name = NormalizeTaskName(line);
+            if (string.IsNullOrWhiteSpace(name)) continue;
+
+            result.Add(new BriefingCompletedTaskItem { Name = name, CompletedDate = completedDate.Date });
+        }
+
+        return result;
+    }
+
+    private static string BuildDueLabel(string line, out bool isOverdue)
+    {
+        isOverdue = false;
+        var m = DueRx.Match(line);
+        if (!m.Success) return "No due";
+
+        var rawDue = m.Groups[1].Value.Trim();
+        if (!DateTime.TryParse(rawDue, out var dueDate))
+            return rawDue;
+
+        var delta = (dueDate.Date - DateTime.Today).Days;
+        if (delta < 0)
+        {
+            isOverdue = true;
+            return $"overdue {Math.Abs(delta)}d";
+        }
+        if (delta == 0) return "today";
+        return $"in {delta}d";
+    }
+
+    private static string NormalizeTaskName(string raw)
+    {
+        var normalized = raw;
+        normalized = Regex.Replace(normalized, @"<!--.*?-->", "", RegexOptions.Singleline);
+        normalized = Regex.Replace(normalized, @"\[\[Asana\]\([^)]+\)\]", "", RegexOptions.IgnoreCase);
+        normalized = DueRx.Replace(normalized, "");
+        normalized = Regex.Replace(normalized, @"^\s*-\s+\[[ xX]\]\s+", "");
+        normalized = Regex.Replace(normalized, @"^\s*\[(担当|コラボ|他)\]\s*", "");
+        return normalized.Trim();
+    }
+
+    private static string TrimForPrompt(string s, int maxChars)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var normalized = s.Replace("\r\n", "\n").Trim();
+        if (normalized.Length <= maxChars) return normalized;
+        return normalized[..maxChars] + "\n...(truncated)";
+    }
+
+    private static string BuildBriefingUserPrompt(BriefingData data)
+    {
+        var sb = new StringBuilder();
+        var p = data.Project;
+
+        sb.AppendLine($"## Project: {p.Name}");
+        sb.AppendLine($"Date: {DateTime.Today:yyyy-MM-dd}");
+        sb.AppendLine();
+
+        sb.AppendLine("## Current Focus");
+        sb.AppendLine(string.IsNullOrWhiteSpace(data.FocusContent) ? "(no focus file)" : data.FocusContent);
+        if (data.WorkstreamFocusSnippets.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("### Workstream Focus Snippets");
+            foreach (var wsFocus in data.WorkstreamFocusSnippets.Take(8))
+                sb.AppendLine($"- {wsFocus}");
+        }
+        sb.AppendLine();
+
+        sb.AppendLine("## Open Tensions");
+        sb.AppendLine(string.IsNullOrWhiteSpace(data.TensionsContent) ? "(no tensions file)" : data.TensionsContent);
+        sb.AppendLine();
+
+        sb.AppendLine("## Recent Decisions (latest 3)");
+        if (data.Decisions.Count == 0)
+        {
+            sb.AppendLine("(no recent decisions)");
+        }
+        else
+        {
+            foreach (var d in data.Decisions)
+            {
+                sb.AppendLine($"### {d.Date:yyyy-MM-dd}: {d.Topic}");
+                sb.AppendLine(string.IsNullOrWhiteSpace(d.Preview) ? "(no preview)" : d.Preview);
+                sb.AppendLine();
+            }
+        }
+
+        sb.AppendLine("## Active Tasks (in progress)");
+        if (data.ActiveTasks.Count == 0)
+            sb.AppendLine("(no active tasks)");
+        else
+            foreach (var t in data.ActiveTasks.Take(20))
+                sb.AppendLine($"- {t.Name} (Due: {t.DueLabel})");
+        sb.AppendLine();
+
+        sb.AppendLine("## Recently Completed Tasks");
+        if (data.CompletedTasks.Count == 0)
+            sb.AppendLine("(none)");
+        else
+            foreach (var c in data.CompletedTasks.Take(5))
+                sb.AppendLine($"- {c.Name} (completed: {c.CompletedDate:yyyy-MM-dd})");
+        sb.AppendLine();
+
+        var repoNames = data.Project.UncommittedRepoStatuses.Count == 0
+            ? "none"
+            : string.Join(", ", data.Project.UncommittedRepoStatuses.Select(r => r.RelativePath));
+
+        sb.AppendLine("## Project Metrics");
+        sb.AppendLine($"- Focus age: {(data.FocusAgeDays >= 0 ? $"{data.FocusAgeDays} days" : "missing")}");
+        sb.AppendLine($"- Summary age: {(data.SummaryAgeDays >= 0 ? $"{data.SummaryAgeDays} days" : "missing")}");
+        sb.AppendLine($"- Open tensions: {data.OpenTensionsCount}");
+        sb.AppendLine($"- Uncommitted repos: {data.UncommittedRepoCount} ({repoNames})");
+        sb.AppendLine($"- Decision log entries this month: {data.DecisionLogThisMonth}");
+        sb.AppendLine($"- Overdue tasks: {data.OverdueTaskCount}");
+        sb.AppendLine();
+
+        sb.AppendLine("## Workstreams");
+        if (data.Workstreams.Count == 0)
+            sb.AppendLine("(no workstreams)");
+        else
+            foreach (var ws in data.Workstreams.OrderBy(w => w.IsClosed).ThenBy(w => w.Label, StringComparer.OrdinalIgnoreCase))
+            {
+                var closedText = ws.IsClosed ? " (closed)" : "";
+                var focusAge = ws.FocusAge.HasValue ? $"{ws.FocusAge}d" : "missing";
+                sb.AppendLine($"{ws.Label}: Focus age {focusAge}, {ws.DecisionLogCount} decisions{closedText}");
+            }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private Window BuildBriefingLoadingWindow(System.Threading.CancellationTokenSource cts)
+    {
+        var appResources = Application.Current.Resources;
+        var surface = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "💡",
+            FontSize = 13,
+            Margin = new Thickness(12, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Briefing",
+            Foreground = text,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+
+        var loadingText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Reading project context...",
+            Foreground = subtext,
+            FontSize = 13,
+            Margin = new Thickness(0, 0, 0, 14),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+        };
+
+        var cancelBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 100,
+            Height = 32,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+        };
+
+        var content = new StackPanel
+        {
+            Margin = new Thickness(24, 18, 24, 18),
+            Children = { loadingText, cancelBtn }
+        };
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(content, 1);
+        root.Children.Add(titleBar);
+        root.Children.Add(content);
+
+        var owner = Window.GetWindow(this);
+        var win = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            SizeToContent = SizeToContent.Height,
+            WindowStyle = WindowStyle.None,
+            Width = 360,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            Content = root
+        };
+
+        cancelBtn.Click += (_, _) => { cts.Cancel(); win.Close(); };
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) win.DragMove();
+        };
+
+        return win;
+    }
+
+    private void ShowBriefingDialog(ProjectInfo project, string markdown)
+    {
+        var mw = Window.GetWindow(this) as MainWindow;
+        var appResources = Application.Current.Resources;
+        var surface = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "💡",
+            FontSize = 13,
+            Margin = new Thickness(12, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = $"Briefing: {project.Name}",
+            Foreground = text,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        Grid.SetColumn(titleText, 1);
+
+        var closeButton = new System.Windows.Controls.Button
+        {
+            Content = "✕",
+            Width = 34,
+            Height = 26,
+            Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Foreground = subtext,
+            FontSize = 13
+        };
+        Grid.SetColumn(closeButton, 2);
+
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+        titleBar.Children.Add(closeButton);
+
+        FrameworkElement contentBody;
+        try
+        {
+            contentBody = BuildBriefingMarkdownPanel(markdown);
+        }
+        catch
+        {
+            contentBody = new System.Windows.Controls.TextBox
+            {
+                Text = markdown,
+                IsReadOnly = true,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Background = surface1,
+                Foreground = text,
+                BorderBrush = surface2,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(10),
+                FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                FontSize = 12,
+                Margin = new Thickness(16, 12, 16, 8)
+            };
+        }
+
+        var scroller = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Padding = new Thickness(0, 4, 0, 0),
+            Content = contentBody
+        };
+
+        var copyBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Copy",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 90,
+            Height = 32,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+
+        var debugBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "View Debug",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            Height = 32,
+            Padding = new Thickness(10, 0, 10, 0),
+            ToolTip = "Show LLM prompt/response"
+        };
+
+        var openEditorBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Open in Editor",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 130,
+            Height = 32,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+
+        var closeFooterBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Close",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 90,
+            Height = 32
+        };
+
+        var rightButtons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Children = { copyBtn, openEditorBtn, closeFooterBtn }
+        };
+
+        var footer = new Grid
+        {
+            Margin = new Thickness(16, 8, 16, 12)
+        };
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(debugBtn, 0);
+        Grid.SetColumn(rightButtons, 2);
+        footer.Children.Add(debugBtn);
+        footer.Children.Add(rightButtons);
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(scroller, 1);
+        Grid.SetRow(footer, 2);
+        root.Children.Add(titleBar);
+        root.Children.Add(scroller);
+        root.Children.Add(footer);
+
+        var owner = Window.GetWindow(this);
+        var dialog = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.CanResize,
+            WindowStyle = WindowStyle.None,
+            Width = 700,
+            Height = 560,
+            MinWidth = 620,
+            MinHeight = 460,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            Content = root
+        };
+
+        System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 0,
+                ResizeBorderThickness = new Thickness(4),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
+
+        copyBtn.Click += (_, _) => System.Windows.Clipboard.SetText(markdown);
+        debugBtn.Click += (_, _) =>
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("=== SYSTEM PROMPT ===");
+            sb.AppendLine(_llmClientService.LastSystemPrompt);
+            sb.AppendLine();
+            sb.AppendLine("=== USER PROMPT ===");
+            sb.AppendLine(_llmClientService.LastUserPrompt);
+            sb.AppendLine();
+            sb.AppendLine("=== RESPONSE ===");
+            sb.AppendLine(_llmClientService.LastResponse);
+            ShowWhatsNextLogDialog("Briefing Debug Log", sb.ToString());
+        };
+        openEditorBtn.Click += (_, _) =>
+        {
+            dialog.Close();
+            mw?.NavigateToEditor(project);
+            mw?.Activate();
+        };
+        closeButton.Click += (_, _) => dialog.Close();
+        closeFooterBtn.Click += (_, _) => dialog.Close();
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) dialog.DragMove();
+        };
+
+        _ = dialog.ShowDialog();
+    }
+
+    private FrameworkElement BuildBriefingMarkdownPanel(string markdown)
+    {
+        var appResources = Application.Current.Resources;
+        var text = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var sectionBg = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var sectionBorder = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var itemBg = appResources.Contains("AppSurface0")
+            ? (System.Windows.Media.Brush)appResources["AppSurface0"]
+            : sectionBg;
+        var red = appResources.Contains("AppRed")
+            ? (System.Windows.Media.Brush)appResources["AppRed"]
+            : text;
+        var yellow = appResources.Contains("AppYellow")
+            ? (System.Windows.Media.Brush)appResources["AppYellow"]
+            : text;
+
+        var panel = new StackPanel { Margin = new Thickness(16, 12, 16, 8) };
+        var sectionStack = new StackPanel();
+        var lines = markdown.Replace("\r\n", "\n").Split('\n');
+        var hasSection = false;
+        var currentSectionTitle = "";
+        StackPanel? currentStepPanel = null;
+
+        void FlushSection()
+        {
+            if (sectionStack.Children.Count == 0) return;
+            panel.Children.Add(new Border
+            {
+                Background = sectionBg,
+                BorderBrush = sectionBorder,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(14, 12, 14, 10),
+                Margin = new Thickness(0, 0, 0, 12),
+                Child = sectionStack
+            });
+            sectionStack = new StackPanel();
+        }
+
+        foreach (var raw in lines)
+        {
+            var line = raw.TrimEnd('\r');
+            var cleanLine = CleanMarkdownLine(line);
+
+            if (cleanLine.StartsWith("## ", StringComparison.Ordinal) || cleanLine.StartsWith("### ", StringComparison.Ordinal))
+            {
+                if (hasSection) FlushSection();
+                hasSection = true;
+                currentSectionTitle = cleanLine.TrimStart('#', ' ').Trim();
+                currentStepPanel = null;
+            }
+
+            var isSuggestedStepsSection = currentSectionTitle.Contains("Suggested next steps", StringComparison.OrdinalIgnoreCase)
+                || currentSectionTitle.Contains("次にやること", StringComparison.Ordinal)
+                || currentSectionTitle.Contains("次のステップ", StringComparison.Ordinal);
+
+            if (isSuggestedStepsSection && MarkdownNumberedRx.IsMatch(cleanLine))
+            {
+                var stepText = FormatSuggestedStepLine(cleanLine);
+                var stepBlock = new System.Windows.Controls.TextBlock
+                {
+                    Text = stepText,
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 12,
+                    FontWeight = FontWeights.SemiBold,
+                    LineHeight = 20,
+                    Foreground = ResolveDueBrush(stepText, text, yellow, red),
+                };
+
+                currentStepPanel = new StackPanel();
+                currentStepPanel.Children.Add(stepBlock);
+
+                sectionStack.Children.Add(new Border
+                {
+                    Background = itemBg,
+                    BorderBrush = sectionBorder,
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(10, 7, 10, 7),
+                    Margin = new Thickness(6, 0, 0, 6),
+                    Child = currentStepPanel
+                });
+                continue;
+            }
+
+            if (isSuggestedStepsSection && currentStepPanel != null && cleanLine.StartsWith("- ", StringComparison.Ordinal))
+            {
+                currentStepPanel.Children.Add(new System.Windows.Controls.TextBlock
+                {
+                    Text = $"• {cleanLine[2..]}",
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 12,
+                    LineHeight = 19,
+                    Margin = new Thickness(0, 4, 0, 0),
+                    Foreground = ResolveDueBrush(cleanLine, subtext, yellow, red)
+                });
+                continue;
+            }
+
+            var block = new System.Windows.Controls.TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12,
+                LineHeight = 19,
+            };
+
+            if (string.IsNullOrWhiteSpace(cleanLine))
+            {
+                currentStepPanel = null;
+                block.Text = "";
+                block.LineHeight = 8;
+                block.Margin = new Thickness(0, 0, 0, 0);
+                block.Foreground = text;
+            }
+            else if (cleanLine.StartsWith("## ", StringComparison.Ordinal) || cleanLine.StartsWith("### ", StringComparison.Ordinal))
+            {
+                block.Text = cleanLine.TrimStart('#', ' ');
+                block.FontWeight = FontWeights.SemiBold;
+                block.FontSize = 14;
+                block.LineHeight = 20;
+                block.Margin = new Thickness(0, 1, 0, 7);
+                block.Foreground = text;
+            }
+            else if (cleanLine.StartsWith("- ", StringComparison.Ordinal))
+            {
+                block.Text = $"• {cleanLine[2..]}";
+                block.Margin = new Thickness(10, 0, 0, 2);
+                block.Foreground = ResolveDueBrush(cleanLine, text, yellow, red);
+            }
+            else if (MarkdownNumberedRx.IsMatch(cleanLine))
+            {
+                currentStepPanel = null;
+                block.Text = cleanLine;
+                block.Margin = new Thickness(10, 0, 0, 2);
+                block.Foreground = ResolveDueBrush(cleanLine, text, yellow, red);
+            }
+            else
+            {
+                block.Text = cleanLine;
+                block.Margin = new Thickness(0, 0, 0, 2);
+                block.Foreground = text;
+            }
+
+            sectionStack.Children.Add(block);
+        }
+
+        FlushSection();
+        if (panel.Children.Count == 0)
+        {
+            panel.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = markdown,
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12,
+                LineHeight = 19,
+                Foreground = text
+            });
+        }
+
+        return panel;
+    }
+
+    private static string FormatSuggestedStepLine(string line)
+    {
+        var formatted = line.Trim();
+        formatted = formatted.Replace("（Active:", "\n（Active:", StringComparison.Ordinal);
+        formatted = formatted.Replace(" (Active:", "\n(Active:", StringComparison.Ordinal);
+        formatted = formatted.Replace("）で、", "）\n- ", StringComparison.Ordinal);
+        formatted = formatted.Replace(")で、", ")\n- ", StringComparison.Ordinal);
+        return formatted;
+    }
+
+    private static string CleanMarkdownLine(string line)
+    {
+        var cleaned = line.Replace("**", "", StringComparison.Ordinal);
+        cleaned = cleaned.Replace("__", "", StringComparison.Ordinal);
+        cleaned = cleaned.Replace("`", "", StringComparison.Ordinal);
+        return cleaned;
+    }
+
+    private static System.Windows.Media.Brush ResolveDueBrush(
+        string line,
+        System.Windows.Media.Brush normal,
+        System.Windows.Media.Brush yellow,
+        System.Windows.Media.Brush red)
+    {
+        var lowered = line.ToLowerInvariant();
+        if (lowered.Contains("due: today", StringComparison.Ordinal) || lowered.Contains("overdue", StringComparison.Ordinal))
+            return red;
+        if (lowered.Contains("due: in ", StringComparison.Ordinal) || lowered.Contains("due: tomorrow", StringComparison.Ordinal))
+            return yellow;
+        return normal;
+    }
+
     // ===== What's Next =====
 
     private const string WhatsNextSystemPrompt = """
@@ -2026,7 +3042,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
 
         var root = new Grid { Background = surface };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetRow(titleBar, 0);
         Grid.SetRow(scrollViewer, 1);
