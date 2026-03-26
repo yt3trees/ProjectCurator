@@ -107,6 +107,24 @@ public partial class CommandPaletteViewModel : ObservableObject
             }
         });
 
+        var settings = _configService.LoadSettings();
+        if (settings.AiEnabled)
+        {
+            commands.Add(new CommandItem
+            {
+                Label = "meeting",
+                Category = "project",
+                Display = "[>]  meeting (Import Meeting Notes)",
+                Action = async (w) =>
+                {
+                    w.RootNavigation.Navigate(typeof(EditorPage));
+                    await Task.Delay(50);
+                    if (_editorViewModel.ImportMeetingNotesCommand.CanExecute(null))
+                        await _editorViewModel.ImportMeetingNotesCommand.ExecuteAsync(null);
+                }
+            });
+        }
+
         commands.Add(new CommandItem
         {
             Label = "standup",

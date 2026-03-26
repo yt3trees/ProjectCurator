@@ -412,6 +412,33 @@ public class CaptureService
     }
 
     /// <summary>
+    /// asana_config.json の AnkenAliases を返す。プロジェクト名自体も含む。
+    /// </summary>
+    public List<string> LoadAnkenAliases(ProjectInfo project)
+    {
+        var aliases = new List<string> { project.Name };
+        var path = ResolveAsanaConfigPath(project);
+        if (!File.Exists(path)) return aliases;
+        try
+        {
+            var (content, _) = _encoding.ReadFile(path);
+            var cfg = JsonSerializer.Deserialize<AsanaProjectConfig>(content, JsonOpts);
+            if (cfg?.AnkenAliases is { Count: > 0 } list)
+                aliases.AddRange(list);
+        }
+        catch { }
+        return aliases;
+    }
+
+    /// <summary>
+    /// asana_global.json の personal_project_gids を返す。
+    /// </summary>
+    public List<string> GetPersonalProjectGids() =>
+        (_configService.LoadAsanaGlobalConfig().PersonalProjectGids ?? [])
+        .Where(g => !string.IsNullOrWhiteSpace(g))
+        .ToList();
+
+    /// <summary>
     /// idempotency キーを生成する (project + summary + body hash)。
     /// </summary>
     public static string BuildIdempotencyKey(string projectGid, string summary, string body)
@@ -860,5 +887,8 @@ identify which project it belongs to, and generate a concise summary.
 
         [JsonPropertyName("workstream_project_map")]
         public Dictionary<string, string> WorkstreamProjectMap { get; set; } = [];
+
+        [JsonPropertyName("anken_aliases")]
+        public List<string> AnkenAliases { get; set; } = [];
     }
 }

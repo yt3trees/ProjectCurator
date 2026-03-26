@@ -82,6 +82,7 @@ public partial class App : WpfApplication
         services.AddSingleton<FocusUpdateService>();
         services.AddSingleton<DecisionLogGeneratorService>();
         services.AddSingleton<CaptureService>();
+        services.AddSingleton<MeetingNotesService>();
 
         // ViewModels
         services.AddSingleton<MainWindowViewModel>();

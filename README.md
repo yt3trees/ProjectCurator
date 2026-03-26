@@ -105,7 +105,7 @@ Required config files are created automatically when you save.
 - Click `Test Connection` to verify the credentials
 - Once the test passes, toggle `Enable AI Features` to on and save
 - The `What's Next` button (💡) will appear in the Dashboard toolbar
-- The `Update Focus from Asana` button and the `AI Decision Log` button will appear in the Editor toolbar
+- The `Update Focus from Asana` button, the `AI Decision Log` button, and the `Import Meeting Notes` button will appear in the Editor toolbar
 
 </details>
 
@@ -170,8 +170,9 @@ In short:
 3. Click a project or workstream and open `current_focus.md`
 4. Update context in `Editor` and save with `Ctrl+S`
 5. Add a `decision_log` entry if needed (when AI Features is enabled, the Dec Log button opens an AI-assisted dialog)
-6. If using Asana, run `Asana Sync` to refresh task files
-7. If AI Features is enabled, click `Update Focus from Asana` in the Editor toolbar to get an LLM-generated update proposal
+6. If you have meeting notes from a recent meeting, click `Import Meeting Notes` in the Editor toolbar to analyze and apply them
+7. If using Asana, run `Asana Sync` to refresh task files
+8. If AI Features is enabled, click `Update Focus from Asana` in the Editor toolbar to get an LLM-generated update proposal
 
 ```mermaid
 flowchart TD
@@ -219,17 +220,21 @@ Click the `Update Focus from Asana` button in the Editor toolbar to generate a d
 
 Click `Dec Log` in the Editor toolbar (AI mode) to open the decision log assistant. Describe what was decided; the model generates a structured draft with Options / Why / Risk / Revisit Trigger sections. Supports natural-language refinement and optionally removes the resolved item from `tensions.md`. Saves as `decision_log/YYYY-MM-DD_{topic}.md`.
 
-### Quick Capture AI Routing
+### Import Meeting Notes (Editor)
 
-When AI Features is enabled, text entered in the Quick Capture window (`Ctrl+Shift+C`) is automatically classified and routed:
+Click the `Import Meeting Notes` button in the Editor toolbar (or press `Ctrl+Enter` in the notes input dialog) to paste raw meeting notes and have the LLM analyze them in a single pass. The model produces four types of output, each shown in a separate tab of the preview dialog:
 
-| Category | Destination |
-|---|---|
-| `task` | Creates a task in Asana (confirmation required) |
-| `tension` | Appends to `tensions.md` |
-| `focus_update` | Opens Editor and starts Update Focus from Asana with your input as context |
-| `decision` | Opens Editor and starts AI Decision Log |
-| `memo` | Appends a timestamped entry to `_config/capture_log.md` |
+- Decisions tab: one checkbox per decision detected; click "Show draft" to preview the structured `decision_log` draft; uncheck any decision to skip it
+- Focus tab: diff-based view of the AI-generated update to `current_focus.md`; the LLM rewrites the full file integrating new items while preserving the existing structure and writing style
+- Tensions tab: preview of items to be appended to `tensions.md` (technical questions, tradeoffs, concerns)
+- Asana Tasks tab: list of action items proposed for Asana. Each task has its own controls:
+  - Project ComboBox: defaults to the first entry in `personal_project_gids` (`asana_global.json`), or the workstream's mapped project if configured
+  - Section ComboBox: auto-selected by matching `anken_aliases` (from `asana_config.json`) against the section name; falls back to `(none)`
+  - Due Date picker (optional)
+  - Set time checkbox: when checked, reveals Hour / Minute selectors (15-minute increments); produces an ISO 8601 `due_at` value with local timezone offset
+  - Check each task to include; uncheck to skip
+
+Select which items to apply and click `Apply Selected`. A `View Debug` button in the dialog shows the full LLM prompt and response. Decision logs are saved as `YYYY-MM-DD_{topic}.md`; `current_focus.md` is backed up to `focus_history/` before updating. Created Asana tasks are appended to `asana-tasks.md` with their GID and due date.
 
 ## AI Agent Collaboration (Claude Code / Codex CLI)
 
@@ -290,7 +295,7 @@ Skills are sourced from the app's embedded `Assets/ContextCompressionLayer/skill
 | Page | What You Can Do |
 |---|---|
 | Dashboard | Project health overview, Today Queue visibility, workstream status checks, AI-powered What's Next suggestions (requires AI Features enabled) |
-| Editor | Markdown context editing, search, link open, quick decision log creation, AI-powered "Update Focus from Asana" and "AI Decision Log" (both require AI Features enabled) |
+| Editor | Markdown context editing, search, link open, quick decision log creation, AI-powered "Update Focus from Asana", "AI Decision Log", and "Import Meeting Notes" (all require AI Features enabled) |
 | Timeline | Review recent project activity in chronological order |
 | Git Repos | Recursively scan workspace roots for repositories |
 | Asana Sync | Sync Asana tasks to project/workstream Markdown outputs |
@@ -340,6 +345,7 @@ Tree-based file browser for AI context files (`current_focus.md`, `decision_log`
 - Toolbar buttons: Refresh, Dec Log (quick decision log entry), P (pin folder), Save
 - Update Focus from Asana button (visible when AI Features is enabled): reads `asana-tasks.md`, sends it to the configured LLM, and shows a diff-based proposal dialog; optionally filter by workstream; supports natural-language refinement and debug view; backup is saved to `focus_history/` automatically
 - Dec Log button (AI mode, visible when AI Features is enabled): detects implicit decisions from recent `focus_history` changes; accepts description of what was decided, Status (Confirmed / Tentative), Trigger (Solo decision / AI session / Meeting), and optional attached files (.txt / .md); LLM generates a structured decision log draft with Options / Why / Risk / Revisit Trigger sections; preview dialog supports natural-language refinement and debug view; optionally removes the resolved item from `tensions.md`; saves as `YYYY-MM-DD_{topic}.md` under `decision_log/`
+- Import Meeting Notes button (visible when AI Features is enabled): paste raw meeting notes to analyze them with a single LLM call; preview dialog shows Decisions / Focus / Tensions / Asana Tasks tabs with checkboxes per item; Focus tab shows an AI-generated diff view where the LLM rewrites the full `current_focus.md`; Asana Tasks tab lets you select a target project and section, then creates tasks via the Asana API; a `View Debug` button shows the full prompt and response; `current_focus.md` is backed up to `focus_history/` before overwriting
 - Full file path displayed in the header bar
 - Status bar at the bottom shows the current project and file name
 
