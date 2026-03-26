@@ -131,5 +131,163 @@
   個人的には B(グローバルキャプチャ) と D(コミット→意思決定記録) が特に面白いと思います。Bはアプリのインタラクションを根
   本から変える可能性があり、Dは開発者として毎日のコミット作業と意思決定記録が一体化する。
 
+---
+
+ AI機能アイデア集
+
+  1. Context Switch Briefing (復帰ブリーフィング)
+
+  しばらく触れていなかったプロジェクトを Dashboard/Editor
+  で開いたとき、「以前のあなた、ここまでやってましたよ」と要約してくれる機能。
+
+  - トリガー: Focus が N日以上古いプロジェクトをクリックしたとき、ポップアップで提案
+  - 入力データ: 直近の focus_history/ diff、decision_log/ 最新数件、未完了Asanaタスクの変化、git の未コミット変更
+  - 出力: 「前回ここまで進んでいた / その後こうなった / 今日再開するならここから」の3段構成ブリーフィング
+  - 実装: ProjectDiscoveryService の FocusAge を見て閾値判定、FocusUpdateService と同様のパターンでプロンプト構築
+
+  復帰コストが一番高い「あれ、何やってたっけ」を解消する。What's Nextが全体俯瞰なのに対し、こちらは1プロジェクト深掘り。
+
+  ---
+  2. Tension Synthesizer (テンション棚卸し)
+
+  tensions.md に溜まった項目を定期的に「まだ生きてる？もう解決した？」と棚卸しする機能。
+
+  - トリガー: Editor で tensions.md を開いたとき、またはCommand Paletteから手動実行
+  - 入力データ: tensions.md 全項目 + 直近の decision_log/ + current_focus.md + focus_history/ diff
+  - LLMの仕事:
+    - 各tension に対し「Resolved(この決定で解消済み) / Active(まだ未解決) /
+  Stale(3週間触れてない、エスカレーション推奨)」を判定
+    - Resolved なものは該当 decision_log へのリンク付きで削除提案
+    - 関連する tension をクラスタリングして「これらは同じ論点では？」と提示
+  - 出力: diff形式で確認 → 承認して tensions.md を更新
+
+  Decision Logの「resolved_tension」機能の逆引き版。放置テンションの蓄積を防ぐ。
+
+  ---
+  3. Weekly Digest (週次ダイジェスト)
+
+  金曜日(または設定日)に、全プロジェクト横断の「今週の振り返り + 来週の見通し」を自動生成。
+
+  - トリガー: 設定した曜日にアプリ起動時に生成(Standup と同じパターン)、またはCommand Paletteから手動
+  - 入力データ: 今週の focus_history/ 全diff、decision_log/ 全件、完了Asanaタスク、Today Queueの来週分
+  - 出力:
+    - This Week: プロジェクトごとに「やったこと」を自然言語で要約
+    - Decisions Made: 今週の意思決定を横断一覧
+    - Drift Report: 月曜のfocusと金曜のfocusを比較して「計画 vs 実態」のズレを可視化
+    - Next Week Outlook: 来週期限のタスク + 未解決tensionから予測
+  - 保存先: {ObsidianVaultRoot}/weekly/YYYY-WNN_digest.md
+
+  既存の Standup
+  が「今日」のスナップショットなのに対し、こちらは「1週間」の物語。上司への報告や振り返りにそのまま使える。
+
+  ---
+  4. Decision Impact Tracker (決定追跡)
+
+  過去の decision_log に書かれた「Revisit Trigger」や「Risk」が実際にどうなったかを追跡する機能。
+
+  - トリガー: Command Palette、または decision_log が一定数(例: 10件)を超えたとき Dashboard に通知バッジ
+  - 入力データ: 過去の decision_log/ 全件(特に Risk, Revisit Trigger セクション) + 現在の current_focus.md + tensions.md
+  - LLMの仕事:
+    - 各 Revisit Trigger の条件を現在の状況と照合
+    - 「この決定、見直し時期かも」をリスト化
+    - Riskが現実化していないか tensions と突合
+  - 出力: 「要レビュー」「問題なし」「情報不足」の3分類でリスト表示、該当ファイルへのリンク付き
+
+  Decision Logを「書いて終わり」にしない仕組み。意思決定の品質が上がる。
+
+  ---
+  5. Project Weather Report (プロジェクト天気予報)
+
+  Dashboard の各プロジェクトカードに、1行の「天気」を表示する機能。
+
+  - トリガー: Dashboard リフレッシュ時(自動更新サイクルに乗せる or 手動ボタン)
+  - 入力データ: 各プロジェクトの FocusAge, SummaryAge, DecisionLogCount, 未コミット数, TodayQueue のoverdue件数,
+  tension件数
+  - LLMの仕事: メトリクスの組み合わせから1行の天気メタファを生成
+    - 例: "晴れ - 順調に進行中"、"曇り - focusが5日前、要アップデート"、"雷雨 - overdue 3件 + 未解決tension 5件"
+  - 表示: カード上部に天気アイコン + 1行テキスト
+
+  What's Next が「次にやること」なのに対し、天気予報は「今の状態」のエモーショナルな可視化。ダッシュボードを開いた瞬間に
+  どこがヤバいか直感的にわかる。
+
+  ただしLLMコストを抑えるため、全プロジェクト分を1回のAPI呼び出しでバッチ処理するのがポイント。
+
+  ---
+  6. Git Commit → Focus Bridge (コミットからフォーカス更新)
+
+  git の最近のコミットを読み取り、current_focus.md への反映を提案する機能。
+
+  - トリガー: Editor の Update Focus ボタンの横に "From Git"
+  ボタン追加、またはDashboardの未コミット件数クリック後のダイアログに追加
+  - 入力データ: git log --oneline --since=<前回focus更新日> の結果 + 現在の current_focus.md
+  - LLMの仕事: コミットメッセージ群から「何が進んで、何が残っているか」を読み取り、focus更新案を生成
+  - 出力: FocusUpdateService と同じ承認フロー(diff表示 + refine)
+
+  「コード書いたけど focus 更新するの忘れた」を救済する。Update Focus from Asana の Git 版。
+
+  ---
+  優先度の目安
+
+  ┌───────────────────────────┬─────────────────────────────────────────┬──────────────┬────────┐
+  │         アイデア          │               実装コスト                │ ユーザー価値 │ 面白さ │
+  ├───────────────────────────┼─────────────────────────────────────────┼──────────────┼────────┤
+  │ Context Switch Briefing   │ 中 (FocusUpdateService類似パターン)     │ 高           │ 中     │
+  ├───────────────────────────┼─────────────────────────────────────────┼──────────────┼────────┤
+  │ Tension Synthesizer       │ 中 (DecisionLogGeneratorServiceの逆)    │ 高           │ 中     │
+  ├───────────────────────────┼─────────────────────────────────────────┼──────────────┼────────┤
+  │ Weekly Digest             │ 中 (StandupGeneratorの拡張)             │ 高           │ 高     │
+  ├───────────────────────────┼─────────────────────────────────────────┼──────────────┼────────┤
+  │ Decision Impact Tracker   │ 高 (全decision_logのパース必要)         │ 中           │ 高     │
+  ├───────────────────────────┼─────────────────────────────────────────┼──────────────┼────────┤
+  │ Project Weather Report    │ 低 (1回のLLM呼び出し + カードUI追加)    │ 中           │ 高     │
+  ├───────────────────────────┼─────────────────────────────────────────┼──────────────┼────────┤
+  │ Git Commit → Focus Bridge │ 中 (git log取得 + 既存承認フロー再利用) │ 中           │ 中     │
+  └───────────────────────────┴─────────────────────────────────────────┴──────────────┴────────┘
+
+  個人的なおすすめは Weekly Digest と Context Switch Briefing です。前者は「書くのが面倒な振り返りが自動で出てくる」快感
+  があり、後者は複数プロジェクト管理の最大の痛み(復帰コスト)を直撃します。
+  
+  
+  
+  ----
+  
+  
+    2. Meeting-to-Execution Pipeline v2
+
+  - 内容: 既存Meeting Notes Importを拡張し、抽出タスクに信頼度と重複候補を付けてAsana起票前に一括確認。
+  - なぜ今: Google Meetも会議メモ→アクション整理を中心に進化。 (support.google.com
+    (https://support.google.com/meet/answer/14754931?co=GENIE.Platform%3DDesktop&hl=en))
+  - 挑戦点: 誤抽出を減らしつつ、取りこぼしを許容しないバランス。
+
+  3. Cross-Project Duplicate & Conflict Detector
+
+  - 内容: 全プロジェクト横断で「同じ課題の多重起票」「decision logの方針衝突」を検知。
+  - なぜ今: Linearは重複Issue検知をAIトリアージの中核に置いている。 (linear.app (https://linear.app/ai))
+  - 挑戦点: 類似判定の誤検知（同名別件）を説明可能にすること。
+
+  4. Daily/Weekly Ops Digest
+
+  - 内容: Slack Recap/Linear Pulse型で、毎日・毎週の「進捗/ブロッカー/未解決」を1枚に圧縮して配信（アプリ内＋Markdown保
+    存）。
+  - なぜ今: “catch-up時間削減”ユースケースは定着済み。 (slack.com
+    (https://slack.com/help/articles/25076892548883-Guide-to-AI-features-in-Slack))
+  - 挑戦点: 重要イベントだけを残してノイズを削る要約設計。
+
+  5. PR/Commit Impact to Context
+
+  - 内容: Git差分からcurrent_focus.mdとdecision_logの更新候補を自動提示（「この変更は何を決めたか」）。
+  - なぜ今: GitHubはPR要約・レビュー理解支援を標準化している。 (docs.github.com
+
+  (https://docs.github.com/en/enterprise-cloud%40latest/copilot/how-tos/use-copilot-for-common-tasks/create-a-pr-summary))
+  - 挑戦点: コード変更と意思決定の因果を過剰推論しないこと。
+
+  6. AI Knowledge Gap Radar
+
+  - 内容: 「探し物時間」を減らすため、よく参照されるのに古いファイルを自動検知して更新提案。
+  - なぜ今: 情報探索ロスの削減は組織課題として明確。 (atlassian.com
+    (https://www.atlassian.com/blog/state-of-teams-2025))
+  - 挑戦点: “古いが正しい文書”を誤って更新対象にしない判定。
+
+  次に着手するなら、効果と実装難易度のバランスで 1 → 4 → 3 が最適です。
 
 

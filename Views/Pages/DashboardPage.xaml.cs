@@ -3276,4 +3276,581 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         }
         return sb.ToString().TrimEnd();
     }
+
+    // ===== Smart Time-Block =====
+
+    private const string TimeBlockSystemPrompt = """
+        You are a daily time-block planner for a developer managing multiple parallel projects.
+        Given today's task queue and project focus notes, create a realistic schedule for the day.
+
+        Output rules:
+        - Output ONLY a JSON array of time blocks. No preamble, no explanation.
+        - Each block: { "start": "HH:MM", "end": "HH:MM", "label": "...", "tasks": [...], "project": "...", "note": "..." }
+        - Use 24-hour format. Assume work hours 09:00-18:00 with a 12:00-13:00 lunch break.
+        - Schedule overdue tasks first, then today-due tasks, then soon tasks.
+        - Group tasks from the same project when possible to minimize context switches.
+        - Each block is 30-120 minutes. Do not schedule more than 3 blocks per project.
+        - Keep note to 1 sentence. Focus on why this block matters today.
+        - If current time is past 09:00, start scheduling from the next 30-minute boundary.
+        - Omit tasks with no due date unless there is spare time.
+        """;
+
+    private sealed class TimeBlockItem
+    {
+        public string Start { get; set; } = "";
+        public string End { get; set; } = "";
+        public string Label { get; set; } = "";
+        public List<string> Tasks { get; set; } = [];
+        public string Project { get; set; } = "";
+        public string Note { get; set; } = "";
+    }
+
+    private async void OnTimeBlockClickAsync(object sender, RoutedEventArgs e)
+    {
+        if (!ViewModel.IsAiEnabled) return;
+
+        using var cts = new System.Threading.CancellationTokenSource();
+        var loadingWindow = BuildTimeBlockLoadingWindow(cts);
+        loadingWindow.Show();
+
+        var userPrompt = "";
+        try
+        {
+            var (tasks, focusPreviews) = await CollectTimeBlockDataAsync(cts.Token);
+
+            if (tasks.Count == 0)
+            {
+                if (loadingWindow.IsVisible) loadingWindow.Close();
+                System.Windows.MessageBox.Show(
+                    "No overdue, today, or soon tasks found. Please run Asana Sync first.",
+                    "Time Block",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            userPrompt = BuildTimeBlockUserPrompt(tasks, focusPreviews);
+            var response = await _llmClientService.ChatCompletionAsync(
+                TimeBlockSystemPrompt, userPrompt, cts.Token);
+
+            var blocks = ParseTimeBlockResponse(response);
+
+            if (loadingWindow.IsVisible) loadingWindow.Close();
+            ShowTimeBlockResultDialog(blocks, userPrompt, response);
+        }
+        catch (OperationCanceledException)
+        {
+            // user cancelled
+        }
+        catch (InvalidOperationException ex)
+        {
+            if (loadingWindow.IsVisible) loadingWindow.Close();
+            System.Windows.MessageBox.Show(
+                $"AI features error: {ex.Message}\n\nPlease check Settings > LLM API.",
+                "Time Block - Error",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
+        }
+        catch (Exception ex)
+        {
+            if (loadingWindow.IsVisible) loadingWindow.Close();
+            System.Windows.MessageBox.Show(
+                $"Failed to generate time blocks: {ex.Message}",
+                "Time Block - Error",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
+        }
+    }
+
+    private async Task<(List<TodayQueueTask> Tasks, Dictionary<string, string> FocusPreviews)> CollectTimeBlockDataAsync(
+        System.Threading.CancellationToken ct)
+    {
+        var allTasks = ViewModel.GetTopTasksForAi(50);
+        var relevantTasks = allTasks.Where(t => t.SortBucket <= 2).ToList();
+
+        var projects = ViewModel.Projects.Select(c => c.Info).ToList();
+        var focusPreviews = new Dictionary<string, string>();
+        foreach (var proj in projects)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(proj.FocusFile) || !File.Exists(proj.FocusFile))
+            {
+                focusPreviews[proj.Name] = "(no focus file)";
+                continue;
+            }
+            try
+            {
+                var (content, _) = await _fileEncodingService.ReadFileAsync(proj.FocusFile, ct);
+                var preview = content.Length > 200 ? content[..200] : content;
+                focusPreviews[proj.Name] = preview.Replace("\r\n", "\n").Trim();
+            }
+            catch
+            {
+                focusPreviews[proj.Name] = "(error reading focus file)";
+            }
+        }
+
+        return (relevantTasks, focusPreviews);
+    }
+
+    private static string BuildTimeBlockUserPrompt(
+        List<TodayQueueTask> tasks,
+        Dictionary<string, string> focusPreviews)
+    {
+        var now = DateTime.Now;
+        var sb = new StringBuilder();
+
+        sb.AppendLine("## Current Time");
+        sb.AppendLine($"{now:HH:mm} ({now:dddd})");
+        sb.AppendLine();
+
+        var overdue = tasks.Where(t => t.SortBucket == 0).ToList();
+        var today   = tasks.Where(t => t.SortBucket == 1).ToList();
+        var soon    = tasks.Where(t => t.SortBucket == 2).ToList();
+
+        sb.AppendLine("## Today's Task Queue");
+        sb.AppendLine();
+
+        sb.AppendLine("### Overdue");
+        if (overdue.Count == 0) sb.AppendLine("(none)");
+        else foreach (var t in overdue)
+            sb.AppendLine($"- [{t.ProjectShortName}] {t.DisplayMainTitle} ({t.DueLabel})");
+        sb.AppendLine();
+
+        sb.AppendLine("### Due Today");
+        if (today.Count == 0) sb.AppendLine("(none)");
+        else foreach (var t in today)
+            sb.AppendLine($"- [{t.ProjectShortName}] {t.DisplayMainTitle}");
+        sb.AppendLine();
+
+        sb.AppendLine("### Due Soon (within 2 days)");
+        if (soon.Count == 0) sb.AppendLine("(none)");
+        else foreach (var t in soon)
+            sb.AppendLine($"- [{t.ProjectShortName}] {t.DisplayMainTitle} ({t.DueLabel})");
+        sb.AppendLine();
+
+        sb.AppendLine("## Project Focus Notes");
+        foreach (var (name, preview) in focusPreviews)
+        {
+            sb.AppendLine($"### {name}");
+            sb.AppendLine(preview);
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("## Instruction");
+        sb.AppendLine("Create a time-blocked schedule for today.");
+        sb.AppendLine("Prioritize overdue tasks. Minimize context switches between projects.");
+
+        return sb.ToString();
+    }
+
+    private static List<TimeBlockItem> ParseTimeBlockResponse(string response)
+    {
+        var json = response.Trim();
+        if (json.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
+            json = json[7..];
+        else if (json.StartsWith("```"))
+            json = json[3..];
+        if (json.EndsWith("```"))
+            json = json[..^3];
+        json = json.Trim();
+
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            return JsonSerializer.Deserialize<List<TimeBlockItem>>(json, options) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private Window BuildTimeBlockLoadingWindow(System.Threading.CancellationTokenSource cts)
+    {
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "⏰",
+            FontSize = 13,
+            Margin = new Thickness(12, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Time Block",
+            Foreground = text,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+
+        var loadingText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Scheduling your day...",
+            Foreground = subtext,
+            FontSize = 13,
+            Margin = new Thickness(0, 0, 0, 14),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+        };
+
+        var cancelBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 100,
+            Height = 32,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+        };
+
+        var content = new StackPanel
+        {
+            Margin = new Thickness(24, 18, 24, 18),
+            Children = { loadingText, cancelBtn }
+        };
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(content, 1);
+        root.Children.Add(titleBar);
+        root.Children.Add(content);
+
+        var owner = Window.GetWindow(this);
+        var win = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            SizeToContent = SizeToContent.Height,
+            WindowStyle = WindowStyle.None,
+            Width = 360,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            Content = root
+        };
+
+        cancelBtn.Click += (_, _) => { cts.Cancel(); win.Close(); };
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) win.DragMove();
+        };
+
+        return win;
+    }
+
+    private void ShowTimeBlockResultDialog(List<TimeBlockItem> blocks, string userPrompt, string rawResponse)
+    {
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var accent   = appResources.Contains("AppPeach")
+            ? (System.Windows.Media.Brush)appResources["AppPeach"]
+            : text;
+
+        // Title bar
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "⏰",
+            FontSize = 13,
+            Margin = new Thickness(12, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+
+        var now = DateTime.Now;
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = $"Today's Time Block  —  {now:yyyy-MM-dd} ({now:dddd})",
+            Foreground = text,
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+
+        var closeBtnTitle = new System.Windows.Controls.Button
+        {
+            Content = "✕",
+            Width = 34,
+            Height = 26,
+            Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Foreground = subtext,
+            FontSize = 13
+        };
+        Grid.SetColumn(closeBtnTitle, 2);
+
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+        titleBar.Children.Add(closeBtnTitle);
+
+        // Blocks panel
+        var blocksPanel = new StackPanel();
+
+        if (blocks.Count == 0)
+        {
+            var fallback = new System.Windows.Controls.TextBox
+            {
+                Text = string.IsNullOrWhiteSpace(rawResponse) ? "(No time blocks generated)" : rawResponse,
+                IsReadOnly = true,
+                TextWrapping = TextWrapping.Wrap,
+                Background = surface1,
+                Foreground = text,
+                BorderBrush = surface2,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8),
+                FontSize = 12,
+                Margin = new Thickness(16, 12, 16, 8),
+                MaxHeight = 400
+            };
+            blocksPanel.Children.Add(fallback);
+        }
+        else
+        {
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                var block = blocks[i];
+
+                if (i > 0)
+                    blocksPanel.Children.Add(new Border
+                    {
+                        Height = 1,
+                        Background = surface2,
+                        Margin = new Thickness(16, 0, 16, 0)
+                    });
+
+                var blockPanel = new StackPanel { Margin = new Thickness(16, 10, 16, 10) };
+
+                // Time range + project header
+                var headerGrid = new Grid();
+                headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                var timeRangeBlock = new System.Windows.Controls.TextBlock
+                {
+                    Text = $"{block.Start} – {block.End}",
+                    Foreground = accent,
+                    FontSize = 13,
+                    FontWeight = FontWeights.Bold,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    MinWidth = 110
+                };
+                Grid.SetColumn(timeRangeBlock, 0);
+
+                var projectBlock = new System.Windows.Controls.TextBlock
+                {
+                    Text = block.Project,
+                    Foreground = text,
+                    FontSize = 13,
+                    FontWeight = FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                Grid.SetColumn(projectBlock, 1);
+
+                headerGrid.Children.Add(timeRangeBlock);
+                headerGrid.Children.Add(projectBlock);
+                blockPanel.Children.Add(headerGrid);
+
+                // Label
+                if (!string.IsNullOrWhiteSpace(block.Label))
+                    blockPanel.Children.Add(new System.Windows.Controls.TextBlock
+                    {
+                        Text = block.Label,
+                        Foreground = subtext,
+                        FontSize = 12,
+                        Margin = new Thickness(0, 2, 0, 0),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+
+                // Tasks
+                foreach (var task in block.Tasks)
+                    blockPanel.Children.Add(new System.Windows.Controls.TextBlock
+                    {
+                        Text = $"  \u2022 {task}",
+                        Foreground = text,
+                        FontSize = 12,
+                        Margin = new Thickness(0, 1, 0, 0),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+
+                // Note
+                if (!string.IsNullOrWhiteSpace(block.Note))
+                    blockPanel.Children.Add(new System.Windows.Controls.TextBlock
+                    {
+                        Text = block.Note,
+                        Foreground = subtext,
+                        FontSize = 11,
+                        FontStyle = FontStyles.Italic,
+                        Margin = new Thickness(0, 3, 0, 0),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+
+                blocksPanel.Children.Add(blockPanel);
+            }
+        }
+
+        var scrollViewer = new ScrollViewer
+        {
+            Content = blocksPanel,
+            MaxHeight = 460,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Margin = new Thickness(0, 4, 0, 0)
+        };
+
+        // Footer
+        var copyBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Copy",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 80,
+            Height = 32,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+
+        var debugBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "View Debug",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            Height = 32,
+            Padding = new Thickness(10, 0, 10, 0),
+            ToolTip = "Show LLM prompt/response"
+        };
+
+        var closeBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Close",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 80,
+            Height = 32
+        };
+
+        var rightButtons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Children = { copyBtn, closeBtn }
+        };
+
+        var footer = new Grid { Margin = new Thickness(16, 10, 16, 14) };
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(debugBtn, 0);
+        Grid.SetColumn(rightButtons, 2);
+        footer.Children.Add(debugBtn);
+        footer.Children.Add(rightButtons);
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(scrollViewer, 1);
+        Grid.SetRow(footer, 2);
+        root.Children.Add(titleBar);
+        root.Children.Add(scrollViewer);
+        root.Children.Add(footer);
+
+        var owner = Window.GetWindow(this);
+        var win = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.CanResize,
+            WindowStyle = WindowStyle.None,
+            Width = 560,
+            Height = 560,
+            MinWidth = 400,
+            MinHeight = 300,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            Content = root
+        };
+
+        System.Windows.Shell.WindowChrome.SetWindowChrome(win,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 0,
+                ResizeBorderThickness = new Thickness(4),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
+
+        closeBtnTitle.Click += (_, _) => win.Close();
+        closeBtn.Click += (_, _) => win.Close();
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) win.DragMove();
+        };
+
+        copyBtn.Click += (_, _) =>
+            System.Windows.Clipboard.SetText(BuildTimeBlockClipboardText(blocks));
+
+        debugBtn.Click += (_, _) =>
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("=== USER PROMPT ===");
+            sb.AppendLine(userPrompt);
+            sb.AppendLine();
+            sb.AppendLine("=== RESPONSE ===");
+            sb.AppendLine(_llmClientService.LastResponse);
+            ShowWhatsNextLogDialog("Time Block Debug Log", sb.ToString());
+        };
+
+        win.ShowDialog();
+    }
+
+    private static string BuildTimeBlockClipboardText(List<TimeBlockItem> blocks)
+    {
+        if (blocks.Count == 0) return "(No time blocks)";
+
+        var sb = new StringBuilder();
+        sb.AppendLine("## Today's Schedule");
+        foreach (var block in blocks)
+        {
+            sb.AppendLine($"### {block.Start}-{block.End} {block.Project}");
+            foreach (var task in block.Tasks)
+                sb.AppendLine($"- {task}");
+            if (!string.IsNullOrWhiteSpace(block.Note))
+                sb.AppendLine($"> {block.Note}");
+            sb.AppendLine();
+        }
+        return sb.ToString().TrimEnd();
+    }
 }

@@ -37,6 +37,12 @@
                         <ui:SymbolIcon Symbol="Lightbulb24"/>
                     </ui:Button>
                     <ui:Button Margin="0,0,6,0" Height="34" Padding="10,0" FontSize="13"
+                               ToolTip="Generate today's time-blocked schedule — AI schedules overdue and due-soon tasks"
+                               Click="OnTimeBlockClickAsync"
+                               Visibility="{Binding IsAiEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ui:SymbolIcon Symbol="Clock24"/>
+                    </ui:Button>
+                    <ui:Button Margin="0,0,6,0" Height="34" Padding="10,0" FontSize="13"
                                ToolTip="View capture log"
                                Click="OnShowCaptureLogClick">
                         <ui:SymbolIcon Symbol="Note24"/>
