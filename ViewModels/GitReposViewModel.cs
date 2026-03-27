@@ -394,7 +394,7 @@ public partial class GitReposViewModel : ObservableObject
         var path = ResolveRepoPath(repo);
         if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
             return "(path not found)";
-        var log = RunGitCommand(path, "log", "--oneline", "--graph", $"-n {maxCount}");
+        var log = RunGitCommand(path, "log", "--graph", $"-n {maxCount}", "\"--format=%h %ad %s\"", "\"--date=format:%Y-%m-%d %H:%M\"");
         return string.IsNullOrEmpty(log) ? "(no commits)" : log;
     }
 
