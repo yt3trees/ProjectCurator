@@ -389,6 +389,15 @@ public partial class GitReposViewModel : ObservableObject
         catch { return ""; }
     }
 
+    public string GetGitLog(GitRepoItem repo, int maxCount = 50)
+    {
+        var path = ResolveRepoPath(repo);
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
+            return "(path not found)";
+        var log = RunGitCommand(path, "log", "--oneline", "--graph", $"-n {maxCount}");
+        return string.IsNullOrEmpty(log) ? "(no commits)" : log;
+    }
+
     private string ResolveRepoPath(GitRepoItem repo)
     {
         if (!string.IsNullOrWhiteSpace(repo.FullPath))

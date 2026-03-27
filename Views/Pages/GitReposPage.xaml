@@ -120,7 +120,7 @@
                     <DataGridTextColumn Header="Remote URL" Binding="{Binding RemoteOrigin}" Width="*" ElementStyle="{StaticResource CenterTextColumnStyle}"/>
                     <DataGridTextColumn Header="Branch" Binding="{Binding Branch}" Width="90" ElementStyle="{StaticResource CenterTextColumnStyle}"/>
                     <DataGridTextColumn Header="Last Commit" Binding="{Binding LastCommitDate}" Width="110" ElementStyle="{StaticResource CenterTextColumnStyle}"/>
-                    <DataGridTemplateColumn Header="Action" Width="190">
+                    <DataGridTemplateColumn Header="Action" Width="240">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -133,8 +133,14 @@
                                     <ui:Button Content="Terminal"
                                                Padding="6,1"
                                                MinWidth="68"
+                                               Margin="0,0,6,0"
                                                Command="{Binding DataContext.OpenRepoTerminalCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                CommandParameter="{Binding}"/>
+                                    <ui:Button Content="Log"
+                                               Padding="6,1"
+                                               MinWidth="46"
+                                               Click="OnShowGitLog"
+                                               Tag="{Binding}"/>
                                 </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
