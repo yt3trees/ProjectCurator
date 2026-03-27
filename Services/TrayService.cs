@@ -70,6 +70,11 @@ public class TrayService : IDisposable
             _hotkeyMenuItem.Text = $"Hotkey: {hotkeyText}";
     }
 
+    public void ShowBalloonTip(string title, string text, int timeoutMs = 3000)
+    {
+        _notifyIcon?.ShowBalloonTip(timeoutMs, title, text, WinForms.ToolTipIcon.Info);
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

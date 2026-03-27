@@ -46,6 +46,7 @@ public partial class EditorViewModel : ObservableObject
     private readonly ConfigService _configService;
     private readonly DecisionLogGeneratorService _decisionLogService;
     private readonly MeetingNotesService _meetingNotesService;
+    private readonly TrayService _trayService;
     private string? _pendingFileToOpen;
     private bool _suppressAutoFileOpenOnProjectChange;
     private CancellationTokenSource? _focusUpdateCts;
@@ -137,7 +138,8 @@ public partial class EditorViewModel : ObservableObject
         LlmClientService llmClient,
         ConfigService configService,
         DecisionLogGeneratorService decisionLogService,
-        MeetingNotesService meetingNotesService)
+        MeetingNotesService meetingNotesService,
+        TrayService trayService)
     {
         _encodingService = encodingService;
         _discoveryService = discoveryService;
@@ -146,6 +148,7 @@ public partial class EditorViewModel : ObservableObject
         _configService = configService;
         _decisionLogService = decisionLogService;
         _meetingNotesService = meetingNotesService;
+        _trayService = trayService;
 
         IsAiEnabled = _configService.LoadSettings().AiEnabled;
         WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
@@ -1223,6 +1226,8 @@ public partial class EditorViewModel : ObservableObject
             if (RequestFocusUpdateApproval == null) return;
             var capturedResult = result;
             var cts = _focusUpdateCts!;
+
+            _trayService.ShowBalloonTip("Focus Update Ready", "Proposal is ready for review.");
 
             // Refine 会話履歴 (instruction → refined result の積み上げ)
             var refineHistory = new List<(string instruction, string result)>();
