@@ -357,6 +357,21 @@ public partial class MainWindow : FluentWindow
     }
 
     /// <summary>
+    /// Quick Capture の decision ルーティング専用。
+    /// Editor に遷移後、AI Decision Log フローを自動発火する。
+    /// </summary>
+    private void NavigateToEditorAndTriggerDecision(ProjectInfo project, string capturedText)
+    {
+        var editorVm = _serviceProvider.GetRequiredService<EditorViewModel>();
+        var match = editorVm.Projects.FirstOrDefault(p => p.HiddenKey == project.HiddenKey);
+        editorVm.SelectedProject = match ?? project;
+        editorVm.RequestDecisionLogOnOpen(capturedText);
+        RootNavigation.Navigate(typeof(EditorPage));
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+            new System.Action(async () => await editorVm.TriggerDecisionLogIfPendingAsync()));
+    }
+
+    /// <summary>
     /// Quick Capture の focus_update ルーティング専用。
     /// エディタを指定ファイルで開いた後、Update Focus LLM フローを自動発火する。
     /// </summary>
@@ -414,11 +429,11 @@ public partial class MainWindow : FluentWindow
             MoveOnScreen();
         };
 
-        captureWindow.OnNavigateToDecision = projectName =>
+        captureWindow.OnNavigateToDecision = (projectName, capturedText) =>
         {
             var project = ResolveProject(projectName);
             if (project != null)
-                NavigateToEditor(project);
+                NavigateToEditorAndTriggerDecision(project, capturedText);
             MoveOnScreen();
         };
 

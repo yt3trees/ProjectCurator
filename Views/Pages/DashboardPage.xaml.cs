@@ -61,6 +61,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     }
 
     private bool _isInitialized = false;
+    private static DateTime? _planMyDayShownToday;
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -68,6 +69,14 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         _isInitialized = true;
         await ViewModel.RefreshAsync();
         ViewModel.SetupAutoRefresh();
+
+        // Morning autopilot (temporarily disabled — re-enable when dialog sizing is fixed)
+        // if (ViewModel.IsAiEnabled && ShouldShowMorningAutopilot())
+        // {
+        //     _planMyDayShownToday = DateTime.Today;
+        //     if (await ShowMorningConfirmDialogAsync())
+        //         await RunPlanMyDayAsync();
+        // }
     }
 
     private void OnRefreshClick(object sender, RoutedEventArgs e)
@@ -3277,37 +3286,112 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         return sb.ToString().TrimEnd();
     }
 
-    // ===== Smart Time-Block =====
+    // ===== Plan My Day =====
 
-    private const string TimeBlockSystemPrompt = """
-        You are a daily time-block planner for a developer managing multiple parallel projects.
-        Given today's task queue and project focus notes, create a realistic schedule for the day.
+    private const string PlanMyDaySystemPrompt = """
+        You are a daily planning assistant for a professional managing multiple parallel projects.
+        Your job is to create a time-blocked plan for today that maximizes productivity and prevents things from falling through the cracks.
 
-        Output rules:
-        - Output ONLY a JSON array of time blocks. No preamble, no explanation.
-        - Each block: { "start": "HH:MM", "end": "HH:MM", "label": "...", "tasks": [...], "project": "...", "note": "..." }
-        - Use 24-hour format. Assume work hours 09:00-18:00 with a 12:00-13:00 lunch break.
-        - Schedule overdue tasks first, then today-due tasks, then soon tasks.
-        - Group tasks from the same project when possible to minimize context switches.
-        - Each block is 30-120 minutes. Do not schedule more than 3 blocks per project.
-        - Keep note to 1 sentence. Focus on why this block matters today.
-        - If current time is past 09:00, start scheduling from the next 30-minute boundary.
-        - Omit tasks with no due date unless there is spare time.
+        ## Output rules
+        - Return a JSON object with this structure:
+          {
+            "blocks": [
+              {
+                "period": "morning" | "afternoon" | "late_afternoon",
+                "items": [
+                  {
+                    "project": "exact project name",
+                    "action": "concise action (imperative, max 10 words)",
+                    "reason": "why today AND why this time slot (1-2 sentences)",
+                    "target_file": "relative file path if applicable, or null",
+                    "category": "task|focus|decision|commit|tension|meeting_prep|review"
+                  }
+                ]
+              }
+            ],
+            "overall_advice": "one sentence of overall advice for the day, or null"
+          }
+        - Output ONLY the JSON object. No explanation, no markdown fences.
+        - Generate 4-7 items total across all time blocks.
+        - Every time block must have at least 1 item.
+
+        ## Time block principles
+        - morning: Deep work, critical decisions, creative tasks. Brain is freshest.
+        - afternoon: Meetings, collaborative work, reviews. Lower cognitive demand tasks.
+        - late_afternoon: Wrap-up tasks — commits, focus updates, quick maintenance. Closing the loop.
+
+        ## Schedule hint handling
+        - If the user provides meeting times, plan around them:
+          - Place meeting prep BEFORE the meeting time
+          - Place meeting follow-up (notes, decisions) AFTER
+          - Protect deep work blocks from meeting interruption
+        - If no schedule hint, assume a standard workday.
+
+        ## Planning rules (in priority order)
+        1. Overdue tasks — must be in morning block
+        2. Today-due tasks — morning or early afternoon
+        3. Meeting prep/follow-up — anchored to meeting times
+        4. Stale focus (7+ days) — afternoon or late_afternoon
+        5. Uncommitted changes — late_afternoon (end-of-day cleanup)
+        6. Unresolved tensions (5+ days old) — morning (needs thinking)
+        7. Upcoming tasks (1-2 days) — afternoon if time permits
+        8. Decision recording — late_afternoon
+
+        ## Day-of-week awareness
+        - Monday: Include a "review weekly priorities" item if not already planned
+        - Friday: Include a "review and close the week" item (commit, update focus, resolve quick tensions)
+
+        ## Anti-patterns to avoid
+        - Do not schedule more than 3 projects in morning (focus fragmentation)
+        - Do not put deep thinking tasks after 15:00
+        - Do not ignore overdue items regardless of other priorities
+
+        ## Category mapping
+        - "task": Complete an Asana task
+        - "focus": Update current_focus.md
+        - "decision": Record a decision in decision_log
+        - "commit": Commit or review uncommitted changes
+        - "tension": Address an item in tensions.md
+        - "meeting_prep": Prepare for an upcoming meeting
+        - "review": Review status, summary, or weekly priorities
+
+        ## Tone
+        - Action-oriented: "Ship the migration script" not "Consider reviewing the task list"
+        - Time-aware: explain WHY this time slot specifically
+        - Encouraging but realistic: acknowledge heavy days, suggest what to defer if overloaded
         """;
 
-    private sealed class TimeBlockItem
+    private sealed class DailyPlan
     {
-        public string Start { get; set; } = "";
-        public string End { get; set; } = "";
-        public string Label { get; set; } = "";
-        public List<string> Tasks { get; set; } = [];
+        public List<DayPeriodBlock> Blocks { get; set; } = [];
+        public string? OverallAdvice { get; set; }
+    }
+
+    private sealed class DayPeriodBlock
+    {
+        public string Period { get; set; } = "";   // "morning" | "afternoon" | "late_afternoon"
+        public List<DayPlanItem> Items { get; set; } = [];
+    }
+
+    private sealed class DayPlanItem
+    {
         public string Project { get; set; } = "";
-        public string Note { get; set; } = "";
+        public string Action { get; set; } = "";
+        public string Reason { get; set; } = "";
+        public string? TargetFile { get; set; }
+        public string Category { get; set; } = "";  // task|focus|decision|commit|tension|meeting_prep|review
     }
 
     private async void OnTimeBlockClickAsync(object sender, RoutedEventArgs e)
     {
         if (!ViewModel.IsAiEnabled) return;
+        await RunPlanMyDayAsync();
+    }
+
+    private async Task RunPlanMyDayAsync()
+    {
+        var scheduleHint = await ShowScheduleHintDialogAsync();
+        if (scheduleHint == null) return;  // user cancelled
 
         using var cts = new System.Threading.CancellationTokenSource();
         var loadingWindow = BuildTimeBlockLoadingWindow(cts);
@@ -3316,27 +3400,16 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         var userPrompt = "";
         try
         {
-            var (tasks, focusPreviews) = await CollectTimeBlockDataAsync(cts.Token);
+            var (tasks, focusPreviews, projects, yesterdayStandup) = await CollectPlanMyDayDataAsync(cts.Token);
 
-            if (tasks.Count == 0)
-            {
-                if (loadingWindow.IsVisible) loadingWindow.Close();
-                System.Windows.MessageBox.Show(
-                    "No overdue, today, or soon tasks found. Please run Asana Sync first.",
-                    "Time Block",
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Information);
-                return;
-            }
-
-            userPrompt = BuildTimeBlockUserPrompt(tasks, focusPreviews);
+            userPrompt = BuildPlanMyDayUserPrompt(tasks, focusPreviews, projects, scheduleHint, yesterdayStandup);
             var response = await _llmClientService.ChatCompletionAsync(
-                TimeBlockSystemPrompt, userPrompt, cts.Token);
+                PlanMyDaySystemPrompt, userPrompt, cts.Token);
 
-            var blocks = ParseTimeBlockResponse(response);
+            var plan = ParseDailyPlanResponse(response);
 
             if (loadingWindow.IsVisible) loadingWindow.Close();
-            ShowTimeBlockResultDialog(blocks, userPrompt, response);
+            ShowPlanMyDayResultDialog(plan, userPrompt, response);
         }
         catch (OperationCanceledException)
         {
@@ -3347,7 +3420,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             if (loadingWindow.IsVisible) loadingWindow.Close();
             System.Windows.MessageBox.Show(
                 $"AI features error: {ex.Message}\n\nPlease check Settings > LLM API.",
-                "Time Block - Error",
+                "Plan My Day - Error",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Error);
         }
@@ -3355,96 +3428,121 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         {
             if (loadingWindow.IsVisible) loadingWindow.Close();
             System.Windows.MessageBox.Show(
-                $"Failed to generate time blocks: {ex.Message}",
-                "Time Block - Error",
+                $"Failed to generate plan: {ex.Message}",
+                "Plan My Day - Error",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Error);
         }
     }
 
-    private async Task<(List<TodayQueueTask> Tasks, Dictionary<string, string> FocusPreviews)> CollectTimeBlockDataAsync(
+    private async Task<(List<TodayQueueTask> Tasks, Dictionary<string, string> FocusPreviews, List<ProjectInfo> Projects, string YesterdayStandup)> CollectPlanMyDayDataAsync(
         System.Threading.CancellationToken ct)
     {
-        var allTasks = ViewModel.GetTopTasksForAi(50);
-        var relevantTasks = allTasks.Where(t => t.SortBucket <= 2).ToList();
-
+        var tasks = ViewModel.GetTopTasksForAi(30);
         var projects = ViewModel.Projects.Select(c => c.Info).ToList();
-        var focusPreviews = new Dictionary<string, string>();
-        foreach (var proj in projects)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(proj.FocusFile) || !File.Exists(proj.FocusFile))
-            {
-                focusPreviews[proj.Name] = "(no focus file)";
-                continue;
-            }
-            try
-            {
-                var (content, _) = await _fileEncodingService.ReadFileAsync(proj.FocusFile, ct);
-                var preview = content.Length > 200 ? content[..200] : content;
-                focusPreviews[proj.Name] = preview.Replace("\r\n", "\n").Trim();
-            }
-            catch
-            {
-                focusPreviews[proj.Name] = "(error reading focus file)";
-            }
-        }
-
-        return (relevantTasks, focusPreviews);
+        var focusPreviews = await CollectFocusPreviewsAsync(projects, ct);
+        var yesterdayStandup = await ReadYesterdayStandupAsync(ct);
+        return (tasks, focusPreviews, projects, yesterdayStandup);
     }
 
-    private static string BuildTimeBlockUserPrompt(
-        List<TodayQueueTask> tasks,
-        Dictionary<string, string> focusPreviews)
+    private async Task<string> ReadYesterdayStandupAsync(System.Threading.CancellationToken ct)
     {
-        var now = DateTime.Now;
+        var settings = _configService.LoadSettings();
+        if (string.IsNullOrWhiteSpace(settings.ObsidianVaultRoot))
+            return "(no standup available)";
+
+        var yesterday = DateTime.Today.AddDays(-1);
+        var path = Path.Combine(settings.ObsidianVaultRoot, "standup", $"{yesterday:yyyyMMdd}_standup.md");
+        if (!File.Exists(path))
+            return "(no standup available)";
+
+        try
+        {
+            var (content, _) = await _fileEncodingService.ReadFileAsync(path, ct);
+            return content.Length > 1000 ? content[..1000] : content;
+        }
+        catch
+        {
+            return "(no standup available)";
+        }
+    }
+
+    private static string BuildPlanMyDayUserPrompt(
+        List<TodayQueueTask> tasks,
+        Dictionary<string, string> focusPreviews,
+        List<ProjectInfo> projects,
+        string scheduleHint,
+        string yesterdayStandup)
+    {
+        var today = DateTime.Today;
         var sb = new StringBuilder();
 
-        sb.AppendLine("## Current Time");
-        sb.AppendLine($"{now:HH:mm} ({now:dddd})");
+        sb.AppendLine("## Date");
+        sb.AppendLine($"{today:yyyy-MM-dd} ({today:dddd})");
         sb.AppendLine();
 
-        var overdue = tasks.Where(t => t.SortBucket == 0).ToList();
-        var today   = tasks.Where(t => t.SortBucket == 1).ToList();
-        var soon    = tasks.Where(t => t.SortBucket == 2).ToList();
-
-        sb.AppendLine("## Today's Task Queue");
+        sb.AppendLine("## Schedule hints");
+        sb.AppendLine(string.IsNullOrWhiteSpace(scheduleHint) ? "(none)" : scheduleHint);
         sb.AppendLine();
 
-        sb.AppendLine("### Overdue");
-        if (overdue.Count == 0) sb.AppendLine("(none)");
-        else foreach (var t in overdue)
-            sb.AppendLine($"- [{t.ProjectShortName}] {t.DisplayMainTitle} ({t.DueLabel})");
+        sb.AppendLine("## Yesterday's standup (for continuity)");
+        sb.AppendLine(yesterdayStandup);
         sb.AppendLine();
 
-        sb.AppendLine("### Due Today");
-        if (today.Count == 0) sb.AppendLine("(none)");
-        else foreach (var t in today)
-            sb.AppendLine($"- [{t.ProjectShortName}] {t.DisplayMainTitle}");
+        sb.AppendLine("## Today Queue (sorted by priority)");
+        if (tasks.Count == 0)
+            sb.AppendLine("(no tasks)");
+        else
+            foreach (var t in tasks)
+                sb.AppendLine($"- [{t.ProjectShortName}] {t.DisplayMainTitle} ({t.DueLabel})");
         sb.AppendLine();
 
-        sb.AppendLine("### Due Soon (within 2 days)");
-        if (soon.Count == 0) sb.AppendLine("(none)");
-        else foreach (var t in soon)
-            sb.AppendLine($"- [{t.ProjectShortName}] {t.DisplayMainTitle} ({t.DueLabel})");
+        sb.AppendLine("## Project Signals");
         sb.AppendLine();
-
-        sb.AppendLine("## Project Focus Notes");
-        foreach (var (name, preview) in focusPreviews)
+        foreach (var proj in projects)
         {
-            sb.AppendLine($"### {name}");
-            sb.AppendLine(preview);
+            var tensionsPath = Path.Combine(proj.AiContextContentPath, "tensions.md");
+            int tensionsCount = 0;
+            bool tensionsExists = File.Exists(tensionsPath);
+            if (tensionsExists)
+            {
+                try
+                {
+                    tensionsCount = File.ReadAllLines(tensionsPath)
+                        .Count(l => l.TrimStart().StartsWith("- ") || l.TrimStart().StartsWith("* "));
+                }
+                catch { }
+            }
+
+            var latestDecision = proj.DecisionLogDates.Count > 0
+                ? proj.DecisionLogDates.Max().ToString("yyyy-MM-dd")
+                : "none";
+
+            var focusStale = proj.FocusAge.HasValue && proj.FocusAge > 7 ? " (stale)" : "";
+            var uncommittedCount = proj.UncommittedRepoPaths.Count;
+
+            sb.AppendLine($"### {proj.Name}");
+            sb.AppendLine($"- Focus age: {(proj.FocusAge.HasValue ? $"{proj.FocusAge}d{focusStale}" : "missing")}");
+            sb.AppendLine($"- Uncommitted repos: {uncommittedCount}");
+            if (tensionsExists)
+                sb.AppendLine($"- Open tensions: yes ({tensionsCount} items)");
+            else
+                sb.AppendLine("- Open tensions: no");
+            sb.AppendLine($"- Recent decisions: {latestDecision}");
+            sb.AppendLine($"- Active workstreams: {proj.Workstreams.Count}");
+            if (focusPreviews.TryGetValue(proj.Name, out var preview) && !string.IsNullOrWhiteSpace(preview))
+                sb.AppendLine($"- Focus preview: {preview}");
             sb.AppendLine();
         }
 
         sb.AppendLine("## Instruction");
-        sb.AppendLine("Create a time-blocked schedule for today.");
-        sb.AppendLine("Prioritize overdue tasks. Minimize context switches between projects.");
+        sb.AppendLine("Create a time-blocked daily plan based on the data above.");
+        sb.AppendLine("Return JSON object only.");
 
         return sb.ToString();
     }
 
-    private static List<TimeBlockItem> ParseTimeBlockResponse(string response)
+    private static DailyPlan ParseDailyPlanResponse(string response)
     {
         var json = response.Trim();
         if (json.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
@@ -3457,12 +3555,47 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
 
         try
         {
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            return JsonSerializer.Deserialize<List<TimeBlockItem>>(json, options) ?? [];
+            var doc = JsonDocument.Parse(json);
+            var plan = new DailyPlan();
+
+            if (doc.RootElement.TryGetProperty("overall_advice", out var adviceEl) &&
+                adviceEl.ValueKind == JsonValueKind.String)
+                plan.OverallAdvice = adviceEl.GetString();
+
+            if (doc.RootElement.TryGetProperty("blocks", out var blocksEl) &&
+                blocksEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var blockEl in blocksEl.EnumerateArray())
+                {
+                    var block = new DayPeriodBlock();
+                    if (blockEl.TryGetProperty("period", out var periodEl))
+                        block.Period = periodEl.GetString() ?? "";
+
+                    if (blockEl.TryGetProperty("items", out var itemsEl) &&
+                        itemsEl.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var itemEl in itemsEl.EnumerateArray())
+                        {
+                            block.Items.Add(new DayPlanItem
+                            {
+                                Project = itemEl.TryGetProperty("project", out var p) ? p.GetString() ?? "" : "",
+                                Action = itemEl.TryGetProperty("action", out var a) ? a.GetString() ?? "" : "",
+                                Reason = itemEl.TryGetProperty("reason", out var r) ? r.GetString() ?? "" : "",
+                                TargetFile = itemEl.TryGetProperty("target_file", out var tf) && tf.ValueKind == JsonValueKind.String ? tf.GetString() : null,
+                                Category = itemEl.TryGetProperty("category", out var c) ? c.GetString() ?? "" : "",
+                            });
+                        }
+                    }
+
+                    plan.Blocks.Add(block);
+                }
+            }
+
+            return plan;
         }
         catch
         {
-            return [];
+            return new DailyPlan();
         }
     }
 
@@ -3481,7 +3614,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
 
         var titleIcon = new System.Windows.Controls.TextBlock
         {
-            Text = "⏰",
+            Text = "☀",
             FontSize = 13,
             Margin = new Thickness(12, 0, 8, 0),
             VerticalAlignment = VerticalAlignment.Center
@@ -3490,7 +3623,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
 
         var titleText = new System.Windows.Controls.TextBlock
         {
-            Text = "Time Block",
+            Text = "Plan My Day",
             Foreground = text,
             FontSize = 14,
             FontWeight = FontWeights.SemiBold,
@@ -3503,7 +3636,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
 
         var loadingText = new System.Windows.Controls.TextBlock
         {
-            Text = "Scheduling your day...",
+            Text = "Planning your day...",
             Foreground = subtext,
             FontSize = 13,
             Margin = new Thickness(0, 0, 0, 14),
@@ -3543,7 +3676,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             ResizeMode = ResizeMode.NoResize,
             SizeToContent = SizeToContent.Height,
             WindowStyle = WindowStyle.None,
-            Width = 360,
+            Width = 340,
             Background = surface,
             Foreground = text,
             BorderBrush = surface2,
@@ -3560,7 +3693,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         return win;
     }
 
-    private void ShowTimeBlockResultDialog(List<TimeBlockItem> blocks, string userPrompt, string rawResponse)
+    private void ShowPlanMyDayResultDialog(DailyPlan plan, string userPrompt, string rawResponse)
     {
         var appResources = Application.Current.Resources;
         var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
@@ -3572,6 +3705,8 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             ? (System.Windows.Media.Brush)appResources["AppPeach"]
             : text;
 
+        var mw = Window.GetWindow(this) as MainWindow;
+
         // Title bar
         var titleBar = new Grid { Background = surface1, Height = 38 };
         titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -3580,7 +3715,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
 
         var titleIcon = new System.Windows.Controls.TextBlock
         {
-            Text = "⏰",
+            Text = "☀",
             FontSize = 13,
             Margin = new Thickness(12, 0, 8, 0),
             VerticalAlignment = VerticalAlignment.Center
@@ -3590,7 +3725,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         var now = DateTime.Now;
         var titleText = new System.Windows.Controls.TextBlock
         {
-            Text = $"Today's Time Block  —  {now:yyyy-MM-dd} ({now:dddd})",
+            Text = $"Today's Plan  —  {now:yyyy-MM-dd} ({now:dddd})",
             Foreground = text,
             FontSize = 13,
             FontWeight = FontWeights.SemiBold,
@@ -3616,14 +3751,25 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         titleBar.Children.Add(titleText);
         titleBar.Children.Add(closeBtnTitle);
 
-        // Blocks panel
-        var blocksPanel = new StackPanel();
+        // Content panel
+        var contentPanel = new StackPanel { Margin = new Thickness(0, 4, 0, 4) };
 
-        if (blocks.Count == 0)
+        var periodOrder = new[] { "morning", "afternoon", "late_afternoon" };
+        static string PeriodLabel(string period) => period switch
+        {
+            "morning" => "Morning (deep work)",
+            "afternoon" => "Afternoon",
+            "late_afternoon" => "Late afternoon (wrap-up)",
+            _ => period
+        };
+
+        var allBlocks = plan.Blocks.OrderBy(b => Array.IndexOf(periodOrder, b.Period)).ToList();
+
+        if (allBlocks.Count == 0 || allBlocks.All(b => b.Items.Count == 0))
         {
             var fallback = new System.Windows.Controls.TextBox
             {
-                Text = string.IsNullOrWhiteSpace(rawResponse) ? "(No time blocks generated)" : rawResponse,
+                Text = string.IsNullOrWhiteSpace(rawResponse) ? "(No plan generated)" : rawResponse,
                 IsReadOnly = true,
                 TextWrapping = TextWrapping.Wrap,
                 Background = surface1,
@@ -3632,104 +3778,163 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(8),
                 FontSize = 12,
-                Margin = new Thickness(16, 12, 16, 8),
-                MaxHeight = 400
+                Margin = new Thickness(14, 10, 14, 8),
+                MaxHeight = 380
             };
-            blocksPanel.Children.Add(fallback);
+            contentPanel.Children.Add(fallback);
         }
         else
         {
-            for (int i = 0; i < blocks.Count; i++)
+            foreach (var block in allBlocks)
             {
-                var block = blocks[i];
+                var sectionBg = block.Period == "afternoon" ? surface1 : surface;
 
-                if (i > 0)
-                    blocksPanel.Children.Add(new Border
-                    {
-                        Height = 1,
-                        Background = surface2,
-                        Margin = new Thickness(16, 0, 16, 0)
-                    });
-
-                var blockPanel = new StackPanel { Margin = new Thickness(16, 10, 16, 10) };
-
-                // Time range + project header
-                var headerGrid = new Grid();
-                headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-                var timeRangeBlock = new System.Windows.Controls.TextBlock
+                var sectionHeader = new Border
                 {
-                    Text = $"{block.Start} – {block.End}",
-                    Foreground = accent,
-                    FontSize = 13,
-                    FontWeight = FontWeights.Bold,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    MinWidth = 110
-                };
-                Grid.SetColumn(timeRangeBlock, 0);
-
-                var projectBlock = new System.Windows.Controls.TextBlock
-                {
-                    Text = block.Project,
-                    Foreground = text,
-                    FontSize = 13,
-                    FontWeight = FontWeights.SemiBold,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextTrimming = TextTrimming.CharacterEllipsis
-                };
-                Grid.SetColumn(projectBlock, 1);
-
-                headerGrid.Children.Add(timeRangeBlock);
-                headerGrid.Children.Add(projectBlock);
-                blockPanel.Children.Add(headerGrid);
-
-                // Label
-                if (!string.IsNullOrWhiteSpace(block.Label))
-                    blockPanel.Children.Add(new System.Windows.Controls.TextBlock
+                    Background = surface2,
+                    Padding = new Thickness(14, 5, 14, 5),
+                    Margin = new Thickness(0, 6, 0, 0),
+                    Child = new System.Windows.Controls.TextBlock
                     {
-                        Text = block.Label,
-                        Foreground = subtext,
-                        FontSize = 12,
-                        Margin = new Thickness(0, 2, 0, 0),
-                        TextWrapping = TextWrapping.Wrap
-                    });
-
-                // Tasks
-                foreach (var task in block.Tasks)
-                    blockPanel.Children.Add(new System.Windows.Controls.TextBlock
-                    {
-                        Text = $"  \u2022 {task}",
+                        Text = PeriodLabel(block.Period),
                         Foreground = text,
                         FontSize = 12,
-                        Margin = new Thickness(0, 1, 0, 0),
-                        TextWrapping = TextWrapping.Wrap
-                    });
+                        FontWeight = FontWeights.SemiBold
+                    }
+                };
+                contentPanel.Children.Add(sectionHeader);
 
-                // Note
-                if (!string.IsNullOrWhiteSpace(block.Note))
-                    blockPanel.Children.Add(new System.Windows.Controls.TextBlock
+                var itemsPanel = new StackPanel { Background = sectionBg };
+
+                for (int i = 0; i < block.Items.Count; i++)
+                {
+                    var item = block.Items[i];
+
+                    var itemGrid = new Grid { Margin = new Thickness(14, 9, 14, 9) };
+                    itemGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    itemGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    itemGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                    var categoryIcon = new Wpf.Ui.Controls.SymbolIcon
                     {
-                        Text = block.Note,
+                        Symbol = GetCategorySymbol(item.Category),
+                        FontSize = 16,
+                        Foreground = accent,
+                        Margin = new Thickness(0, 2, 10, 0),
+                        VerticalAlignment = VerticalAlignment.Top
+                    };
+                    Grid.SetColumn(categoryIcon, 0);
+
+                    var bodyPanel = new StackPanel();
+
+                    var projectLabel = new System.Windows.Controls.TextBlock
+                    {
+                        Text = $"[{item.Project}]",
                         Foreground = subtext,
                         FontSize = 11,
-                        FontStyle = FontStyles.Italic,
-                        Margin = new Thickness(0, 3, 0, 0),
-                        TextWrapping = TextWrapping.Wrap
-                    });
+                        FontWeight = FontWeights.SemiBold
+                    };
 
-                blocksPanel.Children.Add(blockPanel);
+                    var actionBlock = new System.Windows.Controls.TextBlock
+                    {
+                        Text = item.Action,
+                        Foreground = text,
+                        FontSize = 13,
+                        FontWeight = FontWeights.SemiBold,
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(0, 1, 0, 0)
+                    };
+
+                    bodyPanel.Children.Add(projectLabel);
+                    bodyPanel.Children.Add(actionBlock);
+
+                    if (!string.IsNullOrWhiteSpace(item.Reason))
+                        bodyPanel.Children.Add(new System.Windows.Controls.TextBlock
+                        {
+                            Text = item.Reason,
+                            Foreground = subtext,
+                            FontSize = 12,
+                            TextWrapping = TextWrapping.Wrap,
+                            Margin = new Thickness(0, 3, 0, 0)
+                        });
+
+                    Grid.SetColumn(bodyPanel, 1);
+
+                    var openBtn = new Wpf.Ui.Controls.Button
+                    {
+                        Content = "Open ▶",
+                        Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+                        FontSize = 11,
+                        Height = 28,
+                        Padding = new Thickness(10, 0, 10, 0),
+                        VerticalAlignment = VerticalAlignment.Top,
+                        Margin = new Thickness(10, 0, 0, 0)
+                    };
+                    Grid.SetColumn(openBtn, 2);
+
+                    var capturedItem = item;
+                    openBtn.Click += (_, _) =>
+                    {
+                        NavigateToPlanItem(mw, capturedItem);
+                        mw?.Activate();
+                    };
+
+                    itemGrid.Children.Add(categoryIcon);
+                    itemGrid.Children.Add(bodyPanel);
+                    itemGrid.Children.Add(openBtn);
+                    itemsPanel.Children.Add(itemGrid);
+
+                    if (i < block.Items.Count - 1)
+                        itemsPanel.Children.Add(new Border
+                        {
+                            Height = 1,
+                            Background = surface2,
+                            Margin = new Thickness(40, 0, 14, 0)
+                        });
+                }
+
+                contentPanel.Children.Add(itemsPanel);
+            }
+
+            if (!string.IsNullOrWhiteSpace(plan.OverallAdvice))
+            {
+                contentPanel.Children.Add(new Border
+                {
+                    Margin = new Thickness(14, 10, 14, 4),
+                    Padding = new Thickness(12, 8, 12, 8),
+                    Background = surface1,
+                    BorderBrush = surface2,
+                    BorderThickness = new Thickness(1),
+                    Child = new System.Windows.Controls.TextBlock
+                    {
+                        Text = plan.OverallAdvice,
+                        Foreground = subtext,
+                        FontSize = 12,
+                        FontStyle = FontStyles.Italic,
+                        TextWrapping = TextWrapping.Wrap
+                    }
+                });
             }
         }
 
         var scrollViewer = new ScrollViewer
         {
-            Content = blocksPanel,
+            Content = contentPanel,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Margin = new Thickness(0, 4, 0, 0)
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            MaxHeight = 440
         };
 
         // Footer
+        var debugBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "View Debug",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            Height = 32,
+            Padding = new Thickness(10, 0, 10, 0),
+            ToolTip = "Show LLM prompt/response"
+        };
+
         var copyBtn = new Wpf.Ui.Controls.Button
         {
             Content = "Copy",
@@ -3739,13 +3944,17 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             Margin = new Thickness(0, 0, 8, 0)
         };
 
-        var debugBtn = new Wpf.Ui.Controls.Button
+        var settings = _configService.LoadSettings();
+        var obsidianRoot = settings.ObsidianVaultRoot;
+        var saveBtn = new Wpf.Ui.Controls.Button
         {
-            Content = "View Debug",
+            Content = "Save",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 80,
             Height = 32,
-            Padding = new Thickness(10, 0, 10, 0),
-            ToolTip = "Show LLM prompt/response"
+            Margin = new Thickness(0, 0, 8, 0),
+            Visibility = string.IsNullOrWhiteSpace(obsidianRoot) ? Visibility.Collapsed : Visibility.Visible,
+            ToolTip = "Save plan as Markdown to standup folder"
         };
 
         var closeBtn = new Wpf.Ui.Controls.Button
@@ -3759,7 +3968,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         var rightButtons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Children = { copyBtn, closeBtn }
+            Children = { copyBtn, saveBtn, closeBtn }
         };
 
         var footer = new Grid { Margin = new Thickness(16, 10, 16, 14) };
@@ -3773,7 +3982,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
 
         var root = new Grid { Background = surface };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetRow(titleBar, 0);
         Grid.SetRow(scrollViewer, 1);
@@ -3782,19 +3991,19 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         root.Children.Add(scrollViewer);
         root.Children.Add(footer);
 
-        var owner = Window.GetWindow(this);
         var win = new Window
         {
             Title = "",
-            Owner = owner,
+            Owner = Window.GetWindow(this),
             ShowInTaskbar = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             ResizeMode = ResizeMode.CanResize,
             WindowStyle = WindowStyle.None,
-            Width = 560,
-            Height = 560,
-            MinWidth = 400,
-            MinHeight = 300,
+            SizeToContent = SizeToContent.Height,
+            Width = 680,
+            MaxHeight = 600,
+            MinWidth = 460,
+            MinHeight = 200,
             Background = surface,
             Foreground = text,
             BorderBrush = surface2,
@@ -3819,7 +4028,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         };
 
         copyBtn.Click += (_, _) =>
-            System.Windows.Clipboard.SetText(BuildTimeBlockClipboardText(blocks));
+            System.Windows.Clipboard.SetText(BuildPlanMyDayClipboardText(plan));
 
         debugBtn.Click += (_, _) =>
         {
@@ -3829,27 +4038,380 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             sb.AppendLine();
             sb.AppendLine("=== RESPONSE ===");
             sb.AppendLine(_llmClientService.LastResponse);
-            ShowWhatsNextLogDialog("Time Block Debug Log", sb.ToString());
+            ShowWhatsNextLogDialog("Plan My Day Debug Log", sb.ToString());
+        };
+
+        saveBtn.Click += (_, _) =>
+        {
+            try
+            {
+                var planPath = Path.Combine(obsidianRoot, "standup", $"{DateTime.Today:yyyy-MM-dd}_plan.md");
+                _fileEncodingService.WriteFile(planPath, BuildPlanMyDayClipboardText(plan), "UTF-8BOM");
+                saveBtn.Content = "Saved!";
+                saveBtn.IsEnabled = false;
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(
+                    $"Failed to save: {ex.Message}",
+                    "Plan My Day",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+            }
         };
 
         win.ShowDialog();
     }
 
-    private static string BuildTimeBlockClipboardText(List<TimeBlockItem> blocks)
+    private static Wpf.Ui.Controls.SymbolRegular GetCategorySymbol(string category) => category switch
     {
-        if (blocks.Count == 0) return "(No time blocks)";
+        "task"         => Wpf.Ui.Controls.SymbolRegular.TaskListSquareLtr24,
+        "focus"        => Wpf.Ui.Controls.SymbolRegular.DocumentEdit24,
+        "decision"     => Wpf.Ui.Controls.SymbolRegular.Gavel24,
+        "commit"       => Wpf.Ui.Controls.SymbolRegular.BranchFork24,
+        "tension"      => Wpf.Ui.Controls.SymbolRegular.Important24,
+        "meeting_prep" => Wpf.Ui.Controls.SymbolRegular.PeopleAudience24,
+        "review"       => Wpf.Ui.Controls.SymbolRegular.Eye24,
+        _              => Wpf.Ui.Controls.SymbolRegular.AlertBadge24,
+    };
 
-        var sb = new StringBuilder();
-        sb.AppendLine("## Today's Schedule");
-        foreach (var block in blocks)
+    private void NavigateToPlanItem(MainWindow? mw, DayPlanItem item)
+    {
+        if (mw == null) return;
+
+        var card = ViewModel.Projects.FirstOrDefault(c =>
+            string.Equals(c.Info.Name, item.Project, StringComparison.OrdinalIgnoreCase));
+        if (card == null) return;
+
+        if (!string.IsNullOrWhiteSpace(item.TargetFile))
         {
-            sb.AppendLine($"### {block.Start}-{block.End} {block.Project}");
-            foreach (var task in block.Tasks)
-                sb.AppendLine($"- {task}");
-            if (!string.IsNullOrWhiteSpace(block.Note))
-                sb.AppendLine($"> {block.Note}");
+            var fullPath = ResolveWhatsNextTargetFile(card.Info, item.TargetFile);
+            if (!string.IsNullOrWhiteSpace(fullPath) && File.Exists(fullPath))
+            {
+                mw.NavigateToEditorAndOpenFile(card.Info, fullPath);
+                return;
+            }
+        }
+
+        mw.NavigateToEditor(card.Info);
+    }
+
+    private static string BuildPlanMyDayClipboardText(DailyPlan plan)
+    {
+        var today = DateTime.Today;
+        var sb = new StringBuilder();
+        sb.AppendLine($"# Today's Plan — {today:yyyy-MM-dd} ({today:dddd})");
+        sb.AppendLine();
+
+        static string PeriodLabel(string period) => period switch
+        {
+            "morning" => "Morning (deep work)",
+            "afternoon" => "Afternoon",
+            "late_afternoon" => "Late afternoon (wrap-up)",
+            _ => period
+        };
+
+        foreach (var block in plan.Blocks)
+        {
+            sb.AppendLine($"## {PeriodLabel(block.Period)}");
+            sb.AppendLine();
+            foreach (var item in block.Items)
+            {
+                sb.AppendLine($"- [{item.Project}] {item.Action}");
+                if (!string.IsNullOrWhiteSpace(item.Reason))
+                    sb.AppendLine($"  {item.Reason}");
+            }
             sb.AppendLine();
         }
+
+        if (!string.IsNullOrWhiteSpace(plan.OverallAdvice))
+        {
+            sb.AppendLine($"> {plan.OverallAdvice}");
+            sb.AppendLine();
+        }
+
         return sb.ToString().TrimEnd();
+    }
+
+    private Task<string?> ShowScheduleHintDialogAsync()
+    {
+        var tcs = new TaskCompletionSource<string?>();
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "☀",
+            FontSize = 13,
+            Margin = new Thickness(12, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Plan My Day",
+            Foreground = text,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+
+        var closeBtnTitle = new System.Windows.Controls.Button
+        {
+            Content = "✕",
+            Width = 34,
+            Height = 26,
+            Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Foreground = subtext,
+            FontSize = 13
+        };
+        Grid.SetColumn(closeBtnTitle, 2);
+
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+        titleBar.Children.Add(closeBtnTitle);
+
+        var promptLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Any meetings or time constraints today?",
+            Foreground = text,
+            FontSize = 13,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+
+        var promptSub = new System.Windows.Controls.TextBlock
+        {
+            Text = "(optional — press Plan to skip)",
+            Foreground = subtext,
+            FontSize = 12,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+
+        var inputBox = new System.Windows.Controls.TextBox
+        {
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            Height = 80,
+            FontSize = 12,
+            Padding = new Thickness(6),
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+
+        var cancelBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 80,
+            Height = 32,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+
+        var planBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Plan My Day ▶",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 120,
+            Height = 32
+        };
+
+        var btnRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(0, 12, 0, 0),
+            Children = { cancelBtn, planBtn }
+        };
+
+        var body = new StackPanel
+        {
+            Margin = new Thickness(16, 14, 16, 16),
+            Children = { promptLabel, promptSub, inputBox, btnRow }
+        };
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(body, 1);
+        root.Children.Add(titleBar);
+        root.Children.Add(body);
+
+        var win = new Window
+        {
+            Title = "",
+            Owner = Window.GetWindow(this),
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStyle = WindowStyle.None,
+            Width = 500,
+            Height = 265,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            Content = root
+        };
+
+        closeBtnTitle.Click += (_, _) => { tcs.TrySetResult(null); win.Close(); };
+        cancelBtn.Click += (_, _) => { tcs.TrySetResult(null); win.Close(); };
+        planBtn.Click += (_, _) => { tcs.TrySetResult(inputBox.Text); win.Close(); };
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) win.DragMove();
+        };
+        win.KeyDown += (_, ev) =>
+        {
+            if (ev.Key == System.Windows.Input.Key.Escape) { tcs.TrySetResult(null); win.Close(); }
+        };
+
+        win.ShowDialog();
+        return tcs.Task;
+    }
+
+    private Task<bool> ShowMorningConfirmDialogAsync()
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "☀",
+            FontSize = 13,
+            Margin = new Thickness(12, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Plan My Day",
+            Foreground = text,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+
+        var greetingLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Good morning!",
+            Foreground = text,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+
+        var promptLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Generate today's plan?",
+            Foreground = subtext,
+            FontSize = 13
+        };
+
+        var notTodayBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Not today",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 90,
+            Height = 32,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+
+        var letsGoBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Let's go ▶",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 100,
+            Height = 32
+        };
+
+        var btnRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(0, 16, 0, 0),
+            Children = { notTodayBtn, letsGoBtn }
+        };
+
+        var body = new StackPanel
+        {
+            Margin = new Thickness(20, 16, 20, 18),
+            Children = { greetingLabel, promptLabel, btnRow }
+        };
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(body, 1);
+        root.Children.Add(titleBar);
+        root.Children.Add(body);
+
+        var win = new Window
+        {
+            Title = "",
+            Owner = Window.GetWindow(this),
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStyle = WindowStyle.None,
+            Width = 360,
+            Height = 175,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            Content = root
+        };
+
+        notTodayBtn.Click += (_, _) => { tcs.TrySetResult(false); win.Close(); };
+        letsGoBtn.Click += (_, _) => { tcs.TrySetResult(true); win.Close(); };
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) win.DragMove();
+        };
+
+        win.ShowDialog();
+        return tcs.Task;
+    }
+
+    private static bool ShouldShowMorningAutopilot()
+    {
+        var now = DateTime.Now;
+        if (now.Hour < 6) return false;
+        if (now.DayOfWeek == DayOfWeek.Saturday || now.DayOfWeek == DayOfWeek.Sunday) return false;
+        if (_planMyDayShownToday.HasValue && _planMyDayShownToday.Value.Date == now.Date) return false;
+        return true;
     }
 }

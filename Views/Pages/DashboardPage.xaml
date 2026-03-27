@@ -37,10 +37,10 @@
                         <ui:SymbolIcon Symbol="Lightbulb24"/>
                     </ui:Button>
                     <ui:Button Margin="0,0,6,0" Height="34" Padding="10,0" FontSize="13"
-                               ToolTip="Generate today's time-blocked schedule — AI schedules overdue and due-soon tasks"
+                               ToolTip="Plan my day — AI generates a time-blocked plan with project signals and task priorities"
                                Click="OnTimeBlockClickAsync"
                                Visibility="{Binding IsAiEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <ui:SymbolIcon Symbol="Clock24"/>
+                        <ui:SymbolIcon Symbol="WeatherSunny24"/>
                     </ui:Button>
                     <ui:Button Margin="0,0,6,0" Height="34" Padding="10,0" FontSize="13"
                                ToolTip="View capture log"

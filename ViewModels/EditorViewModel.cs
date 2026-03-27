@@ -52,6 +52,7 @@ public partial class EditorViewModel : ObservableObject
     private CancellationTokenSource? _focusUpdateCts;
     private CancellationTokenSource? _decisionLogCts;
     private string? _capturedContextForFocusUpdate;
+    private string? _capturedContextForDecisionLog;
 
     // ---- 選択プロジェクト ----
     [ObservableProperty]
@@ -119,8 +120,8 @@ public partial class EditorViewModel : ObservableObject
     public Action<string, string>? ShowScrollableError;
 
     // ---- AI Decision Log コールバック ----
-    // 入力ダイアログ: 検出候補リストを渡す → 入力結果 (null=キャンセル)
-    public Func<List<DetectedDecision>, Task<AiDecisionLogInputResult?>>? RequestAiDecisionLogInput;
+    // 入力ダイアログ: 検出候補リストと prefill テキストを渡す → 入力結果 (null=キャンセル)
+    public Func<List<DetectedDecision>, string?, Task<AiDecisionLogInputResult?>>? RequestAiDecisionLogInput;
     // プレビューダイアログ: ドラフト + Refine 関数を渡す → (保存するか, コンテンツ, ファイル名, tension削除フラグ)
     public Func<DecisionLogDraftResult, Func<string, string, Task<string>>,
         Task<(bool save, string? content, string? fileName, bool removeTension)>>? RequestDecisionLogPreview;
@@ -818,8 +819,10 @@ public partial class EditorViewModel : ObservableObject
         }
 
         // Step 3: 入力ダイアログを表示
+        var prefillText = _capturedContextForDecisionLog;
+        _capturedContextForDecisionLog = null;
         if (RequestAiDecisionLogInput == null) return;
-        var input = await RequestAiDecisionLogInput(candidates);
+        var input = await RequestAiDecisionLogInput(candidates, prefillText);
         if (input == null) return; // キャンセル
 
         if (input.UseBlankTemplate)
@@ -1162,6 +1165,15 @@ public partial class EditorViewModel : ObservableObject
     /// </summary>
     public void RequestFocusUpdateOnOpen(string capturedText)
         => _capturedContextForFocusUpdate = capturedText;
+
+    public void RequestDecisionLogOnOpen(string capturedText)
+        => _capturedContextForDecisionLog = capturedText;
+
+    public async Task TriggerDecisionLogIfPendingAsync()
+    {
+        if (_capturedContextForDecisionLog != null && SelectedProject != null)
+            await NewAiDecisionLogAsync();
+    }
 
     /// <summary>
     /// Quick Capture focus_update ルーティング後、ApplicationIdle/Background タイミングから呼ばれる。

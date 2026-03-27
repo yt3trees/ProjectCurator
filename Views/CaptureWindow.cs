@@ -94,7 +94,7 @@ public class CaptureWindow : Window
     // ── ナビゲーションコールバック ─────────────────────────────────────────
     public Action<string, string>? OnNavigateToFile { get; set; }         // (projectName, filePath)
     public Action<string, string, string>? OnNavigateToFocusUpdate { get; set; }  // (projectName, filePath, capturedText) → focus_update 専用
-    public Action<string>? OnNavigateToDecision { get; set; }             // (projectName)
+    public Action<string, string>? OnNavigateToDecision { get; set; }      // (projectName, capturedText)
 
     // ─────────────────────────────────────────────────────────────────────
     public CaptureWindow(
@@ -1207,7 +1207,10 @@ public class CaptureWindow : Window
                     OnNavigateToFile?.Invoke(result.NavigationProjectName, result.NavigationFilePath);
             }
             else if (result.NavigationProjectName != null)
-                OnNavigateToDecision?.Invoke(result.NavigationProjectName);
+            {
+                var capturedText = _classification?.Body ?? _inputBox.Text;
+                OnNavigateToDecision?.Invoke(result.NavigationProjectName, capturedText);
+            }
             Close();
         }
     }

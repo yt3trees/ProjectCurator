@@ -82,7 +82,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         ViewModel.ShowScrollableError = (t, m) => ShowScrollableErrorDialog(t, m);
 
         // AI Decision Log ダイアログ
-        ViewModel.RequestAiDecisionLogInput = ShowAiDecisionLogInputDialogAsync;
+        ViewModel.RequestAiDecisionLogInput = (candidates, prefill) => ShowAiDecisionLogInputDialogAsync(candidates, prefill);
         ViewModel.RequestDecisionLogPreview = (draft, refineFunc) =>
             ShowDecisionLogPreviewDialogAsync(draft, refineFunc);
 
@@ -1171,7 +1171,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     // AI Decision Log - 入力ダイアログ
     // -------------------------------------------------------------------------
     private Task<ProjectCurator.Models.AiDecisionLogInputResult?> ShowAiDecisionLogInputDialogAsync(
-        List<ProjectCurator.Models.DetectedDecision> candidates)
+        List<ProjectCurator.Models.DetectedDecision> candidates, string? prefillText = null)
     {
         var appResources = Application.Current.Resources;
         var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
@@ -1228,6 +1228,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             AcceptsReturn = true,
             Height = 90,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Text = prefillText ?? "",
         };
 
         // ---- Status ----
