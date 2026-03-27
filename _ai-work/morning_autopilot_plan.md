@@ -1,238 +1,191 @@
-# Morning Autopilot - 今日の作戦を自動生成
+# Time-Block → Plan My Day 改修計画
 
-朝アプリを開いた瞬間に「今日一日の作戦」を時間ブロック付きで提案する機能。
-What's Nextが「何をやるか」のリストなら、Morning Autopilotは「いつ・何を・なぜ」の時間割を生成する。
+既存の「Smart Time-Block」機能 (Clock24 ボタン / OnTimeBlockClickAsync) を Morning Autopilot 相当に昇格させる改修。
+新規ファイルゼロ、変更ファイル 2 つ (DashboardPage.xaml + DashboardPage.xaml.cs)。
 
-## 解決する課題
+## 画面イメージ
 
-- 朝一で「今日は何から始めるか」を考える判断コスト (毎朝10-15分)
-- 複数プロジェクトの優先度をその場の感覚で決めてしまう問題
-- 期限が近いタスクやメンテナンス作業 (focus更新、commit等) の見落とし
-- 時間配分の偏り (気がつくと1プロジェクトだけに時間を使っている)
+### (0) ツールバーボタン
 
-## What's Next との違い
+```
+[Dashboard]                   [☀ Plan My Day]  [✨ What's Next]  [Auto: 10 min v]  [↻]  [👁]
+```
 
-| 観点 | What's Next | Morning Autopilot |
+### (1) 自動起動確認ダイアログ (ShowMorningConfirmDialogAsync)
+
+朝の初回起動時のみ表示。幅 360px、SizeToContent。
+
+```
++----------------------------------------------+
+| ☀  Plan My Day                               |
++----------------------------------------------+
+|                                              |
+|   Good morning!                              |
+|   Generate today's plan?                     |
+|                                              |
+|                  [Not today]  [Let's go  >]  |
++----------------------------------------------+
+```
+
+### (2) スケジュールヒント入力ダイアログ (ShowScheduleHintDialogAsync)
+
+手動ボタン押下時・[Let's go] 後どちらも表示。幅 500px、SizeToContent。
+
+```
++-----------------------------------------------------------+
+| ☀  Plan My Day                                       [x] |
++-----------------------------------------------------------+
+|                                                           |
+|   Any meetings or time constraints today?                 |
+|   (optional — press Plan to skip)                         |
+|                                                           |
+|   +-----------------------------------------------------+ |
+|   | 14:00 ProjectBeta meeting                           | |
+|   | 16:30 out of office                                 | |
+|   |                                                     | |
+|   +-----------------------------------------------------+ |
+|                                                           |
+|                               [Cancel]  [Plan My Day  >] |
++-----------------------------------------------------------+
+```
+
+### (3) ローディングダイアログ (BuildTimeBlockLoadingWindow 改修後)
+
+幅 340px、SizeToContent。
+
+```
++------------------------------------+
+| ☀  Plan My Day                    |
++------------------------------------+
+|                                    |
+|      Planning your day...          |
+|                                    |
+|           [Cancel]                 |
+|                                    |
++------------------------------------+
+```
+
+### (4) 結果ダイアログ (ShowTimeBlockResultDialog 改修後)
+
+幅 680px、高さ 520px、CanResize。
+
+```
++----------------------------------------------------------------------+
+| ☀  Today's Plan  --  2026-03-27 (Fri)                          [x] |
++----------------------------------------------------------------------+
+|                                                                      |
+|  Schedule: 14:00 ProjectBeta meeting / 16:30 out of office          |
+|                                                                      |
+| +-Morning (deep work)------------------------------------------+    |
+| |                                                               |    |
+| |  [!] [ProjectAlpha]  Resolve auth library decision            |    |
+| |       Tension open for 6 days. Morning is the best            |    |
+| |       window before cognitive load builds up.     [Open >]    |    |
+| |                                                               |    |
+| |  [>] [ProjectGamma]  Commit staged migrations                 |    |
+| |       4 files uncommitted since Wednesday. Ship               |    |
+| |       before end-of-week review.                 [Open >]    |    |
+| |                                                               |    |
+| +---------------------------------------------------------------+    |
+|                                                                      |
+| +-Afternoon----------------------------------------------------+    |
+| |                                                               |    |
+| |  [P] [ProjectBeta]   Prep for 14:00 meeting                  |    |
+| |       Review focus and recent decisions. Capture              |    |
+| |       open questions before the meeting.         [Open >]    |    |
+| |                                                               |    |
+| |  [*] [ProjectAlpha]  Complete Asana task: Deploy staging      |    |
+| |       Due today. Afternoon slots free before standup.         |    |
+| |                                                   [Open >]   |    |
+| |                                                               |    |
+| +---------------------------------------------------------------+    |
+|                                                                      |
+| +-Late afternoon (wrap-up)-------------------------------------+    |
+| |                                                               |    |
+| |  [D] [ProjectBeta]   Record meeting outcomes in decision_log  |    |
+| |       Capture decisions before memory fades.     [Open >]    |    |
+| |                                                               |    |
+| |  [F] [ProjectGamma]  Update current_focus.md                  |    |
+| |       Last updated 9 days ago. 3 tasks closed.   [Open >]    |    |
+| |                                                               |    |
+| +---------------------------------------------------------------+    |
+|                                                                      |
+|   Friday: close the week strong -- ship the commit and update        |
+|   focus before the weekend.                                          |
+|                                                                      |
++----------------------------------[View Debug]  [Copy]  [Save]  [Close]+
+```
+
+アイコン凡例:
+- `[!]` tension (Warning24)
+- `[>]` commit (BranchFork24)
+- `[P]` meeting_prep (People24)
+- `[*]` task (TaskListSquare24)
+- `[D]` decision (Gavel24)
+- `[F]` focus (DocumentEdit24)
+- `[@]` review (Eye24)
+
+セクション背景色:
+- Morning: AppSurface0 (通常背景)
+- Afternoon: AppSurface1
+- Late afternoon: AppSurface0 (Morning と同じ、Afternoon の間に挟まれる視覚的区切り)
+
+---
+
+## 既存実装の要約
+
+- ボタン: Clock24 アイコン (XAML line 39-44)
+- ハンドラ: `OnTimeBlockClickAsync` (line 3308)
+- データ収集: `CollectTimeBlockDataAsync` — SortBucket <= 2 タスクのみ、focus 先頭 200 文字
+- データモデル: `TimeBlockItem { Start, End, Label, Tasks[], Project, Note }`
+- 出力: HH:MM 時刻区切りのスケジュール、[Copy] / [Close] のみ
+
+## 変更ゴール
+
+| 項目 | 現在 | 改修後 |
 |---|---|---|
-| 出力 | 優先タスク3-5件のリスト | 時間ブロック付きの1日計画 |
-| 時間軸 | なし (優先度順のみ) | 午前/午後/夕方の時間帯に配分 |
-| 粒度 | 「これをやれ」 | 「この順で、この時間帯にやれ」 |
-| 起動 | ボタン手動 | 朝の初回起動で自動提案 + ボタン手動 |
-| 理由 | 1-2文 | 「なぜ今日」「なぜこの時間帯」を含む |
-| ファイル保存 | なし (一時表示) | Markdown保存 (振り返り用、任意) |
-| Today Queue連携 | 読み取りのみ | 承認した項目をToday Queueにスター付与 |
+| ボタン表示 | Clock24 アイコン | WeatherSunny24 アイコン + "Plan My Day" テキスト |
+| データ収集 | SortBucket <= 2 のみ | 全 30 件 + project signals + 昨日 standup |
+| 時間表現 | HH:MM 具体時刻 | morning / afternoon / late_afternoon ピリオド |
+| 結果ダイアログ | テキストリスト | カテゴリアイコン + [Open] + overall_advice + [Save] |
+| スケジュールヒント | なし | ユーザー入力ダイアログ (任意) |
+| 自動起動 | なし | 朝の初回起動で確認プロンプト |
 
-## フロー全体像
+---
 
-```
-[アプリ起動 / Dashboardボタン]
-        │
-        ▼
-┌─ 自動起動判定 ─────────────────────────────────────┐
-│  条件: 今日初回起動 && AI有効 && 6時以降 && 平日     │
-│  (ボタン押下時はこの判定をスキップ)                   │
-└──────────────────────────────────────────────────────┘
-        │
-        ▼
-┌─ データ収集 ───────────────────────────────────────┐
-│  1. Today Queue全タスク (TodayQueueService)         │
-│  2. 全プロジェクトのシグナル (ProjectDiscoveryService)│
-│  3. 各プロジェクトのfocusプレビュー (先頭500文字)    │
-│  4. 昨日のstandup (あれば: 何をやったかの文脈)       │
-│  5. 今日のスケジュールヒント (ユーザー入力、任意)     │
-└──────────────────────────────────────────────────────┘
-        │
-        ▼
-┌─ ローディングダイアログ ──────────────────────────┐
-│  ⟳ Planning your day...             [Cancel]       │
-└──────────────────────────────────────────────────────┘
-        │
-        ▼ LLM 1回 (時間ブロック付き計画を生成)
-        │
-        ▼
-┌─ 計画表示ダイアログ ─────────────────────────────────────┐
-│  ☀ Today's Plan — 2026-03-26 (Thu)                 [×]  │
-├──────────────────────────────────────────────────────────┤
-│  Schedule hint: 14時にProject Bの会議                    │
-│                                                          │
-│  🌅 Morning  (deep work)                                 │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │ 1. [ProjectAlpha] Finalize auth decision           │  │
-│  │    Tension open for 5 days. No meeting blockers    │  │
-│  │    in the morning — best time for deep thinking.   │  │
-│  │                                       [Open ▶]    │  │
-│  ├────────────────────────────────────────────────────┤  │
-│  │ 2. [ProjectAlpha] Commit staged changes            │  │
-│  │    3 files uncommitted since Tuesday.              │  │
-│  │                                       [Open ▶]    │  │
-│  └────────────────────────────────────────────────────┘  │
-│                                                          │
-│  🌤 Afternoon                                            │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │ 3. [ProjectBeta] Prep for 14:00 meeting            │  │
-│  │    Review focus and recent decisions before         │  │
-│  │    the meeting. Update focus afterward.             │  │
-│  │                                       [Open ▶]    │  │
-│  ├────────────────────────────────────────────────────┤  │
-│  │ 4. [ProjectGamma] Update current_focus.md          │  │
-│  │    Last updated 9 days ago. Asana shows 4 tasks    │  │
-│  │    completed since then.                           │  │
-│  │                                       [Open ▶]    │  │
-│  └────────────────────────────────────────────────────┘  │
-│                                                          │
-│  🌆 Late afternoon  (wrap-up)                            │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │ 5. [ProjectBeta] Record meeting decisions          │  │
-│  │    Capture outcomes from 14:00 meeting into        │  │
-│  │    decision_log before end of day.                 │  │
-│  │                                       [Open ▶]    │  │
-│  └────────────────────────────────────────────────────┘  │
-│                                                          │
-│                          [Copy]  [Save & Close]  [Close] │
-└──────────────────────────────────────────────────────────┘
-```
-
-## アーキテクチャ
-
-```
-DashboardPage.xaml
-  ├── [Morning Autopilot] ボタン (Click)
-  └── App起動時の自動トリガー (DashboardPage.Loaded)
-        │
-        ▼
-DashboardPage.xaml.cs
-  └── OnMorningAutopilotClickAsync()
-        │
-        ├── 自動起動判定 (IsFirstLaunchToday + IsAiEnabled + 時間帯)
-        ├── データ収集:
-        │     ├── ViewModel.Projects (ProjectDiscoveryService経由)
-        │     ├── ViewModel.GetTopTasksForAi(30) (TodayQueueService経由)
-        │     ├── CollectFocusPreviewsAsync() (既存メソッド流用)
-        │     └── ReadYesterdayStandupAsync() (新規)
-        │
-        ├── スケジュールヒント入力 (任意、省略可能)
-        │
-        ├── プロンプト構築 + LlmClientService.ChatCompletionAsync()
-        │
-        ├── レスポンス解析 (JSON → DailyPlan)
-        │
-        └── 計画表示ダイアログ
-              ├── [Open] → Editor / Git Repos に遷移
-              ├── [Copy] → クリップボード
-              └── [Save & Close] → Markdown ファイル保存
-                    {ObsidianVaultRoot}/standup/{date}_plan.md
-```
-
-ViewModel にコマンドを追加するのではなく、What's Next と同じくコードビハインドで直接処理する。
-理由: ダイアログ表示と MainWindow への遷移はビューの責務。既存のパターンと統一。
-
-## データソース
-
-LLM に渡す入力データ:
-
-| データ | ソース | 計画への活用 |
-|---|---|---|
-| Today Queue 全タスク | TodayQueueService | 期限ベースの優先度と時間配分 |
-| FocusAge (全プロジェクト) | ProjectInfo | 「focus更新」アクションの生成 |
-| current_focus.md 要約 | ProjectInfo.FocusFile | 各プロジェクトの現在の文脈 |
-| 未コミット変更 | ProjectInfo.UncommittedRepoPaths | 「コミット」アクションの生成 |
-| tensions.md 有無+項目数 | ファイル存在チェック | 「tension解消」の優先度判定 |
-| decision_log 直近日付 | ProjectInfo.DecisionLogDates | 「決定記録」の必要性判定 |
-| 昨日のstandup | standup/{date}_standup.md | 継続作業の文脈 (あれば) |
-| スケジュールヒント | ユーザー入力 (任意) | 会議前後の計画調整 |
-| 曜日 | DateTime.Now.DayOfWeek | 週初め=計画、週末=振り返り傾向 |
-
-### トークン予算の管理
-
-What's Next と同じ方式:
-- current_focus.md は先頭 500 文字のみ
-- tensions.md は項目数のみ (全文不要)
-- Today Queue は上位 30 件に制限
-- 昨日のstandup は先頭 1000 文字のみ (あれば)
-- プロジェクトメタデータは数値で軽量
-
-## データモデル
-
-DashboardPage.xaml.cs 内にネストクラスとして定義 (What's Next の WhatsNextSuggestion と同パターン):
+## データモデル (既存 TimeBlockItem を置き換え)
 
 ```csharp
-private class DailyPlan
+// DashboardPage.xaml.cs 内に追加 (TimeBlockItem の代替)
+private sealed class DailyPlan
 {
-    public List<TimeBlock> Blocks { get; set; } = [];
-    public string? OverallAdvice { get; set; }     // 全体を通じたアドバイス (任意)
+    public List<DayPeriodBlock> Blocks { get; set; } = [];
+    public string? OverallAdvice { get; set; }
 }
 
-private class TimeBlock
+private sealed class DayPeriodBlock
 {
-    public string Period { get; set; } = "";        // "morning" | "afternoon" | "late_afternoon"
-    public List<PlanItem> Items { get; set; } = [];
+    public string Period { get; set; } = "";   // "morning" | "afternoon" | "late_afternoon"
+    public List<DayPlanItem> Items { get; set; } = [];
 }
 
-private class PlanItem
+private sealed class DayPlanItem
 {
-    public string Project { get; set; } = "";       // プロジェクト名
-    public string Action { get; set; } = "";        // 具体的アクション (命令形、10語以内)
-    public string Reason { get; set; } = "";        // なぜ今日・なぜこの時間帯 (1-2文)
-    public string? TargetFile { get; set; }         // 対象ファイルの相対パス (任意)
-    public string Category { get; set; } = "";      // task|focus|decision|commit|tension|meeting_prep|review
-}
-```
-
-## 自動起動の判定ロジック
-
-```csharp
-private bool ShouldShowMorningAutopilot()
-{
-    // AI無効なら出さない
-    if (!ViewModel.IsAiEnabled) return false;
-
-    // 6時前なら出さない
-    if (DateTime.Now.Hour < 6) return false;
-
-    // 今日既に表示済みなら出さない (static フラグ)
-    if (_morningAutopilotShownToday == DateTime.Today) return false;
-
-    // 土日は出さない (設定で変更可能にする余地あり)
-    var dow = DateTime.Now.DayOfWeek;
-    if (dow == DayOfWeek.Saturday || dow == DayOfWeek.Sunday) return false;
-
-    return true;
+    public string Project { get; set; } = "";
+    public string Action { get; set; } = "";
+    public string Reason { get; set; } = "";
+    public string? TargetFile { get; set; }
+    public string Category { get; set; } = "";  // task|focus|decision|commit|tension|meeting_prep|review
 }
 ```
 
-- `_morningAutopilotShownToday` は `static DateTime?` で管理 (アプリ再起動まで保持)
-- Dashboard の `Loaded` イベントで判定し、条件を満たせば確認ダイアログ:
-  "Good morning! Generate today's plan?" [Yes] [Not today]
-- [Not today] でフラグを立てて当日は再表示しない
-- ボタン押下時はこの判定をスキップして常に実行
+TimeBlockItem は削除 (参照箇所は ParseTimeBlockResponse / ShowTimeBlockResultDialog のみ)。
 
-## スケジュールヒント入力
+---
 
-計画精度を上げるための任意入力 (省略可能):
+## LLM プロンプト
 
-```
-┌─────────────────────────────────────────────────────┐
-│  ☀ Morning Autopilot                          [×]   │
-├─────────────────────────────────────────────────────┤
-│                                                      │
-│  Any meetings or time constraints today?             │
-│  (optional — press Plan to skip)                     │
-│                                                      │
-│  ┌────────────────────────────────────────────────┐ │
-│  │ 14:00 Project Beta meeting                     │ │
-│  │ 16:00 out of office                            │ │
-│  └────────────────────────────────────────────────┘ │
-│                                                      │
-│                              [Cancel]  [Plan ▶]     │
-└─────────────────────────────────────────────────────┘
-```
-
-- TextBox は空でもOK (空ならスケジュールヒントなしで計画生成)
-- 将来的にカレンダー連携を入れる場合はここに自動挿入できる
-
-## LLM プロンプト設計
-
-### System Prompt
+### System Prompt (TimeBlockSystemPrompt を置き換え)
 
 ```
 You are a daily planning assistant for a professional managing multiple parallel projects.
@@ -307,296 +260,205 @@ Your job is to create a time-blocked plan for today that maximizes productivity 
 - Encouraging but realistic: acknowledge heavy days, suggest what to defer if overloaded
 ```
 
-### User Prompt 構造
+### User Prompt (BuildTimeBlockUserPrompt を置き換え)
 
 ```
 ## Date
-{today: YYYY-MM-DD (Day of week)}
+{today: yyyy-MM-dd (DayOfWeek)}
 
 ## Schedule hints
-{ユーザー入力のスケジュールヒント、または "(none)"}
+{ユーザー入力、または "(none)"}
 
 ## Yesterday's standup (for continuity)
-{昨日のstandupファイル先頭1000文字、または "(no standup available)"}
+{昨日 standup/{date}_standup.md 先頭 1000 文字、または "(no standup available)"}
 
 ## Today Queue (sorted by priority)
-{For each task, max 30:}
 - [{ProjectShortName}] {DisplayMainTitle} ({DueLabel})
+  ... (上位 30 件)
 
 ## Project Signals
 
 ### {ProjectName}
 - Focus age: {N} days {(stale) if > 7}
 - Uncommitted repos: {count}
-- Open tensions: {yes/no} ({count} items)
-- Recent decisions: {latest date or "none"}
+- Open tensions: yes/no ({count} items)
+- Recent decisions: {date or "none"}
 - Active workstreams: {count}
-- Focus preview: {first 500 chars of current_focus.md}
+- Focus preview: {先頭 500 文字}
 
-{Repeat for each project}
+... (全プロジェクト繰り返し)
 
 ## Instruction
 Create a time-blocked daily plan based on the data above.
 Return JSON object only.
 ```
 
-## ファイル保存 (任意)
-
-[Save & Close] ボタン押下時に Markdown ファイルとして保存:
-
-### 保存先
-
-`{ObsidianVaultRoot}/standup/{date}_plan.md`
-
-standupファイルと同じディレクトリに配置 (standup は `_standup.md`、plan は `_plan.md` の接尾辞で区別)。
-
-### 保存フォーマット
-
-```markdown
-# Daily Plan — 2026-03-26 (Thu)
-
-Schedule: 14:00 Project Beta meeting
-
-## Morning (deep work)
-
-1. [ProjectAlpha] Finalize auth decision
-   - Tension open for 5 days. No meeting blockers in the morning.
-   - -> decision_log
-
-2. [ProjectAlpha] Commit staged changes
-   - 3 files uncommitted since Tuesday.
-
-## Afternoon
-
-3. [ProjectBeta] Prep for 14:00 meeting
-   - Review focus and recent decisions before the meeting.
-
-4. [ProjectGamma] Update current_focus.md
-   - Last updated 9 days ago. 4 tasks completed since then.
-   - -> current_focus.md
-
-## Late afternoon (wrap-up)
-
-5. [ProjectBeta] Record meeting decisions
-   - Capture outcomes from 14:00 meeting into decision_log.
-   - -> decision_log
-```
-
-## UI 設計
-
-### ボタン配置
-
-Dashboard ヘッダーのツールバー、What's Next ボタンの左隣に追加:
-
-```
-[Dashboard]    [☀ Plan My Day]  [✨ What's Next]  [▼ 10 min] [↻] [👁 2]
-```
-
-- アイコン: `WeatherSunny24` (wpf-ui SymbolRegular)
-- ToolTip: "Plan my day"
-- Visibility: `IsAiEnabled` バインディング (BooleanToVisibilityConverter)
-
-### 確認プロンプト (自動起動時のみ)
-
-```
-┌──────────────────────────────────────────────┐
-│  ☀ Good morning!                       [×]   │
-├──────────────────────────────────────────────┤
-│                                               │
-│  Generate today's plan?                       │
-│                                               │
-│              [Not today]  [Let's go ▶]       │
-└──────────────────────────────────────────────┘
-```
-
-### 計画表示ダイアログ
-
-- サイズ: 680 x 520, CanResize, WindowChrome適用
-- スタイル: What's Next 結果ダイアログと統一感のあるデザイン
-- 時間ブロックはセクション分けで背景色を微妙に変える:
-  - Morning: 通常背景
-  - Afternoon: AppSurface1
-  - Late afternoon: AppSurface0
-- overall_advice がある場合はフッター上部にイタリック表示
-- 各アイテムのカテゴリに応じたアイコン:
-  - task: `TaskListSquare24`
-  - focus: `DocumentEdit24`
-  - decision: `Gavel24`
-  - commit: `BranchFork24`
-  - tension: `Warning24`
-  - meeting_prep: `People24`
-  - review: `Eye24`
-
-### ボタン
-
-- [Open] (各アイテム): プロジェクトの Editor / Git Repos に遷移。target_file があればファイルを直接開く
-- [Copy]: 全計画をプレーンテキスト (Markdown形式) でクリップボードにコピー。チャット/メールに貼れる
-- [Save & Close]: Markdown ファイルに保存してダイアログを閉じる
-- [Close]: 保存せずに閉じる
+---
 
 ## 実装タスク
 
-### Phase 1: データ収集
+### Phase 1: データモデル置き換え
 
-- [ ] 1-1. 昨日のstandup読み込みヘルパーを実装
-  - standup ディレクトリから昨日の `{date}_standup.md` を検索
+- [ ] 1-1. `TimeBlockItem` を `DailyPlan / DayPeriodBlock / DayPlanItem` に置き換え
+  - ファイル: `DashboardPage.xaml.cs` (line 3298-3306)
+
+### Phase 2: スケジュールヒント入力ダイアログ (新規メソッド)
+
+- [ ] 2-1. `ShowScheduleHintDialogAsync()` を実装
+  - Window (500 x SizeToContent, NoResize, WindowStyle.None, BorderThickness(1))
+  - タイトル: "☀ Plan My Day"
+  - TextBox (MultiLine, AcceptsReturn=True, Height=80, Placeholder=任意)
+  - [Cancel] → null 返す / [Plan] → 入力文字列 (空でもOK) 返す
+  - ファイル: `DashboardPage.xaml.cs`
+
+- [ ] 2-2. 自動起動時の確認プロンプト `ShowMorningConfirmDialogAsync()` を実装
+  - タイトル: "☀ Good morning!"
+  - 本文: "Generate today's plan?"
+  - [Not today] → false / [Let's go] → true
+  - ファイル: `DashboardPage.xaml.cs`
+
+### Phase 3: データ収集の強化
+
+- [ ] 3-1. `CollectTimeBlockDataAsync` を `CollectPlanMyDayDataAsync` に改名し拡張
+  - 既存: SortBucket <= 2 タスク + focus 200文字
+  - 追加: 全 30 件タスク、focus 500文字、project signals (tensions/focus age/uncommitted/decisions)
+  - 追加: 昨日 standup ファイル読み込み (`ReadYesterdayStandupAsync`)
+  - ファイル: `DashboardPage.xaml.cs`
+
+- [ ] 3-2. `ReadYesterdayStandupAsync()` ヘルパーを実装
+  - settings から ObsidianVaultRoot を取得 (ConfigService 経由)
+  - `{ObsidianVaultRoot}/standup/{yesterday:yyyyMMdd}_standup.md` を検索
   - 先頭 1000 文字を返す (不在なら空文字)
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+  - ファイル: `DashboardPage.xaml.cs`
 
-- [ ] 1-2. tensions.md の項目数カウントヘルパーを実装
-  - ファイルを読み、`- ` で始まる行数をカウント (簡易)
-  - What's Next の CollectFocusPreviewsAsync と並行で呼べる設計
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+### Phase 4: プロンプト & パーサー置き換え
 
-- [ ] 1-3. CollectProjectSignalsAsync ヘルパーを実装
-  - 各プロジェクトから: FocusAge, 未コミット数, tension項目数, 最新decision_log日付, workstream数
-  - 構造化データとして返す (What's Next の BuildWhatsNextUserPrompt 内のロジックを分離)
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+- [ ] 4-1. `TimeBlockSystemPrompt` を上記 System Prompt に置き換え
+  - ファイル: `DashboardPage.xaml.cs` (line 3282)
 
-### Phase 2: スケジュールヒント入力ダイアログ
+- [ ] 4-2. `BuildTimeBlockUserPrompt` を `BuildPlanMyDayUserPrompt` に改名し全面書き直し
+  - 引数追加: `string scheduleHint`, `string yesterdayStandup`, `Dictionary<string, ProjectSignals> signals`
+  - ファイル: `DashboardPage.xaml.cs`
 
-- [ ] 2-1. ヒント入力ダイアログの実装
-  - Window (500 x SizeToContent, NoResize)
-  - TextBox (MultiLine, AcceptsReturn=True, Height=80)
-  - [Cancel] / [Plan] ボタン (Plan は空入力でもOK)
-  - 自動起動時は「Good morning!」ヘッダー付き
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+- [ ] 4-3. `ParseTimeBlockResponse` を `ParseDailyPlanResponse` に改名し書き直し
+  - JSONオブジェクト `{ blocks, overall_advice }` をパース → DailyPlan
+  - パース失敗時は fallback (生テキスト表示) はそのまま維持
+  - ファイル: `DashboardPage.xaml.cs`
 
-### Phase 3: プロンプト構築と LLM 呼び出し
+### Phase 5: ハンドラ更新 (OnTimeBlockClickAsync)
 
-- [ ] 3-1. System Prompt を定数として定義
-  - 上記プロンプト設計に基づく
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+- [ ] 5-1. `OnTimeBlockClickAsync` を書き直し
+  - ヒント入力ダイアログ (2-1) → キャンセルで中断
+  - データ収集 (3-1) → プロンプト構築 → ローディング → LLM → 計画ダイアログ
+  - ファイル: `DashboardPage.xaml.cs`
 
-- [ ] 3-2. User Prompt の組み立てロジック (BuildMorningAutopilotUserPrompt)
-  - 日付 + 曜日 + スケジュールヒント + 昨日standup + Today Queue + Project Signals
-  - What's Next の BuildWhatsNextUserPrompt を参考にしつつ、追加データを含む
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+- [ ] 5-2. ローディングウィンドウのテキスト更新
+  - `BuildTimeBlockLoadingWindow`: "Planning your day..." に変更、アイコン ☀ に変更
+  - ファイル: `DashboardPage.xaml.cs`
 
-- [ ] 3-3. OnMorningAutopilotClickAsync イベントハンドラを実装
-  - ヒント入力ダイアログ → データ収集 → プロンプト構築 → ローディング → LLM → 計画ダイアログ
-  - CancellationToken 対応
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+### Phase 6: 結果ダイアログ刷新 (ShowTimeBlockResultDialog)
 
-- [ ] 3-4. LLM レスポンスの解析 (ParseDailyPlanResponse)
-  - JSON オブジェクトをパース → DailyPlan
-  - blocks 配列 → TimeBlock → PlanItem
-  - パース失敗時はプレーンテキストとしてフォールバック表示
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+- [ ] 6-1. `ShowTimeBlockResultDialog` を DailyPlan 対応に全面書き直し
+  - タイトル: "☀ Today's Plan — {date}"
+  - 3 セクション: Morning / Afternoon / Late afternoon (背景色で区分)
+  - 各アイテム: カテゴリアイコン (Symbol) + [Project] Action テキスト + Reason + [Open] ボタン
+  - overall_advice フッター (あれば)
+  - [Copy] / [Save & Close] / [Close] ボタン
+  - サイズ: 680 x 520、CanResize、WindowChrome
+  - ファイル: `DashboardPage.xaml.cs`
 
-### Phase 4: 計画表示ダイアログ
-
-- [ ] 4-1. 計画ダイアログの実装
-  - 680 x 520, CanResize, WindowChrome
-  - 時間ブロックごとのセクション表示 (Morning / Afternoon / Late afternoon)
-  - 各アイテム: カテゴリアイコン + [Project] Action + Reason + [Open]
-  - ダークモード対応 (テーマリソース使用)
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
-
-- [ ] 4-2. [Open] ボタンの実装
-  - What's Next と同じナビゲーションロジック
+- [ ] 6-2. [Open] ボタンの実装
+  - What's Next と同じナビゲーションロジック (NavigateToSuggestionDirect を流用または参考に)
   - target_file あり → NavigateToEditorAndOpenFile
-  - target_file なし → NavigateToEditor (プロジェクト選択状態)
-  - category が "commit" → NavigateToGitRepos
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+  - target_file なし + category != "commit" → NavigateToEditor (プロジェクト選択)
+  - category == "commit" → NavigateToGitRepos
+  - ファイル: `DashboardPage.xaml.cs`
 
-- [ ] 4-3. [Copy] ボタンの実装
-  - DailyPlan を Markdown形式のプレーンテキストに変換
-  - ヘッダー + 時間ブロック + 番号付きアイテム
-  - Clipboard.SetText で設定
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+- [ ] 6-3. [Copy] ボタン: `BuildTimeBlockClipboardText` を `BuildPlanMyDayClipboardText` に書き直し
+  - Markdown形式: ヘッダー + 時間ピリオドセクション + 番号付きアイテム
+  - ファイル: `DashboardPage.xaml.cs`
 
-- [ ] 4-4. [Save & Close] ボタンの実装
-  - Markdown ファイルを `{ObsidianVaultRoot}/standup/{date}_plan.md` に保存
-  - FileEncodingService.WriteFileAsync (UTF-8)
-  - 保存成功後にダイアログを閉じる
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+- [ ] 6-4. [Save & Close] ボタンの実装
+  - `{ObsidianVaultRoot}/standup/{date}_plan.md` に Markdown 保存
+  - FileEncodingService.WriteFileAsync (UTF-8BOM)
+  - ObsidianVaultRoot 未設定時はボタン非表示 (Visibility.Collapsed)
+  - ファイル: `DashboardPage.xaml.cs`
 
-### Phase 5: XAML ボタン + 自動起動
+### Phase 7: 自動起動
 
-- [ ] 5-1. Dashboard ヘッダーにボタンを追加
-  - wpf-ui の `<ui:Button>` で配置 (What's Next ボタンの左隣)
-  - SymbolIcon: `WeatherSunny24`
-  - Content: "Plan My Day"
-  - Visibility: `IsAiEnabled` バインディング
-  - Click: `OnMorningAutopilotClickAsync`
-  - ファイル: `Views/Pages/DashboardPage.xaml`
+- [ ] 7-1. `ShouldShowMorningAutopilot()` を実装
+  - AI有効 && 6時以降 && 平日 && 当日未表示 → true
+  - `static DateTime? _planMyDayShownToday` で管理
+  - ファイル: `DashboardPage.xaml.cs`
 
-- [ ] 5-2. 自動起動判定ロジックの実装
-  - ShouldShowMorningAutopilot() メソッド
-  - static DateTime? _morningAutopilotShownToday フラグ
-  - DashboardPage Loaded イベントから呼び出し
-  - 条件合致時: 確認プロンプト表示 → [Let's go] で実行 / [Not today] でスキップ
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+- [ ] 7-2. `OnLoaded` から自動起動判定を呼び出し
+  - 既存の Loaded イベントハンドラに追記
+  - 条件合致時 → ShowMorningConfirmDialogAsync → [Let's go] で OnTimeBlockClickAsync を呼ぶ
+  - ファイル: `DashboardPage.xaml.cs`
 
-- [ ] 5-3. ローディングダイアログの実装
-  - What's Next の BuildWhatsNextLoadingWindow と同パターン
-  - テキスト: "Planning your day..."
-  - [Cancel] で CancellationTokenSource をキャンセル
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+### Phase 8: XAML ボタン更新
 
-### Phase 6: エラーハンドリング
+- [ ] 8-1. Clock24 ボタンを Plan My Day ボタンに変更
+  - Icon: `WeatherSunny24`
+  - Content: "Plan My Day" (テキスト付きボタンに変更)
+  - ToolTip: "Plan my day — AI generates a time-blocked plan with project signals and task priorities"
+  - ファイル: `DashboardPage.xaml` (line 39-44)
 
-- [ ] 6-1. API キー未設定時のガイダンス
-  - "AI features are enabled but API key is not configured. Go to Settings?" ダイアログ
-  - What's Next と同じパターン
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+---
 
-- [ ] 6-2. LLM API エラー時の表示
-  - タイムアウト、認証エラー → エラーダイアログ
-  - レスポンス解析失敗 → プレーンテキストとしてフォールバック表示
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+## カテゴリアイコンマッピング (Phase 6-1 で使用)
 
-- [ ] 6-3. プロジェクトゼロ件の処理
-  - LLM を呼ばず "No projects found" メッセージ
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+| category | wpf-ui Symbol |
+|---|---|
+| task | TaskListSquare24 |
+| focus | DocumentEdit24 |
+| decision | Gavel24 |
+| commit | BranchFork24 |
+| tension | Warning24 |
+| meeting_prep | People24 |
+| review | Eye24 |
 
-- [ ] 6-4. standup ディレクトリ不在時の処理
-  - ObsidianVaultRoot 未設定 or standup/ 不在 → Save 機能を無効化 (ボタン非表示)
-  - 計画生成自体は問題なく動作
-  - ファイル: `Views/Pages/DashboardPage.xaml.cs`
+---
 
-## ファイル追加/変更一覧
-
-### 新規ファイル
-
-なし。
-
-### 変更ファイル
+## ファイル変更一覧
 
 | ファイル | 変更内容 |
 |---|---|
-| `Views/Pages/DashboardPage.xaml` | ヘッダーに Plan My Day ボタン追加 |
-| `Views/Pages/DashboardPage.xaml.cs` | 自動起動判定、ヒント入力ダイアログ、データ収集、プロンプト構築、LLM呼び出し、計画ダイアログ、保存ロジック |
-| `ViewModels/DashboardViewModel.cs` | IsAiEnabled プロパティ (What's Nextで追加済みなら変更不要) |
+| `Views/Pages/DashboardPage.xaml` | Phase 8: ボタン更新 (2行) |
+| `Views/Pages/DashboardPage.xaml.cs` | Phase 1-7: データモデル/ハンドラ/ダイアログ全面改修 |
+
+新規ファイル: なし
+
+---
 
 ## 実装順序
 
-Phase 1 (データ収集) → Phase 2 (ヒント入力) → Phase 3 (プロンプト+LLM) → Phase 4 (計画ダイアログ) → Phase 5 (XAML+自動起動) → Phase 6 (エラー処理)
+Phase 1 (モデル) → Phase 3 (データ収集) → Phase 4 (プロンプト) → Phase 5 (ハンドラ) → Phase 2 (ヒント入力ダイアログ) → Phase 6 (結果ダイアログ) → Phase 7 (自動起動) → Phase 8 (XAML)
 
-Phase 1-3 が裏側のロジック、Phase 4-5 が見た目、Phase 6 が堅牢化。
-全体で新規ファイルゼロ、変更ファイル2-3つの軽量実装 (What's Next と同パターン)。
+Phase 1-5 がロジック、Phase 6 が最大の作業 (UI コード量)、Phase 7-8 が仕上げ。
 
-## 他の計画との関係
+---
 
-| 観点 | What's Next | Morning Autopilot | Standup Generator |
-|---|---|---|---|
-| トリガー | ボタン手動 | 朝の自動起動 + ボタン | タイマー (1時間) |
-| LlmClientService | 利用 | 利用 | 不使用 |
-| ProjectDiscoveryService | 全プロジェクト走査 | 全プロジェクト走査 | 全プロジェクト走査 |
-| TodayQueueService | Today Queue読取 | Today Queue読取 | Today Queue読取 |
-| 昨日のstandup | 不使用 | 読み取り (継続性のため) | 生成する側 |
-| スケジュールヒント | なし | ユーザー入力 (任意) | なし |
-| 出力 | 一時表示 (ダイアログ) | ダイアログ + ファイル保存 (任意) | ファイル保存 |
-| 時間軸 | なし (優先度のみ) | 時間ブロック (午前/午後/夕方) | 昨日/今日/今週 |
-| 新規ファイル | 0 | 0 | 0 |
+## 既存コードの活用方針
 
-What's Next のデータ収集ロジック (CollectFocusPreviewsAsync, BuildWhatsNextUserPrompt 内のプロジェクトシグナル部分) はそのまま流用可能。Morning Autopilot はその上にスケジュールヒントと時間ブロック生成を追加する形。
+| 既存要素 | 扱い |
+|---|---|
+| `CollectFocusPreviewsAsync` | Phase 3-1 に統合 (focus 500文字に拡大) |
+| `BuildWhatsNextUserPrompt` の Project Signals 部分 | Phase 4-2 でそのままコピー流用 |
+| `NavigateToSuggestionDirect` / `ResolveWhatsNextTargetFile` | Phase 6-2 で流用 (引数型を DayPlanItem に合わせて調整) |
+| `BuildTimeBlockLoadingWindow` | Phase 5-2 でテキスト/アイコンのみ修正、構造は維持 |
+| `ShowWhatsNextLogDialog` | Debug ボタンでそのまま流用 |
+| `BuildTimeBlockClipboardText` | Phase 6-3 で置き換え |
 
-## 将来の拡張候補
+---
 
-- カレンダー連携 (Outlook/Google Calendar API) でスケジュールヒントを自動取得
-- 過去の plan ファイルからの学習 (どのアイテムが実際に完了されたか)
-- 「午後の残り」再計画ボタン (午前が予定通りに行かなかった時用)
-- Today Queue へのスター付与 (承認した計画アイテムをハイライト)
-- ウィジェット表示 (ダイアログではなくDashboard上にインライン表示)
+## What's Next との住み分け
+
+| 観点 | What's Next (維持) | Plan My Day (改修後) |
+|---|---|---|
+| 起動 | ボタン手動 | 朝の自動起動 + ボタン |
+| 出力 | 優先順タスク 3-5 件 | 時間ピリオド付き 4-7 件の1日計画 |
+| 時間軸 | なし | morning / afternoon / late_afternoon |
+| 理由 | 1-2 文 | 「なぜ今日・なぜこの時間帯」 |
+| ファイル保存 | なし | Markdown 保存 (任意) |
+| ナビゲーション | [Open] ボタンあり | [Open] ボタンあり |
