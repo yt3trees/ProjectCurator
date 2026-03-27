@@ -3725,7 +3725,6 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         var scrollViewer = new ScrollViewer
         {
             Content = blocksPanel,
-            MaxHeight = 460,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Margin = new Thickness(0, 4, 0, 0)
         };
