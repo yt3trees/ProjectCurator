@@ -28,4 +28,13 @@
     <EmbeddedResource Include="Assets\ContextCompressionLayer\**\*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Exclude stale nested project artifacts from previous repository layout. -->
+    <Compile Remove="ProjectCurator.Core\**\*.cs;ProjectCurator.Desktop\**\*.cs" />
+    <EmbeddedResource Remove="ProjectCurator.Core\**\*;ProjectCurator.Desktop\**\*" />
+    <None Remove="ProjectCurator.Core\**\*;ProjectCurator.Desktop\**\*" />
+    <Page Remove="ProjectCurator.Core\**\*;ProjectCurator.Desktop\**\*" />
+    <Resource Remove="ProjectCurator.Core\**\*;ProjectCurator.Desktop\**\*" />
+  </ItemGroup>
+
 </Project>
