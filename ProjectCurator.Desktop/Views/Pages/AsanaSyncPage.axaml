@@ -1,0 +1,273 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ProjectCurator.Desktop.Views.Pages.AsanaSyncPage">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- ツールバー -->
+            <RowDefinition Height="*"/>
+            <!-- メインコンテンツ -->
+        </Grid.RowDefinitions>
+
+        <!-- ===== ツールバー ===== -->
+        <Border Grid.Row="0" Background="#1E1E2E" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Asana Sync"
+                           FontSize="14" FontWeight="SemiBold"
+                           Foreground="White"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"/>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <ProgressBar IsIndeterminate="True" Width="80" Height="4"
+                                 IsVisible="{Binding IsSyncing}"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,8,0"/>
+                    <Button Content="Run Sync Now"
+                            Command="{Binding SyncCommand}"
+                            IsEnabled="{Binding !IsSyncing}"
+                            Margin="0,0,6,0"/>
+                    <Button Content="Clear"
+                            Command="{Binding ClearOutputCommand}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ===== メインコンテンツ ===== -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" MinWidth="300"/>
+                <ColumnDefinition Width="5"/>
+                <!-- Splitter -->
+                <ColumnDefinition Width="280" MinWidth="220"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ===== 左: スケジュール設定 + 出力ログ ===== -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <!-- スケジュール設定 -->
+                    <RowDefinition Height="*"/>
+                    <!-- 出力ログ -->
+                </Grid.RowDefinitions>
+
+                <!-- スケジュール設定バー -->
+                <Border Grid.Row="0" Background="#1E1E2E"
+                        BorderBrush="#313244"
+                        BorderThickness="0,0,0,1"
+                        Padding="8,6">
+                    <WrapPanel Orientation="Horizontal">
+                        <CheckBox Content="Auto Sync"
+                                  IsChecked="{Binding ScheduleEnabled}"
+                                  Foreground="White"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,12,0"/>
+                        <TextBlock Text="Interval (min):"
+                                   VerticalAlignment="Center"
+                                   Foreground="#A6ADC8"
+                                   FontSize="12"
+                                   Margin="0,0,4,0"/>
+                        <TextBox Text="{Binding IntervalMin}"
+                                 Width="50"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,6,0"
+                                 Padding="4,2"/>
+                        <Button Content="Save Schedule"
+                                Command="{Binding SaveScheduleCommand}"
+                                Margin="0,0,16,0"/>
+                        <CheckBox Content="Skip hidden projects"
+                                  IsChecked="{Binding SkipHiddenProjects}"
+                                  Foreground="White"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,16,0"/>
+                        <TextBlock Text="Last sync: "
+                                   VerticalAlignment="Center"
+                                   Foreground="#A6ADC8"
+                                   FontSize="12"/>
+                        <TextBlock Text="{Binding LastSyncTime}"
+                                   VerticalAlignment="Center"
+                                   Foreground="#89B4FA"
+                                   FontSize="12"/>
+                    </WrapPanel>
+                </Border>
+
+                <!-- 出力ログ -->
+                <TextBox Grid.Row="1"
+                         Text="{Binding OutputLog, Mode=OneWay}"
+                         IsReadOnly="True"
+                         TextWrapping="NoWrap"
+                         FontFamily="Consolas, Courier New"
+                         FontSize="12"
+                         Background="#181825"
+                         Foreground="White"
+                         BorderThickness="0"
+                         Padding="8"
+                         AcceptsReturn="True"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+            </Grid>
+
+            <!-- GridSplitter -->
+            <GridSplitter Grid.Column="1" Width="5"
+                          HorizontalAlignment="Stretch"
+                          Background="#313244"/>
+
+            <!-- ===== 右: asana_config.json エディター ===== -->
+            <Grid Grid.Column="2" Background="#1E1E2E">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <!-- ヘッダー -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- プロジェクト選択 -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- GIDs ラベル -->
+                    <RowDefinition Height="*"/>
+                    <!-- GIDs テキストボックス -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- Workstream map ラベル -->
+                    <RowDefinition Height="*"/>
+                    <!-- Workstream map テキストボックス -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- Field 名 -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- エイリアス ラベル -->
+                    <RowDefinition Height="*"/>
+                    <!-- エイリアス テキストボックス -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- 保存 + ステータス -->
+                </Grid.RowDefinitions>
+
+                <!-- ヘッダー -->
+                <Border Grid.Row="0"
+                        Background="#313244"
+                        BorderBrush="#45475A"
+                        BorderThickness="0,0,0,1"
+                        Padding="8,6">
+                    <TextBlock Text="asana_config.json"
+                               FontSize="13" FontWeight="SemiBold"
+                               Foreground="White"/>
+                </Border>
+
+                <!-- プロジェクト選択 + Load ボタン -->
+                <Grid Grid.Row="1" Margin="8,8,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ComboBox Grid.Column="0"
+                              ItemsSource="{Binding Projects}"
+                              SelectedItem="{Binding SelectedProject}"
+                              DisplayMemberBinding="{Binding DisplayName}"
+                              Margin="0,0,4,0"/>
+                    <Button Grid.Column="1"
+                            Content="Load"
+                            Command="{Binding LoadAsanaConfigCommand}"/>
+                </Grid>
+
+                <!-- Asana Project GIDs ラベル -->
+                <TextBlock Grid.Row="2"
+                           Text="Asana Project GIDs (1 per line):"
+                           Foreground="#A6ADC8"
+                           FontSize="11"
+                           Margin="8,8,8,2"/>
+
+                <!-- GIDs テキストボックス -->
+                <TextBox Grid.Row="3"
+                         Text="{Binding AsanaConfigGids}"
+                         AcceptsReturn="True"
+                         TextWrapping="NoWrap"
+                         FontFamily="Consolas, Courier New"
+                         FontSize="11"
+                         Margin="8,0,8,0"
+                         Padding="4"
+                         BorderThickness="1"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+
+                <!-- Workstream map ラベル -->
+                <TextBlock Grid.Row="4"
+                           Text="Workstream Map (gid=workstream-id):"
+                           Foreground="#A6ADC8"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Margin="8,8,8,2"/>
+
+                <!-- Workstream map テキストボックス -->
+                <TextBox Grid.Row="5"
+                         Text="{Binding AsanaConfigWorkstreamMap}"
+                         AcceptsReturn="True"
+                         TextWrapping="NoWrap"
+                         FontFamily="Consolas, Courier New"
+                         FontSize="11"
+                         Margin="8,0,8,0"
+                         Padding="4"
+                         BorderThickness="1"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+
+                <!-- Workstream field name -->
+                <Grid Grid.Row="6" Margin="8,8,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Workstream Field:"
+                               Foreground="#A6ADC8"
+                               FontSize="11"
+                               VerticalAlignment="Center"
+                               Margin="0,0,6,0"/>
+                    <TextBox Grid.Column="1"
+                             Text="{Binding AsanaConfigWorkstreamFieldName}"
+                             Padding="4,2"
+                             BorderThickness="1"/>
+                </Grid>
+
+                <!-- Project Aliases ラベル -->
+                <TextBlock Grid.Row="7"
+                           Text="Project Aliases (1 per line):"
+                           Foreground="#A6ADC8"
+                           FontSize="11"
+                           Margin="8,8,8,2"/>
+
+                <!-- エイリアス テキストボックス -->
+                <TextBox Grid.Row="8"
+                         Text="{Binding AsanaConfigAliases}"
+                         AcceptsReturn="True"
+                         TextWrapping="NoWrap"
+                         FontFamily="Consolas, Courier New"
+                         FontSize="11"
+                         Margin="8,0,8,0"
+                         Padding="4"
+                         BorderThickness="1"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+
+                <!-- 保存ボタン + ステータス -->
+                <Grid Grid.Row="9" Margin="8,6,8,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0"
+                            Content="Save"
+                            Command="{Binding SaveAsanaConfigCommand}"
+                            Margin="0,0,8,0"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding AsanaConfigStatus}"
+                               Foreground="#A6ADC8"
+                               FontSize="11"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"/>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,354 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ProjectCurator.ViewModels"
+             xmlns:conv="using:ProjectCurator.Desktop.Converters"
+             x:Class="ProjectCurator.Desktop.Views.Pages.TimelinePage">
+
+    <UserControl.Resources>
+        <conv:HeatmapIntensityToBrushConverter x:Key="HeatmapIntensityToBrushConverter"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ===== ヘッダーバー ===== -->
+        <Border Grid.Row="0" Background="#1E1E2E" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="Timeline"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="White"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"/>
+
+                <TextBlock Grid.Column="1"
+                           Text="Project:"
+                           VerticalAlignment="Center"
+                           Foreground="#A6ADC8"
+                           FontSize="12"
+                           Margin="0,0,4,0"/>
+
+                <ComboBox Grid.Column="2"
+                          ItemsSource="{Binding Projects}"
+                          SelectedItem="{Binding SelectedProject}"
+                          DisplayMemberBinding="{Binding DisplayName}"
+                          MinWidth="200" MaxWidth="320"
+                          Margin="0,0,12,0"/>
+
+                <TextBlock Grid.Column="3"
+                           Text="Period:"
+                           VerticalAlignment="Center"
+                           Foreground="#A6ADC8"
+                           FontSize="12"
+                           Margin="0,0,4,0"/>
+
+                <ComboBox x:Name="PeriodComboBox"
+                          Grid.Column="4"
+                          Width="112"
+                          FontSize="12"
+                          HorizontalAlignment="Left"
+                          SelectionChanged="OnPeriodChanged">
+                    <ComboBoxItem Tag="30" Content="30 days"/>
+                    <ComboBoxItem Tag="90" Content="90 days"/>
+                    <ComboBoxItem Tag="0" Content="All"/>
+                </ComboBox>
+
+                <TextBlock Grid.Column="5"
+                           Text="Graph scope:"
+                           VerticalAlignment="Center"
+                           Foreground="#A6ADC8"
+                           FontSize="12"
+                           Margin="12,0,4,0"/>
+
+                <ComboBox Grid.Column="6"
+                          Width="150"
+                          FontSize="12"
+                          ItemsSource="{Binding GraphScopes}"
+                          SelectedItem="{Binding SelectedGraphScope}"/>
+            </Grid>
+        </Border>
+
+        <!-- ===== タブコンテンツ ===== -->
+        <TabControl Grid.Row="1"
+                    Margin="8,8,8,0"
+                    Background="Transparent">
+
+            <!-- ===== Entries タブ ===== -->
+            <TabItem Header="Entries">
+                <Grid>
+                    <ListBox x:Name="TimelineListBox"
+                             ItemsSource="{Binding Entries}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             SelectionMode="Single"
+                             SelectionChanged="OnEntrySelected"
+                             Padding="0,4">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:TimelineEntryItem}">
+                                <Grid>
+                                    <Border Background="#313244"
+                                            BorderBrush="#45475A"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            Padding="10,6"
+                                            Margin="0,0,0,4"
+                                            Cursor="Hand"
+                                            IsVisible="{Binding !IsGap}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding DateText}"
+                                                       FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#89B4FA"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Preview}"
+                                                       FontSize="12"
+                                                       Foreground="White"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <TextBlock Text="{Binding GapText}"
+                                               FontSize="11"
+                                               Foreground="#45475A"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,2,0,2"
+                                               IsVisible="{Binding IsGap}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <Grid IsVisible="{Binding IsLoading}"
+                          Background="#40000000"
+                          IsHitTestVisible="False">
+                        <ProgressBar IsIndeterminate="True"
+                                     Width="40" Height="8"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <TextBlock Text="Select a project"
+                               FontSize="14"
+                               Foreground="#A6ADC8"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding SelectedProject, Converter={x:Static ObjectConverters.IsNull}}"/>
+                </Grid>
+            </TabItem>
+
+            <!-- ===== Graph タブ ===== -->
+            <TabItem Header="Graph">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- ヘッダー行 (日付ラベル) -->
+                    <Border Grid.Row="0"
+                            Background="#1E1E2E"
+                            BorderBrush="#313244"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="6"
+                            Margin="0,0,0,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       Text="Projects"
+                                       Foreground="#A6ADC8"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       FontWeight="SemiBold"/>
+
+                            <ScrollViewer x:Name="HeatmapHeaderScrollViewer"
+                                          Grid.Column="1"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding HeatmapBuckets}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Width="18" Margin="1,0" Background="Transparent">
+                                                <TextBlock Text="{Binding ShortLabel}"
+                                                           FontSize="8"
+                                                           Foreground="#6C7086"
+                                                           HorizontalAlignment="Center"
+                                                           ToolTip.Tip="{Binding Label}"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+
+                    <!-- ヒートマップ本体 -->
+                    <Border Grid.Row="1"
+                            Background="#1E1E2E"
+                            BorderBrush="#313244"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- プロジェクト名列 -->
+                            <ScrollViewer x:Name="HeatmapProjectScrollViewer"
+                                          Grid.Column="0"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Hidden"
+                                          ScrollChanged="OnHeatmapProjectScrollChanged">
+                                <ItemsControl ItemsSource="{Binding HeatmapRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Height="18" Margin="0,0,8,4" Background="Transparent">
+                                                <TextBlock Text="{Binding ProjectName}"
+                                                           Foreground="White"
+                                                           FontSize="12"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <!-- セル列 -->
+                            <ScrollViewer x:Name="HeatmapBodyScrollViewer"
+                                          Grid.Column="1"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Auto"
+                                          ScrollChanged="OnHeatmapBodyScrollChanged">
+                                <ItemsControl ItemsSource="{Binding HeatmapRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Height="18" Margin="0,0,0,4" Background="Transparent">
+                                                <ItemsControl ItemsSource="{Binding Cells}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Orientation="Horizontal"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="{x:Type vm:TimelineHeatmapCellItem}">
+                                                            <Border Width="18"
+                                                                    Height="14"
+                                                                    Margin="1"
+                                                                    CornerRadius="2"
+                                                                    Background="{Binding Intensity, Converter={StaticResource HeatmapIntensityToBrushConverter}}"
+                                                                    Cursor="Hand"
+                                                                    ToolTip.Tip="{Binding ToolTipText}"
+                                                                    PointerPressed="OnHeatmapCellPointerPressed"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+
+                    <!-- 凡例 -->
+                    <Border Grid.Row="2"
+                            Background="#1E1E2E"
+                            BorderBrush="#313244"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="8,6"
+                            Margin="0,6,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding GraphStatsText}"
+                                       FontSize="11"
+                                       Foreground="#A6ADC8"
+                                       VerticalAlignment="Center"/>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Low" Foreground="#6C7086" FontSize="10" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <Border Width="12" Height="12" Margin="0,0,2,0" CornerRadius="2" Background="#313244"/>
+                                <Border Width="12" Height="12" Margin="0,0,2,0" CornerRadius="2" Background="#89B4FA" Opacity="0.3"/>
+                                <Border Width="12" Height="12" Margin="0,0,2,0" CornerRadius="2" Background="#89B4FA" Opacity="0.6"/>
+                                <Border Width="12" Height="12" Margin="0,0,6,0" CornerRadius="2" Background="#89B4FA"/>
+                                <TextBlock Text="High" Foreground="#6C7086" FontSize="10" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- グラフ読み込みオーバーレイ -->
+                    <Grid Grid.RowSpan="3"
+                          Background="#40000000"
+                          IsVisible="{Binding IsGraphLoading}"
+                          IsHitTestVisible="False">
+                        <ProgressBar IsIndeterminate="True"
+                                     Width="40" Height="8"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- 空状態テキスト -->
+                    <TextBlock Grid.Row="1"
+                               Text="{Binding GraphEmptyText}"
+                               FontSize="14"
+                               Foreground="#A6ADC8"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               IsHitTestVisible="False"
+                               IsVisible="{Binding !HeatmapRows.Count}"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- ===== ステータスバー ===== -->
+        <Border Grid.Row="2"
+                Background="#313244"
+                BorderBrush="#45475A"
+                BorderThickness="0,1,0,0"
+                Padding="8,6,8,9">
+            <TextBlock Text="{Binding StatsText}"
+                       FontSize="11"
+                       Foreground="White"/>
+        </Border>
+    </Grid>
+</UserControl>

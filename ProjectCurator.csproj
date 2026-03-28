@@ -19,9 +19,14 @@
     <ProjectReference Include="ProjectCurator.Core\ProjectCurator.Core.csproj" />
   </ItemGroup>
 
-  <!-- Exclude Core project files from WPF compilation (they are compiled by Core project) -->
+  <!-- Exclude Core and Desktop project files from WPF compilation -->
   <ItemGroup>
     <Compile Remove="ProjectCurator.Core\**\*.cs" />
+    <Compile Remove="ProjectCurator.Desktop\**\*.cs" />
+    <None Remove="ProjectCurator.Desktop\**" />
+    <Content Remove="ProjectCurator.Desktop\**" />
+    <EmbeddedResource Remove="ProjectCurator.Desktop\**" />
+    <Page Remove="ProjectCurator.Desktop\**" />
   </ItemGroup>
 
   <!-- Exclude WPF-local copies of files that are now owned by Core (Phase 0 transition) -->

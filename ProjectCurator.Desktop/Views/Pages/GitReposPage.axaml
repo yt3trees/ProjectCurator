@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ProjectCurator.ViewModels"
+             x:Class="ProjectCurator.Desktop.Views.Pages.GitReposPage">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- ツールバー -->
+            <RowDefinition Height="*"/>
+            <!-- DataGrid -->
+            <RowDefinition Height="Auto"/>
+            <!-- ステータス -->
+        </Grid.RowDefinitions>
+
+        <!-- ===== ツールバー ===== -->
+        <Border Grid.Row="0" Background="#1E1E2E" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Git Repos"
+                           FontSize="14" FontWeight="SemiBold"
+                           Foreground="White"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"/>
+
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding Projects}"
+                          SelectedItem="{Binding SelectedProject}"
+                          DisplayMemberBinding="{Binding DisplayName}"
+                          MinWidth="200" MaxWidth="320"
+                          HorizontalAlignment="Left"/>
+
+                <!-- アクションボタン群 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="Scan"
+                            Command="{Binding ScanCommand}"
+                            IsEnabled="{Binding !IsScanning}"
+                            Margin="6,0,0,0"/>
+                    <Button Content="Save to Cloud"
+                            Command="{Binding SaveToCloudCommand}"
+                            IsEnabled="{Binding !IsScanning}"
+                            Margin="6,0,0,0"/>
+                    <Button Content="Load from Cloud"
+                            Command="{Binding LoadFromCloudCommand}"
+                            IsEnabled="{Binding !IsScanning}"
+                            Margin="6,0,0,0"/>
+                    <Button Content="Copy Clone Script"
+                            Command="{Binding CopyCloneScriptCommand}"
+                            IsEnabled="{Binding !IsScanning}"
+                            Margin="6,0,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ===== DataGrid ===== -->
+        <Grid Grid.Row="1">
+            <DataGrid ItemsSource="{Binding Repos}"
+                      SelectedItem="{Binding SelectedRepo}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      GridLinesVisibility="Horizontal"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      ColumnHeaderHeight="30"
+                      RowHeight="28"
+                      FontSize="12">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Project" Binding="{Binding ProjectName}" Width="120"/>
+                    <DataGridTextColumn Header="Repository" Binding="{Binding RepoName}" Width="150"/>
+                    <DataGridTextColumn Header="Remote URL" Binding="{Binding RemoteOrigin}" Width="*"/>
+                    <DataGridTextColumn Header="Branch" Binding="{Binding Branch}" Width="90"/>
+                    <DataGridTextColumn Header="Last Commit" Binding="{Binding LastCommitDate}" Width="110"/>
+                    <DataGridTemplateColumn Header="Action" Width="200">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="vm:GitRepoItem">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Button Content="Open"
+                                            Padding="6,1"
+                                            MinWidth="56"
+                                            Margin="0,0,4,0"
+                                            Command="{Binding $parent[DataGrid].((vm:GitReposViewModel)DataContext).OpenRepoFolderCommand}"
+                                            CommandParameter="{Binding}"/>
+                                    <Button Content="Terminal"
+                                            Padding="6,1"
+                                            MinWidth="68"
+                                            Margin="0,0,4,0"
+                                            Command="{Binding $parent[DataGrid].((vm:GitReposViewModel)DataContext).OpenRepoTerminalCommand}"
+                                            CommandParameter="{Binding}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- ローディングオーバーレイ -->
+            <Grid IsVisible="{Binding IsScanning}"
+                  Background="#40000000"
+                  IsHitTestVisible="False">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
+                    <TextBlock Text="Scanning..."
+                               Foreground="White"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- ===== ステータスバー ===== -->
+        <Border Grid.Row="2"
+                Background="#1E1E2E"
+                BorderBrush="#313244"
+                BorderThickness="0,1,0,0"
+                Padding="8,4">
+            <TextBlock Text="{Binding StatusText}"
+                       FontSize="11"
+                       Foreground="#A6ADC8"/>
+        </Border>
+    </Grid>
+</UserControl>

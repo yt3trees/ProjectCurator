@@ -1,0 +1,413 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ProjectCurator.ViewModels"
+             x:Class="ProjectCurator.Desktop.Views.Pages.SetupPage">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ヘッダー -->
+        <TextBlock Grid.Row="0"
+                   Text="Setup"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="White"
+                   Margin="16,12,16,8"/>
+
+        <!-- メインコンテンツ -->
+        <Grid Grid.Row="1" Margin="12,0,12,44">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ===== サブタブ ===== -->
+            <TabControl Grid.Row="0"
+                        SelectedIndex="{Binding SelectedTabIndex}"
+                        Background="Transparent">
+
+                <!-- ===== New ===== -->
+                <TabItem Header="New Project">
+                    <ScrollViewer>
+                        <StackPanel Margin="0,12,0,0" Spacing="4">
+                            <TextBlock Text="Create / Update Project"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="#A6ADC8"
+                                       Margin="0,0,0,6"/>
+
+                            <!-- Project Name -->
+                            <TextBlock Text="Project Name *" Foreground="White" Margin="0,0,0,4"/>
+                            <ComboBox ItemsSource="{Binding ProjectNames}"
+                                      SelectedItem="{Binding NewProjectName}"
+                                      IsEnabled="{Binding !IsRunning}"
+                                      MinWidth="400" MaxWidth="600"
+                                      HorizontalAlignment="Left"
+                                      Margin="0,0,0,4"/>
+                            <TextBlock Text="Select an existing project to auto-fill Tier/Category, add ExternalSharedPaths, or run AI Context Setup on it."
+                                       FontSize="11" Foreground="#A6ADC8"
+                                       TextWrapping="Wrap" MaxWidth="600" HorizontalAlignment="Left"
+                                       Margin="0,0,0,10"/>
+
+                            <!-- Detect from BOX -->
+                            <Button Content="Detect from BOX"
+                                    Command="{Binding DetectBoxProjectsCommand}"
+                                    IsEnabled="{Binding CanDetectBoxProjects}"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,0,0,6"/>
+                            <ComboBox ItemsSource="{Binding BoxOnlyProjects}"
+                                      SelectedItem="{Binding SelectedBoxOnlyProject}"
+                                      DisplayMemberBinding="{Binding DisplayName}"
+                                      IsEnabled="{Binding HasBoxOnlyProjects}"
+                                      MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
+                                      Margin="0,0,0,4"
+                                      IsVisible="{Binding HasBoxOnlyProjects}"/>
+                            <TextBlock Text="Select a BOX-only project to auto-fill the fields below."
+                                       FontSize="11" Foreground="#A6ADC8"
+                                       Margin="0,0,0,10"
+                                       IsVisible="{Binding HasBoxOnlyProjects}"/>
+
+                            <!-- Tier / Category -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <StackPanel Margin="0,0,24,0">
+                                    <TextBlock Text="Tier" Foreground="White" Margin="0,0,0,4"/>
+                                    <ComboBox SelectedItem="{Binding NewTier}"
+                                              IsEnabled="{Binding !IsRunning}"
+                                              Width="180">
+                                        <ComboBoxItem Content="full (standard)" Tag="full"/>
+                                        <ComboBoxItem Content="mini (lightweight)" Tag="mini"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="Category" Foreground="White" Margin="0,0,0,4"/>
+                                    <ComboBox SelectedItem="{Binding NewCategory}"
+                                              IsEnabled="{Binding !IsRunning}"
+                                              Width="200">
+                                        <ComboBoxItem Content="project (time-bound)" Tag="project"/>
+                                        <ComboBoxItem Content="domain (ongoing)" Tag="domain"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- External Shared Paths (optional) -->
+                            <TextBlock Text="ExternalSharedPaths (optional, one path per line)"
+                                       Foreground="#A6ADC8" FontSize="12"
+                                       Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding NewExternalSharedPaths}"
+                                     Watermark="C:\Path\To\External\Shared"
+                                     AcceptsReturn="True"
+                                     MinHeight="80" MaxHeight="150"
+                                     FontFamily="Cascadia Mono, Consolas, Monospace"
+                                     FontSize="12"
+                                     IsEnabled="{Binding !IsRunning}"
+                                     MinWidth="400" MaxWidth="800" HorizontalAlignment="Left"
+                                     Margin="0,0,0,16"/>
+
+                            <!-- AI Context Setup -->
+                            <CheckBox Content="Also run AI Context Setup"
+                                      IsChecked="{Binding NewAlsoRunAiContext}"
+                                      IsEnabled="{Binding !IsRunning}"
+                                      Margin="0,0,0,6"/>
+
+                            <CheckBox Content="Overwrite existing skills (-Force)"
+                                      IsChecked="{Binding NewAiContextForce}"
+                                      IsEnabled="{Binding NewAiContextForceEnabled}"
+                                      Margin="16,0,0,6"/>
+
+                            <CheckBox Content="Reset skills folder (delete all before re-deploy)"
+                                      IsChecked="{Binding NewAiContextResetSkills}"
+                                      IsEnabled="{Binding NewAiContextResetSkillsEnabled}"
+                                      Margin="16,0,0,16"/>
+
+                            <Button Content="Setup Project"
+                                    Command="{Binding RunNewCommand}"
+                                    IsEnabled="{Binding !IsRunning}"
+                                    HorizontalAlignment="Left"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- ===== Check ===== -->
+                <TabItem Header="Check">
+                    <StackPanel Margin="0,12,0,0" Spacing="4">
+                        <TextBlock Text="Project Structure Check"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#A6ADC8"
+                                   Margin="0,0,0,6"/>
+
+                        <TextBlock Text="Project" Foreground="White" Margin="0,0,0,4"/>
+                        <ComboBox ItemsSource="{Binding ProjectNames}"
+                                  SelectedItem="{Binding CheckProjectName}"
+                                  IsEnabled="{Binding !IsRunning}"
+                                  MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
+                                  Margin="0,0,0,8"/>
+
+                        <TextBlock Text="* Tier / Category is determined automatically from the project list"
+                                   FontSize="11" Foreground="#A6ADC8"
+                                   Margin="0,0,0,10"/>
+
+                        <Button Content="Run Check"
+                                Command="{Binding RunCheckCommand}"
+                                IsEnabled="{Binding !IsRunning}"
+                                HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- ===== Archive ===== -->
+                <TabItem Header="Archive">
+                    <StackPanel Margin="0,12,0,0" Spacing="4">
+                        <TextBlock Text="Archive Project"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#A6ADC8"
+                                   Margin="0,0,0,6"/>
+
+                        <TextBlock Text="Project" Foreground="White" Margin="0,0,0,4"/>
+                        <ComboBox ItemsSource="{Binding ProjectNames}"
+                                  SelectedItem="{Binding ArchiveProjectName}"
+                                  IsEnabled="{Binding !IsRunning}"
+                                  MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
+                                  Margin="0,0,0,8"/>
+
+                        <CheckBox Content="Dry Run (no actual changes)"
+                                  IsChecked="{Binding ArchiveDryRun}"
+                                  IsEnabled="{Binding !IsRunning}"
+                                  Margin="0,0,0,8"/>
+
+                        <Border Background="#313244"
+                                CornerRadius="4" Padding="8,6" MaxWidth="600" HorizontalAlignment="Left"
+                                Margin="0,0,0,10">
+                            <TextBlock FontSize="11"
+                                       Foreground="#F9E2AF"
+                                       TextWrapping="Wrap"
+                                       Text="Warning: Disabling Dry Run will actually move the project to _archive/."/>
+                        </Border>
+
+                        <Button Content="Run Archive"
+                                Command="{Binding RunArchiveCommand}"
+                                IsEnabled="{Binding !IsRunning}"
+                                HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- ===== Convert ===== -->
+                <TabItem Header="Convert Tier">
+                    <StackPanel Margin="0,12,0,0" Spacing="4">
+                        <TextBlock Text="Tier Conversion (mini &#x27F7; full)"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#A6ADC8"
+                                   Margin="0,0,0,6"/>
+
+                        <TextBlock Text="Project" Foreground="White" Margin="0,0,0,4"/>
+                        <ComboBox ItemsSource="{Binding ProjectNames}"
+                                  SelectedItem="{Binding ConvertProjectName}"
+                                  IsEnabled="{Binding !IsRunning}"
+                                  MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"
+                                  Margin="0,0,0,10"/>
+
+                        <TextBlock Text="Target Tier" Foreground="White" Margin="0,0,0,4"/>
+                        <ComboBox SelectedItem="{Binding ConvertTargetTier}"
+                                  IsEnabled="{Binding !IsRunning}"
+                                  Width="130" HorizontalAlignment="Left"
+                                  Margin="0,0,0,10">
+                            <ComboBoxItem Content="full" Tag="full"/>
+                            <ComboBoxItem Content="mini" Tag="mini"/>
+                        </ComboBox>
+
+                        <CheckBox Content="Dry Run (no actual changes)"
+                                  IsChecked="{Binding ConvertDryRun}"
+                                  IsEnabled="{Binding !IsRunning}"
+                                  Margin="0,0,0,10"/>
+
+                        <Button Content="Run Convert"
+                                Command="{Binding RunConvertCommand}"
+                                IsEnabled="{Binding !IsRunning}"
+                                HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- ===== Workstreams ===== -->
+                <TabItem Header="Workstreams">
+                    <ScrollViewer>
+                        <StackPanel Margin="0,12,0,0" Spacing="4">
+                            <TextBlock Text="Workstream Management"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="#A6ADC8"
+                                       Margin="0,0,0,6"/>
+
+                            <TextBlock Text="Project" Foreground="White" Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <ComboBox ItemsSource="{Binding ProjectNames}"
+                                          SelectedItem="{Binding ManageProjectName}"
+                                          IsEnabled="{Binding !IsRunning}"
+                                          MinWidth="400" MaxWidth="600" HorizontalAlignment="Left"/>
+                                <Button Content="Reload"
+                                        Command="{Binding ReloadWorkstreamsCommand}"
+                                        Margin="8,0,0,0"
+                                        IsEnabled="{Binding CanManageWorkstreams}"/>
+                            </StackPanel>
+
+                            <Border Background="#313244" Padding="10" CornerRadius="4" Margin="0,0,0,10">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Add Workstream"
+                                               FontWeight="SemiBold"
+                                               Foreground="White"
+                                               Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <StackPanel Margin="0,0,12,0">
+                                            <TextBlock Text="Workstream ID (kebab-case)"
+                                                       Foreground="#A6ADC8" FontSize="11" Margin="0,0,0,4"/>
+                                            <TextBox Text="{Binding NewWorkstreamId}"
+                                                     Watermark="workstream-id"
+                                                     Width="240"
+                                                     IsEnabled="{Binding CanManageWorkstreams}"/>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="Label (optional)"
+                                                       Foreground="#A6ADC8" FontSize="11" Margin="0,0,0,4"/>
+                                            <TextBox Text="{Binding NewWorkstreamLabel}"
+                                                     Watermark="Display label (optional)"
+                                                     Width="280"
+                                                     IsEnabled="{Binding CanManageWorkstreams}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Button Content="Create Workstream"
+                                            Command="{Binding AddWorkstreamCommand}"
+                                            IsEnabled="{Binding CanManageWorkstreams}"
+                                            HorizontalAlignment="Left"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="Existing Workstreams"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           VerticalAlignment="Center"/>
+                                <Button Grid.Column="1"
+                                        Content="Save Labels"
+                                        Command="{Binding SaveWorkstreamLabelsCommand}"
+                                        IsEnabled="{Binding CanManageWorkstreams}"/>
+                            </Grid>
+
+                            <Border Background="#1E1E2E"
+                                    BorderBrush="#45475A"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="8">
+                                <ItemsControl ItemsSource="{Binding ManageWorkstreams}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:WorkstreamManageItem}">
+                                            <Border BorderBrush="#45475A" BorderThickness="0,0,0,1" Padding="0,6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="220"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="80"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding Id}"
+                                                               FontFamily="Cascadia Mono, Consolas, Monospace"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="White"/>
+
+                                                    <TextBox Grid.Column="1"
+                                                             Text="{Binding Label}"
+                                                             Margin="10,0,10,0"
+                                                             VerticalAlignment="Center"/>
+
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding StatusText}"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Center"
+                                                               Foreground="#A6ADC8"/>
+
+                                                    <Button Grid.Column="3"
+                                                            Content="{Binding ToggleButtonLabel}"
+                                                            Command="{Binding $parent[UserControl].((vm:SetupViewModel)DataContext).ToggleWorkstreamClosedCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            Padding="10,2"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+
+                            <TextBlock Text="No workstreams found for this project."
+                                       Foreground="#A6ADC8"
+                                       Margin="0,8,0,0"
+                                       IsVisible="{Binding !HasManageWorkstreams}"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
+
+            <!-- ===== 出力エリア ===== -->
+            <Grid Grid.Row="1" Margin="0,8,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- 出力ヘッダー + ボタン -->
+                <Grid Grid.Row="0" Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Output"
+                               FontWeight="SemiBold"
+                               Foreground="#A6ADC8"
+                               VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Content="Cancel"
+                                Command="{Binding CancelCommand}"
+                                Margin="0,0,6,0"
+                                IsVisible="{Binding IsRunning}"/>
+                        <Button Content="Clear"
+                                Command="{Binding ClearOutputCommand}"
+                                IsEnabled="{Binding !IsRunning}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- 出力テキスト -->
+                <Border Grid.Row="1"
+                        Background="#1E1E2E"
+                        BorderBrush="#45475A"
+                        BorderThickness="1"
+                        CornerRadius="4">
+                    <ScrollViewer x:Name="OutputScrollViewer"
+                                  HorizontalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="OutputTextBlock"
+                                   Text="{Binding OutputText}"
+                                   FontFamily="Cascadia Mono, Consolas, Monospace"
+                                   FontSize="12"
+                                   Foreground="White"
+                                   TextWrapping="NoWrap"
+                                   Padding="8"/>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- ProgressBar オーバーレイ -->
+                <Grid Grid.Row="1"
+                      IsVisible="{Binding IsRunning}"
+                      Background="#40000000"
+                      IsHitTestVisible="False">
+                    <ProgressBar IsIndeterminate="True"
+                                 Width="36" Height="8"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"/>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

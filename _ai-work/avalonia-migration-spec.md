@@ -111,41 +111,41 @@ ProjectCurator.sln
 
 ### プロジェクト作成
 
-- [ ] `ProjectCurator.Desktop.csproj` 作成 (net9.0, Avalonia)
-- [ ] NuGet追加: Avalonia 11.x, Avalonia.Desktop 11.x, FluentAvalonia 2.x, SharpHook
-- [ ] Core プロジェクト参照追加
+- [x] `ProjectCurator.Desktop.csproj` 作成 (net9.0, Avalonia)
+- [x] NuGet追加: Avalonia 11.x, Avalonia.Desktop 11.x, FluentAvalonia 2.x, SharpHook
+- [x] Core プロジェクト参照追加
 
 ### アプリケーション基盤
 
-- [ ] `App.axaml` - FluentAvaloniaTheme適用 (ダークモード強制)、TrayIcon定義
-- [ ] `App.axaml.cs` - DI コンテナ設定 (既存App.xaml.csから移植)、シングルインスタンスMutex
+- [x] `App.axaml` - FluentAvaloniaTheme適用 (ダークモード強制)、TrayIcon定義
+- [x] `App.axaml.cs` - DI コンテナ設定 (既存App.xaml.csから移植)、シングルインスタンスMutex
 - [ ] テーマリソース: `GitHubDark.axaml` (既存GitHubDark.xamlから変換)
 - [ ] テーマリソース: `CatppuccinMocha.axaml` (既存CatppuccinMocha.xamlから変換)
 
 ### MainWindow
 
-- [ ] `MainWindow.axaml` - FluentAvalonia NavigationView、ステータスバー
-- [ ] `MainWindow.axaml.cs` - ウィンドウ表示/非表示トグル、キーボードショートカット (Ctrl+1-7, Ctrl+K, Escape)
-- [ ] DWMフラッシュ回避ハック不要 (Avaloniaのレンダリングでは発生しない見込み)
+- [x] `MainWindow.axaml` - FluentAvalonia NavigationView、ステータスバー
+- [x] `MainWindow.axaml.cs` - ウィンドウ表示/非表示トグル、キーボードショートカット (Ctrl+1-7, Ctrl+K, Escape)
+- [x] DWMフラッシュ回避ハック不要 (Avaloniaのレンダリングでは発生しない見込み)
 
 ### プラットフォームサービス実装 (Windows)
 
-- [ ] `AvaloniaDispatcherService.cs` - `Avalonia.Threading.Dispatcher.UIThread`使用
-- [ ] `AvaloniaDialogService.cs` - FluentAvalonia ContentDialog使用
-- [ ] `WindowsHotkeyService.cs` - 既存Win32Interop再利用、`TryGetPlatformHandle()`でHWND取得
-- [ ] `WindowsShellService.cs` (スタブ、Phase 3で完成)
-- [ ] `WindowsTrayService.cs` (Avalonia TrayIcon使用)
+- [x] `AvaloniaDispatcherService.cs` - `Avalonia.Threading.Dispatcher.UIThread`使用
+- [x] `AvaloniaDialogService.cs` - FluentAvalonia ContentDialog使用
+- [x] `WindowsHotkeyService.cs` - 既存Win32Interop再利用、`TryGetPlatformHandle()`でHWND取得
+- [x] `WindowsShellService.cs` (スタブ、Phase 3で完成)
+- [x] `WindowsTrayService.cs` (Avalonia TrayIcon使用)
 
 ### プラットフォームサービス実装 (macOS スタブ)
 
-- [ ] `MacOSHotkeyService.cs` (No-opスタブ)
-- [ ] `MacOSShellService.cs` (スタブ)
-- [ ] `MacOSTrayService.cs` (Avalonia TrayIcon使用)
+- [x] `MacOSHotkeyService.cs` (No-opスタブ)
+- [x] `MacOSShellService.cs` (スタブ)
+- [x] `MacOSTrayService.cs` (Avalonia TrayIcon使用)
 
 ### SettingsPage (概念実証)
 
-- [ ] `SettingsPage.axaml` - WPF版から変換 (フォーム系のみ、最もシンプル)
-- [ ] `SettingsPage.axaml.cs` - データバインディング・テーマ検証
+- [x] `SettingsPage.axaml` - WPF版から変換 (フォーム系のみ、最もシンプル)
+- [x] `SettingsPage.axaml.cs` - データバインディング・テーマ検証
 
 ### Phase 1 検証
 
@@ -161,14 +161,14 @@ ProjectCurator.sln
 
 ### 2-1. AsanaSyncPage (最も単純: 304 XAML行, 29 CS行)
 
-- [ ] `AsanaSyncPage.axaml` - XAML変換 (xmlns, Visibility->IsVisible, コントロール置換)
-- [ ] `AsanaSyncPage.axaml.cs` - コードビハインド移植
+- [x] `AsanaSyncPage.axaml` - XAML変換 (xmlns, Visibility->IsVisible, コントロール置換)
+- [x] `AsanaSyncPage.axaml.cs` - コードビハインド移植
 - [ ] 動作確認: Asana同期実行、ステータス表示
 
 ### 2-2. GitReposPage (176 XAML行, 174 CS行)
 
-- [ ] `GitReposPage.axaml` - テーブル/リスト表示、ボタン
-- [ ] `GitReposPage.axaml.cs` - `explorer.exe`/PowerShell呼び出しを`IShellService`経由に
+- [x] `GitReposPage.axaml` - テーブル/リスト表示、ボタン
+- [x] `GitReposPage.axaml.cs` - `explorer.exe`/PowerShell呼び出しを`IShellService`経由に
 - [ ] 動作確認: リポジトリ一覧、フォルダ開く、ターミナル起動
 
 ### 2-3. SetupPage (490 XAML行, 42 CS行)
