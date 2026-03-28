@@ -70,6 +70,9 @@ public partial class AsanaSyncViewModel : ObservableObject
     [ObservableProperty]
     private string asanaConfigStatus = "";
 
+    [ObservableProperty]
+    private bool skipHiddenProjects = true;
+
     public AsanaSyncViewModel(
         ConfigService configService,
         ProjectDiscoveryService discoveryService,
@@ -86,6 +89,7 @@ public partial class AsanaSyncViewModel : ObservableObject
         if (settings.AsanaSync != null)
         {
             IntervalMin = settings.AsanaSync.IntervalMin > 0 ? settings.AsanaSync.IntervalMin : 60;
+            SkipHiddenProjects = settings.AsanaSync.SkipHiddenProjects;
             ScheduleEnabled = settings.AsanaSync.Enabled;  // OnScheduleEnabledChanged でタイマー開始
         }
     }
@@ -116,6 +120,7 @@ public partial class AsanaSyncViewModel : ObservableObject
         settings.AsanaSync ??= new AsanaSyncConfig();
         settings.AsanaSync.Enabled = ScheduleEnabled;
         settings.AsanaSync.IntervalMin = IntervalMin;
+        settings.AsanaSync.SkipHiddenProjects = SkipHiddenProjects;
         _configService.SaveSettings(settings);
 
         UpdateScheduleTimer();
@@ -230,7 +235,7 @@ public partial class AsanaSyncViewModel : ObservableObject
 
         try
         {
-            await Task.Run(async () => await _asanaSyncService.RunAsync(AppendOutput));
+            await Task.Run(async () => await _asanaSyncService.RunAsync(AppendOutput, SkipHiddenProjects));
             AppendOutput("\n--- Done (exit: 0) ---\n");
             LastSyncTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         }

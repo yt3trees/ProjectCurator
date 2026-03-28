@@ -30,7 +30,7 @@ public class AsanaSyncService
         _configService = configService;
     }
 
-    public async Task RunAsync(Action<string>? log = null, CancellationToken ct = default)
+    public async Task RunAsync(Action<string>? log = null, bool skipHiddenProjects = true, CancellationToken ct = default)
     {
         void Log(string line) => log?.Invoke(line + Environment.NewLine);
 
@@ -69,8 +69,31 @@ public class AsanaSyncService
         }
         outputFile ??= Path.Combine(obsidianRoot, "asana-tasks-view.md");
 
+        // 非表示プロジェクトのフィルタリング
+        HashSet<string>? hiddenSet = null;
+        if (skipHiddenProjects)
+        {
+            var hidden = _configService.LoadHiddenProjects();
+            if (hidden.Count > 0)
+            {
+                hiddenSet = new HashSet<string>(hidden, StringComparer.OrdinalIgnoreCase);
+                Log($"[Skip hidden] {hidden.Count} hidden projects will be excluded from sync.");
+            }
+        }
+
         Log("[1/5] Discovering projects with asana_config.json...");
         var discovered = DiscoverProjects(boxRoot, Log);
+
+        // 非表示プロジェクトを除外
+        if (hiddenSet != null && hiddenSet.Count > 0)
+        {
+            var before = discovered.Count;
+            discovered = discovered.Where(p => !hiddenSet.Contains(p.Name)).ToList();
+            var skipped = before - discovered.Count;
+            if (skipped > 0)
+                Log($"  Skipped {skipped} hidden project(s).");
+        }
+
         if (discovered.Count == 0 && personalProjectGids.Count == 0)
         {
             Log("No projects with asana_config.json found and no personal projects configured.");

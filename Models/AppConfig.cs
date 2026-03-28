@@ -12,6 +12,7 @@ public class AsanaSyncConfig
 {
     public bool Enabled { get; set; } = false;
     public int IntervalMin { get; set; } = 60;
+    public bool SkipHiddenProjects { get; set; } = true;
 }
 
 /// <summary>
