@@ -207,25 +207,25 @@ ProjectCurator.sln
 
 ### 2-7. CommandPaletteOverlay (81 XAML行)
 
-- [ ] `CommandPaletteOverlay.axaml` - オーバーレイコントロール
-- [ ] `CommandPaletteOverlay.axaml.cs` - キーボード操作
+- [x] `CommandPaletteOverlay.axaml` - オーバーレイコントロール
+- [x] `CommandPaletteOverlay.axaml.cs` - キーボード操作
 - [ ] 動作確認: Ctrl+K起動、コマンド検索・実行
 
 ### 2-8. CaptureWindow (1488 CS行、XAMLなし -> AXAML新規作成)
 
-- [ ] `CaptureWindow.axaml` 新規作成 (コードビハインドUI構築をAXAMLへ)
-- [ ] 画面状態 (Input, Loading, Confirm, TaskApproval, Complete) をVisibility切替パネルで実装
-- [ ] `CaptureWindow.axaml.cs` - コードビハインド
+- [x] `CaptureWindow.axaml` 新規作成 (コードビハインドUI構築をAXAMLへ)
+- [x] 画面状態 (Input, Loading, Confirm, TaskApproval, Complete) をVisibility切替パネルで実装
+- [x] `CaptureWindow.axaml.cs` - コードビハインド
 - [ ] 動作確認: クイックキャプチャ全フロー
 
 ### Converters (Avalonia版)
 
-- [ ] InverseBoolConverter
-- [ ] DirtyConverter
-- [ ] ShowAllLabelConverter
+- [x] InverseBoolConverter
+- [x] DirtyConverter
+- [x] ShowAllLabelConverter
 - [ ] DirIconConverter (FluentAvalonia Symbol対応)
-- [ ] HeatmapIntensityToBrushConverter (Avalonia IBrush/Color対応)
-- [ ] その他既存Converterの移植
+- [x] HeatmapIntensityToBrushConverter (Avalonia IBrush/Color対応)
+- [x] その他既存Converterの移植
 
 ### Phase 2 検証
 
