@@ -705,8 +705,6 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 - Windows
 - .NET 9 Runtime (SDK if building from source)
 - Git
-- PowerShell 7+
-- Python 3.10+ (only for Asana sync)
 
 ## Tech Stack
 

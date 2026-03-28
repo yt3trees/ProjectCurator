@@ -702,8 +702,6 @@ Convert Tier タブ:
 - Windows
 - .NET 9 Runtime(ソースビルドする場合はSDK)
 - Git
-- PowerShell 7+
-- Python 3.10+(Asana同期を使う場合)
 
 ## 技術スタック
 
