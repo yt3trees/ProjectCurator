@@ -260,9 +260,9 @@ ProjectCurator.sln
 
 ### MacOSHotkeyService 完成
 
-- [ ] SharpHook によるグローバルキーボードフック実装
-- [ ] Cmd+Shift+P / Cmd+Shift+C (macOS慣習に合わせCtrl->Cmd)
-- [ ] Accessibilityパーミッション要求ダイアログ
+- [x] SharpHook によるグローバルキーボードフック実装
+- [x] Cmd+Shift+P / Cmd+Shift+C (macOS慣習に合わせCtrl->Cmd)
+- [x] Accessibilityパーミッション要求ダイアログ
 
 ### トレイアイコン統合
 
@@ -342,13 +342,13 @@ ProjectCurator.sln
 
 - [ ] `ProjectCurator.WPF`をソリューションから除外 (git履歴に保持)
 - [ ] `GlobalUsings.cs` 削除 (WPF/WinForms競合解決が不要に)
-- [ ] `Helpers/Win32Interop.cs` をCoreからWindowsプラットフォーム実装へ移動
+- [x] `Helpers/Win32Interop.cs` をCoreからWindowsプラットフォーム実装へ移動
 
 ### パブリッシュ設定
 
-- [ ] `publish.cmd` 更新: `dotnet publish -r win-x64`
-- [ ] macOSパブリッシュスクリプト: `dotnet publish -r osx-arm64` (Apple Silicon)
-- [ ] macOSパブリッシュスクリプト: `dotnet publish -r osx-x64` (Intel)
+- [x] `publish.cmd` 更新: `dotnet publish -r win-x64`
+- [x] macOSパブリッシュスクリプト: `dotnet publish -r osx-arm64` (Apple Silicon)
+- [x] macOSパブリッシュスクリプト: `dotnet publish -r osx-x64` (Intel)
 - [ ] macOS `.app` バンドル構成
 
 ### ドキュメント更新
@@ -358,7 +358,7 @@ ProjectCurator.sln
 
 ### Phase 5 検証
 
-- [ ] クリーンビルド成功 (WPF参照なし)
+- [x] クリーンビルド成功 (WPF参照なし)
 - [ ] Windowsパブリッシュ成功・動作確認
 - [ ] macOSパブリッシュ成功・動作確認
 

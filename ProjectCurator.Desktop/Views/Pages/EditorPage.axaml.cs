@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Platform;
 using AvaloniaEdit;
 using AvaloniaEdit.Highlighting;
 using AvaloniaEdit.Highlighting.Xshd;
@@ -29,13 +30,11 @@ public partial class EditorPage : UserControl
         _editor = this.FindControl<TextEditor>("TextEditor");
         if (_editor == null) return;
 
-        // Load Markdown syntax highlighting
-        var xshdPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Markdown.xshd");
-        if (File.Exists(xshdPath))
-        {
-            using var reader = new XmlTextReader(xshdPath);
-            _editor.SyntaxHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
-        }
+        // Load Markdown syntax highlighting from embedded resource
+        var xshdUri = new Uri("avares://ProjectCurator/Assets/Markdown.xshd");
+        using var stream = AssetLoader.Open(xshdUri);
+        using var reader = new XmlTextReader(stream);
+        _editor.SyntaxHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
 
         // Register diff background renderer
         _diffRenderer = new DiffLineBackgroundRenderer();

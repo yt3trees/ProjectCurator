@@ -21,13 +21,11 @@
     <ProjectReference Include="..\ProjectCurator.Core\ProjectCurator.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\Assets\Markdown.xshd">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    <AvaloniaResource Include="..\Assets\Markdown.xshd">
       <Link>Assets\Markdown.xshd</Link>
-    </Content>
-    <Content Include="..\Assets\app.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </AvaloniaResource>
+    <AvaloniaResource Include="..\Assets\app.ico">
       <Link>Assets\app.ico</Link>
-    </Content>
+    </AvaloniaResource>
   </ItemGroup>
 </Project>

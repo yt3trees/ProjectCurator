@@ -8,7 +8,7 @@
     </Application.Styles>
     <TrayIcon.Icons>
         <TrayIcons>
-            <TrayIcon Icon="/Assets/app.ico"
+            <TrayIcon Icon="avares://ProjectCurator/Assets/app.ico"
                       ToolTipText="ProjectCurator">
                 <TrayIcon.Menu>
                     <NativeMenu>

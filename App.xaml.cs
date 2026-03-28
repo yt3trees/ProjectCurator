@@ -2,6 +2,7 @@ using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Wpf.Ui;
 using Wpf.Ui.Appearance;
+using ProjectCurator.Interfaces;
 using ProjectCurator.Services;
 using ProjectCurator.ViewModels;
 using ProjectCurator.Views;
@@ -66,6 +67,11 @@ public partial class App : WpfApplication
 
     private static void ConfigureServices(IServiceCollection services)
     {
+        // Platform abstraction (WPF implementations)
+        services.AddSingleton<IDispatcherService, WpfDispatcherService>();
+        services.AddSingleton<IDialogService, WpfDialogService>();
+        services.AddSingleton<IShellService, WpfShellService>();
+
         // Core services
         services.AddSingleton<ConfigService>();
         services.AddSingleton<HotkeyService>();

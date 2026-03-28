@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-dotnet publish -p:PublishProfile=SingleFile
+echo Building ProjectCurator (Windows x64)...
+dotnet publish ProjectCurator.Desktop/ProjectCurator.Desktop.csproj -r win-x64 -c Release -o bin/Publish --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 echo.
-echo output: bin\Publish\
-pause
+echo Output: bin\Publish\
