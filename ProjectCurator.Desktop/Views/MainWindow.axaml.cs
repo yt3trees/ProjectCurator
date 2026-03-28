@@ -1,26 +1,35 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Platform;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using ProjectCurator.Desktop.Services;
 using ProjectCurator.Desktop.Views.Pages;
 using ProjectCurator.Interfaces;
+using ProjectCurator.Models;
+using ProjectCurator.Services;
 
 namespace ProjectCurator.Desktop.Views;
 
 public partial class MainWindow : Window
 {
     private readonly IHotkeyService? _hotkeyService;
+    private readonly ConfigService? _configService;
     private Dictionary<string, UserControl>? _pages;
+    private UserControl? _currentPage;
 
     public MainWindow()
     {
         InitializeComponent();
         this.Loaded += OnLoaded;
+        this.Closing += OnWindowClosing;
     }
 
-    public MainWindow(IHotkeyService hotkeyService) : this()
+    public MainWindow(IHotkeyService hotkeyService, ConfigService configService) : this()
     {
         _hotkeyService = hotkeyService;
+        _configService = configService;
         if (_hotkeyService != null)
         {
             _hotkeyService.OnActivated = ToggleVisibility;
@@ -40,6 +49,52 @@ public partial class MainWindow : Window
             if (navView.MenuItems.OfType<NavigationViewItem>().FirstOrDefault() is { } first)
                 navView.SelectedItem = first;
         }
+
+        // Restore window position/size from persisted state
+        if (_configService != null)
+            RestoreWindowPosition(_configService);
+
+        // Register global hotkey (Windows only)
+        if (_hotkeyService is WindowsHotkeyService winHotkey)
+        {
+            var handle = TryGetPlatformHandle();
+            if (handle != null)
+                winHotkey.Register(handle.Handle);
+        }
+    }
+
+    private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        // Save window position/size before closing
+        if (_configService != null)
+            SaveWindowPosition(_configService);
+    }
+
+    private void RestoreWindowPosition(ConfigService configService)
+    {
+        var placement = configService.LoadWindowPlacement();
+        if (placement == null) return;
+
+        if (placement.Width > 0 && placement.Height > 0)
+        {
+            Width = placement.Width;
+            Height = placement.Height;
+        }
+        if (placement.Left != 0 || placement.Top != 0)
+        {
+            Position = new PixelPoint((int)placement.Left, (int)placement.Top);
+        }
+    }
+
+    private void SaveWindowPosition(ConfigService configService)
+    {
+        configService.SaveWindowPlacement(new WindowPlacement
+        {
+            Left = Position.X,
+            Top = Position.Y,
+            Width = Width,
+            Height = Height
+        });
     }
 
     private void InitializePages()
@@ -69,6 +124,7 @@ public partial class MainWindow : Window
         var content = this.FindControl<ContentControl>("PageContent");
         if (content != null)
             content.Content = page;
+        _currentPage = page;
     }
 
     private void ToggleVisibility()
@@ -108,6 +164,18 @@ public partial class MainWindow : Window
                 // TODO: show CommandPalette
                 e.Handled = true;
                 return;
+            }
+
+            if (e.Key == Key.S)
+            {
+                // Save in EditorPage when Ctrl+S is pressed
+                if (_currentPage is ProjectCurator.Desktop.Views.Pages.EditorPage editorPage &&
+                    editorPage.DataContext is ProjectCurator.ViewModels.EditorViewModel editorVm)
+                {
+                    editorVm.SaveCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                }
             }
         }
 

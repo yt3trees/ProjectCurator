@@ -38,6 +38,44 @@ public class MacOSShellService : IShellService
         await process.WaitForExitAsync(cancellationToken);
     }
 
-    public void SetStartupEnabled(bool enabled, string appPath) { /* TODO: LaunchAgent Phase 3 */ }
-    public bool IsStartupEnabled(string appPath) => false;
+    public void SetStartupEnabled(bool enabled, string appPath)
+    {
+        var launchAgentsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Library", "LaunchAgents");
+        var plistPath = Path.Combine(launchAgentsDir, "com.projectcurator.app.plist");
+
+        if (enabled)
+        {
+            Directory.CreateDirectory(launchAgentsDir);
+            var plistContent = $"""
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.projectcurator.app</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{appPath}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+""";
+            File.WriteAllText(plistPath, plistContent);
+        }
+        else
+        {
+            if (File.Exists(plistPath)) File.Delete(plistPath);
+        }
+    }
+
+    public bool IsStartupEnabled(string appPath)
+    {
+        var launchAgentsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Library", "LaunchAgents");
+        var plistPath = Path.Combine(launchAgentsDir, "com.projectcurator.app.plist");
+        return File.Exists(plistPath);
+    }
 }

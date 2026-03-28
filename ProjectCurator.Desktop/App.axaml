@@ -6,4 +6,19 @@
     <Application.Styles>
         <fa:FluentAvaloniaTheme/>
     </Application.Styles>
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon Icon="/Assets/app.ico"
+                      ToolTipText="ProjectCurator">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Show" Command="{Binding ShowWindowCommand}"/>
+                        <NativeMenuItem Header="Quick Capture" Command="{Binding QuickCaptureCommand}"/>
+                        <NativeMenuItemSeparator/>
+                        <NativeMenuItem Header="Exit" Command="{Binding ExitCommand}"/>
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
 </Application>

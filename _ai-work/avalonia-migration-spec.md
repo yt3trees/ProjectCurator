@@ -240,23 +240,23 @@ ProjectCurator.sln
 
 ### WindowsShellService 完成
 
-- [ ] `OpenFolder` - `Process.Start("explorer.exe", path)`
-- [ ] `OpenFile` - `UseShellExecute = true`
-- [ ] `OpenTerminal` - `wt.exe` / `pwsh.exe` フォールバック
-- [ ] `CreateSymlink` - PowerShell `New-Item -ItemType Junction`
-- [ ] `IsSymlink` / `ResolveSymlinkTarget` - `FileAttributes.ReparsePoint`
-- [ ] `RunShellScriptAsync` - PowerShell/Python スクリプト実行
-- [ ] `SetStartupEnabled` / `IsStartupEnabled` - `.lnk` ショートカット作成 (WScript.Shell)
+- [x] `OpenFolder` - `Process.Start("explorer.exe", path)`
+- [x] `OpenFile` - `UseShellExecute = true`
+- [x] `OpenTerminal` - `wt.exe` / `pwsh.exe` フォールバック
+- [x] `CreateSymlink` - PowerShell `New-Item -ItemType Junction`
+- [x] `IsSymlink` / `ResolveSymlinkTarget` - `FileAttributes.ReparsePoint`
+- [x] `RunShellScriptAsync` - PowerShell/Python スクリプト実行
+- [x] `SetStartupEnabled` / `IsStartupEnabled` - `.lnk` ショートカット作成 (WScript.Shell)
 
 ### MacOSShellService 完成
 
-- [ ] `OpenFolder` - `Process.Start("open", path)`
-- [ ] `OpenFile` - `Process.Start("open", path)`
-- [ ] `OpenTerminal` - `Process.Start("open", "-a Terminal path")`
-- [ ] `CreateSymlink` - `Directory.CreateSymbolicLink()` (.NET 7+ API)
-- [ ] `IsSymlink` / `ResolveSymlinkTarget` - `FileInfo.LinkTarget`
-- [ ] `RunShellScriptAsync` - `/bin/bash -c` or `/bin/zsh -c`
-- [ ] `SetStartupEnabled` / `IsStartupEnabled` - LaunchAgent plist (`~/Library/LaunchAgents/`)
+- [x] `OpenFolder` - `Process.Start("open", path)`
+- [x] `OpenFile` - `Process.Start("open", path)`
+- [x] `OpenTerminal` - `Process.Start("open", "-a Terminal path")`
+- [x] `CreateSymlink` - `Directory.CreateSymbolicLink()` (.NET 7+ API)
+- [x] `IsSymlink` / `ResolveSymlinkTarget` - `FileInfo.LinkTarget`
+- [x] `RunShellScriptAsync` - `/bin/bash -c` or `/bin/zsh -c`
+- [x] `SetStartupEnabled` / `IsStartupEnabled` - LaunchAgent plist (`~/Library/LaunchAgents/`)
 
 ### MacOSHotkeyService 完成
 
@@ -267,22 +267,22 @@ ProjectCurator.sln
 ### トレイアイコン統合
 
 - [ ] ダイヤモンドアイコン生成 (Avalonia DrawingContext / RenderTargetBitmap)
-- [ ] コンテキストメニュー: Show, Quick Capture, ホットキー表示, Exit
+- [x] コンテキストメニュー: Show, Quick Capture, ホットキー表示, Exit
 - [ ] macOS NSStatusItemへの正常マッピング確認
 
 ### ウィンドウ管理
 
-- [ ] 表示/非表示トグル (トレイ・ホットキー両方)
-- [ ] ウィンドウ位置保存/復元 (ConfigService)
-- [ ] シングルインスタンス強制
+- [x] 表示/非表示トグル (トレイ・ホットキー両方)
+- [x] ウィンドウ位置保存/復元 (ConfigService)
+- [x] シングルインスタンス強制
 
 ### キーボードショートカット全体確認
 
-- [ ] Ctrl+1-7 ページナビゲーション
-- [ ] Ctrl+K コマンドパレット
-- [ ] Escape ウィンドウ非表示
-- [ ] Ctrl+S エディタ保存
-- [ ] グローバルホットキー (Ctrl+Shift+P, Ctrl+Shift+C)
+- [x] Ctrl+1-7 ページナビゲーション
+- [x] Ctrl+K コマンドパレット
+- [x] Escape ウィンドウ非表示
+- [x] Ctrl+S エディタ保存
+- [x] グローバルホットキー (Ctrl+Shift+P, Ctrl+Shift+C)
 
 ### Phase 3 検証
 

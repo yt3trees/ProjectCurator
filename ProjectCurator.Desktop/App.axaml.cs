@@ -8,6 +8,7 @@ using ProjectCurator.Desktop.Views.Pages;
 using ProjectCurator.Interfaces;
 using ProjectCurator.Services;
 using ProjectCurator.ViewModels;
+using System.Windows.Input;
 
 namespace ProjectCurator.Desktop;
 
@@ -17,6 +18,18 @@ public class App : Application
     private static Mutex? _mutex;
 
     public static IServiceProvider Services => _services ?? throw new InvalidOperationException("Services not initialized");
+
+    // Tray icon commands (bound via TrayIcon.Icons in App.axaml)
+    public ICommand ShowWindowCommand { get; }
+    public ICommand QuickCaptureCommand { get; }
+    public ICommand ExitCommand { get; }
+
+    public App()
+    {
+        ShowWindowCommand = new RelayCommand(ShowWindow);
+        QuickCaptureCommand = new RelayCommand(QuickCapture);
+        ExitCommand = new RelayCommand(Exit);
+    }
 
     public override void Initialize()
     {
@@ -44,6 +57,26 @@ public class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void ShowWindow()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var window = desktop.MainWindow;
+            if (window != null) { window.Show(); window.Activate(); }
+        }
+    }
+
+    private void QuickCapture()
+    {
+        // TODO: Phase 3 - open CaptureWindow
+    }
+
+    private void Exit()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            desktop.Shutdown();
     }
 
     private static void ConfigureServices(IServiceCollection services)
@@ -111,5 +144,17 @@ public class App : Application
         services.AddSingleton<AsanaSyncPage>();
         services.AddSingleton<SetupPage>();
         services.AddSingleton<SettingsPage>();
+    }
+
+    // Minimal ICommand implementation (no CommunityToolkit.Mvvm dependency on App class)
+    private sealed class RelayCommand : ICommand
+    {
+        private readonly Action _execute;
+        public RelayCommand(Action execute) => _execute = execute;
+#pragma warning disable CS0067 // CanExecuteChanged is never raised (commands are always executable)
+        public event EventHandler? CanExecuteChanged;
+#pragma warning restore CS0067
+        public bool CanExecute(object? parameter) => true;
+        public void Execute(object? parameter) => _execute();
     }
 }
