@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="using:FluentAvalonia.UI.Controls"
+        x:Class="ProjectCurator.Desktop.Views.MainWindow"
+        Title="ProjectCurator"
+        Width="1200" Height="800"
+        MinWidth="800" MinHeight="600"
+        WindowStartupLocation="CenterScreen">
+
+    <Grid RowDefinitions="*,Auto">
+        <ui:NavigationView x:Name="NavView"
+                           Grid.Row="0"
+                           PaneDisplayMode="Left"
+                           IsBackButtonVisible="False"
+                           IsPaneOpen="True">
+            <ui:NavigationView.MenuItems>
+                <ui:NavigationViewItem Content="Dashboard" Tag="Dashboard">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Home"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Editor" Tag="Editor">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Edit"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Timeline" Tag="Timeline">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Clock"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Git Repos" Tag="GitRepos">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Code"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Asana Sync" Tag="AsanaSync">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Sync"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Setup" Tag="Setup">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Setting"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+            </ui:NavigationView.MenuItems>
+            <ui:NavigationView.FooterMenuItems>
+                <ui:NavigationViewItem Content="Settings" Tag="Settings">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Settings"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+            </ui:NavigationView.FooterMenuItems>
+
+            <!-- Content area placeholder -->
+            <Grid x:Name="ContentArea" Background="#1e1e1e">
+                <TextBlock Text="ProjectCurator"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="24"
+                           Foreground="#cccccc"/>
+            </Grid>
+        </ui:NavigationView>
+
+        <!-- Status bar -->
+        <Border Grid.Row="1" Height="24" Background="#007acc">
+            <TextBlock x:Name="StatusText"
+                       Text="Ready"
+                       VerticalAlignment="Center"
+                       Margin="8,0"
+                       FontSize="12"
+                       Foreground="White"/>
+        </Border>
+    </Grid>
+</Window>

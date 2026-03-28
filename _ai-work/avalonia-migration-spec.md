@@ -33,77 +33,77 @@ ProjectCurator.sln
 
 ### プラットフォーム抽象化インターフェース定義
 
-- [ ] `IDispatcherService` - UIスレッドディスパッチ抽象化 (Post, Invoke, InvokeAsync)
-- [ ] `IShellService` - OS操作抽象化 (OpenFolder, OpenFile, OpenTerminal, CreateSymlink, IsSymlink, ResolveSymlinkTarget, RunShellScriptAsync, SetStartupEnabled, IsStartupEnabled)
-- [ ] `IDialogService` - ダイアログ抽象化 (ShowMessageAsync, ShowConfirmAsync)
-- [ ] `ITrayService` - トレイアイコン抽象化 (Initialize, UpdateHotkeyDisplay, ShowNotification)
-- [ ] `IHotkeyService` - ホットキー抽象化 (既存インターフェースをCoreへ移動)
+- [x] `IDispatcherService` - UIスレッドディスパッチ抽象化 (Post, Invoke, InvokeAsync)
+- [x] `IShellService` - OS操作抽象化 (OpenFolder, OpenFile, OpenTerminal, CreateSymlink, IsSymlink, ResolveSymlinkTarget, RunShellScriptAsync, SetStartupEnabled, IsStartupEnabled)
+- [x] `IDialogService` - ダイアログ抽象化 (ShowMessageAsync, ShowConfirmAsync)
+- [x] `ITrayService` - トレイアイコン抽象化 (Initialize, UpdateHotkeyDisplay, ShowNotification)
+- [x] `IHotkeyService` - ホットキー抽象化 (既存インターフェースをCoreへ移動)
 
 ### Core プロジェクト作成
 
-- [ ] `ProjectCurator.Core.csproj` 作成 (net9.0, UI参照なし)
-- [ ] `ProjectCurator.sln` にCoreプロジェクト追加
+- [x] `ProjectCurator.Core.csproj` 作成 (net9.0, UI参照なし)
+- [x] `ProjectCurator.sln` にCoreプロジェクト追加
 
 ### Models移動 (15ファイル、変更不要)
 
-- [ ] AppConfig.cs
-- [ ] AsanaTaskModels.cs
-- [ ] CaptureModels.cs
-- [ ] CommandItem.cs
-- [ ] CuratorStateSnapshot.cs
-- [ ] DecisionLogModels.cs
-- [ ] EditorState.cs
-- [ ] FileUpdateProposal.cs
-- [ ] FocusUpdateModels.cs
-- [ ] MeetingNotesModels.cs
-- [ ] Messages.cs
-- [ ] PinnedFolder.cs
-- [ ] ProjectCheckResult.cs
-- [ ] ProjectInfo.cs
-- [ ] WorkstreamInfo.cs
+- [x] AppConfig.cs
+- [x] AsanaTaskModels.cs
+- [x] CaptureModels.cs
+- [x] CommandItem.cs
+- [x] CuratorStateSnapshot.cs
+- [x] DecisionLogModels.cs
+- [x] EditorState.cs
+- [x] FileUpdateProposal.cs
+- [x] FocusUpdateModels.cs
+- [x] MeetingNotesModels.cs
+- [x] Messages.cs
+- [x] PinnedFolder.cs
+- [x] ProjectCheckResult.cs
+- [x] ProjectInfo.cs
+- [x] WorkstreamInfo.cs
 
 ### Helpers移動
 
-- [ ] EncodingDetector.cs (変更不要)
+- [x] EncodingDetector.cs (変更不要)
 
 ### Services移動 - プラットフォーム非依存 (そのまま移動)
 
-- [ ] LlmClientService.cs
-- [ ] AsanaSyncService.cs
-- [ ] AsanaTaskParser.cs
-- [ ] TodayQueueService.cs
-- [ ] StandupGeneratorService.cs
-- [ ] FocusUpdateService.cs
-- [ ] DecisionLogGeneratorService.cs
-- [ ] MeetingNotesService.cs
-- [ ] StateSnapshotService.cs
-- [ ] FileEncodingService.cs
-- [ ] ConfigService.cs
-- [ ] CaptureService.cs
+- [x] LlmClientService.cs
+- [x] AsanaSyncService.cs
+- [x] AsanaTaskParser.cs
+- [x] TodayQueueService.cs
+- [x] StandupGeneratorService.cs
+- [x] FocusUpdateService.cs
+- [x] DecisionLogGeneratorService.cs
+- [x] MeetingNotesService.cs
+- [x] StateSnapshotService.cs
+- [x] FileEncodingService.cs
+- [x] ConfigService.cs
+- [x] CaptureService.cs
 
 ### Services移動 - 要リファクタリング
 
-- [ ] ScriptRunnerService.cs - Dispatcher呼び出しを`IDispatcherService`へ、`powershell.exe`を`IShellService`へ置換
-- [ ] ContextCompressionLayerService.cs - Junction作成を`IShellService.CreateSymlink`へ置換
-- [ ] ProjectDiscoveryService.cs - Junction検出を`IShellService.IsSymlink`へ置換
+- [x] ScriptRunnerService.cs - Dispatcher呼び出しを`IDispatcherService`へ、`powershell.exe`を`IShellService`へ置換
+- [x] ContextCompressionLayerService.cs - Junction作成を`IShellService.CreateSymlink`へ置換
+- [x] ProjectDiscoveryService.cs - Junction検出を`IShellService.IsSymlink`へ置換
 - [ ] PageService.cs - ナビゲーション抽象化の検討
 
 ### ViewModels移動 - 要リファクタリング
 
-- [ ] MainWindowViewModel.cs (変更なし)
-- [ ] DashboardViewModel.cs - `explorer.exe`を`IShellService.OpenFolder`へ、`Dispatcher`を`IDispatcherService`へ、`MessageBox`を`IDialogService`へ
-- [ ] EditorViewModel.cs - `MessageBox`呼び出しを`IDialogService`へ
-- [ ] TimelineViewModel.cs (軽微な変更)
-- [ ] GitReposViewModel.cs - `Process.Start`呼び出しを`IShellService`へ
-- [ ] AsanaSyncViewModel.cs - `Dispatcher.Invoke`を`IDispatcherService`へ
-- [ ] SetupViewModel.cs - `MessageBox`を`IDialogService`へ
-- [ ] SettingsViewModel.cs - Startup shortcutを`IShellService.SetStartupEnabled`へ、`WScript.Shell` COM除去
-- [ ] CommandPaletteViewModel.cs - `MessageBox`・Process起動を抽象化
+- [x] MainWindowViewModel.cs (変更なし)
+- [x] DashboardViewModel.cs - `explorer.exe`を`IShellService.OpenFolder`へ、`Dispatcher`を`IDispatcherService`へ、`MessageBox`を`IDialogService`へ
+- [x] EditorViewModel.cs - `MessageBox`呼び出しを`IDialogService`へ
+- [x] TimelineViewModel.cs (軽微な変更)
+- [x] GitReposViewModel.cs - `Process.Start`呼び出しを`IShellService`へ
+- [x] AsanaSyncViewModel.cs - `Dispatcher.Invoke`を`IDispatcherService`へ
+- [x] SetupViewModel.cs - `MessageBox`を`IDialogService`へ
+- [x] SettingsViewModel.cs - Startup shortcutを`IShellService.SetStartupEnabled`へ、`WScript.Shell` COM除去
+- [x] CommandPaletteViewModel.cs - `MessageBox`・Process起動を抽象化
 
 ### Phase 0 検証
 
-- [ ] `ProjectCurator.Core`が単体でビルド成功 (WPF参照なし)
-- [ ] 既存WPFプロジェクトがCoreを参照して正常動作
+- [x] `ProjectCurator.Core`が単体でビルド成功 (WPF参照なし)
+- [x] 既存WPFプロジェクトがCoreを参照して正常動作
 
 ---
 

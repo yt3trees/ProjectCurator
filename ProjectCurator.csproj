@@ -16,6 +16,35 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="ProjectCurator.Core\ProjectCurator.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Exclude Core project files from WPF compilation (they are compiled by Core project) -->
+  <ItemGroup>
+    <Compile Remove="ProjectCurator.Core\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Exclude WPF-local copies of files that are now owned by Core (Phase 0 transition) -->
+  <ItemGroup>
+    <Compile Remove="Models\*.cs" />
+    <Compile Remove="Helpers\EncodingDetector.cs" />
+    <Compile Remove="Services\LlmClientService.cs" />
+    <Compile Remove="Services\AsanaSyncService.cs" />
+    <Compile Remove="Services\AsanaTaskParser.cs" />
+    <Compile Remove="Services\TodayQueueService.cs" />
+    <Compile Remove="Services\StandupGeneratorService.cs" />
+    <Compile Remove="Services\FocusUpdateService.cs" />
+    <Compile Remove="Services\DecisionLogGeneratorService.cs" />
+    <Compile Remove="Services\MeetingNotesService.cs" />
+    <Compile Remove="Services\StateSnapshotService.cs" />
+    <Compile Remove="Services\FileEncodingService.cs" />
+    <Compile Remove="Services\ConfigService.cs" />
+    <Compile Remove="Services\CaptureService.cs" />
+    <Compile Remove="Services\ProjectDiscoveryService.cs" />
+    <Compile Remove="Services\ContextCompressionLayerService.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="WPF-UI" Version="3.*" />
     <PackageReference Include="AvalonEdit" Version="6.*" />
     <PackageReference Include="DiffPlex" Version="1.*" />

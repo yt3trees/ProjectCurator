@@ -6,16 +6,11 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Wpf.Ui;
-using Wpf.Ui.Controls;
+using ProjectCurator.Interfaces;
 using ProjectCurator.Models;
 using ProjectCurator.Services;
-using ProjectCurator.Views.Pages;
-using TextBlock = System.Windows.Controls.TextBlock;
 
 namespace ProjectCurator.ViewModels;
 
@@ -27,7 +22,8 @@ public partial class CommandPaletteViewModel : ObservableObject
     private readonly EditorViewModel _editorViewModel;
     private readonly TimelineViewModel _timelineViewModel;
     private readonly StandupGeneratorService _standupGeneratorService;
-    private readonly IContentDialogService _contentDialogService;
+    private readonly IShellService _shellService;
+    private readonly IDialogService _dialogService;
 
     [ObservableProperty]
     private bool isVisible;
@@ -43,6 +39,12 @@ public partial class CommandPaletteViewModel : ObservableObject
 
     private List<CommandItem> _allCommands = [];
 
+    // Callback for showing resume input dialog (platform-specific)
+    public Func<string, Task<string?>>? ShowResumeInputDialog;
+
+    // Callback for navigation - accepts page type name (string) for platform independence
+    public Action<string>? NavigateToPage;
+
     public CommandPaletteViewModel(
         ConfigService configService,
         ProjectDiscoveryService discoveryService,
@@ -50,7 +52,8 @@ public partial class CommandPaletteViewModel : ObservableObject
         EditorViewModel editorViewModel,
         TimelineViewModel timelineViewModel,
         StandupGeneratorService standupGeneratorService,
-        IContentDialogService contentDialogService)
+        IShellService shellService,
+        IDialogService dialogService)
     {
         _configService = configService;
         _discoveryService = discoveryService;
@@ -58,7 +61,8 @@ public partial class CommandPaletteViewModel : ObservableObject
         _editorViewModel = editorViewModel;
         _timelineViewModel = timelineViewModel;
         _standupGeneratorService = standupGeneratorService;
-        _contentDialogService = contentDialogService;
+        _shellService = shellService;
+        _dialogService = dialogService;
     }
 
     public void Show()
@@ -84,13 +88,13 @@ public partial class CommandPaletteViewModel : ObservableObject
         var commands = new List<CommandItem>();
 
         // --- Tab switch commands ---
-        AddTabCommand(commands, "Dashboard", typeof(DashboardPage));
-        AddTabCommand(commands, "Editor", typeof(EditorPage));
-        AddTabCommand(commands, "Timeline", typeof(TimelinePage));
-        AddTabCommand(commands, "Git Repos", typeof(GitReposPage));
-        AddTabCommand(commands, "Asana Sync", typeof(AsanaSyncPage));
-        AddTabCommand(commands, "Setup", typeof(SetupPage));
-        AddTabCommand(commands, "Settings", typeof(SettingsPage));
+        AddTabCommand(commands, "Dashboard", "DashboardPage");
+        AddTabCommand(commands, "Editor", "EditorPage");
+        AddTabCommand(commands, "Timeline", "TimelinePage");
+        AddTabCommand(commands, "Git Repos", "GitReposPage");
+        AddTabCommand(commands, "Asana Sync", "AsanaSyncPage");
+        AddTabCommand(commands, "Setup", "SetupPage");
+        AddTabCommand(commands, "Settings", "SettingsPage");
 
         // --- Global commands ---
         commands.Add(new CommandItem
@@ -100,7 +104,7 @@ public partial class CommandPaletteViewModel : ObservableObject
             Display = "[>]  update focus (Update Focus from Asana)",
             Action = async (w) =>
             {
-                Mw(w).RootNavigation.Navigate(typeof(EditorPage));
+                NavigateToPage?.Invoke("EditorPage");
                 await Task.Delay(50);
                 if (_editorViewModel.UpdateFocusCommand.CanExecute(null))
                     await _editorViewModel.UpdateFocusCommand.ExecuteAsync(null);
@@ -118,18 +122,14 @@ public partial class CommandPaletteViewModel : ObservableObject
                 Action = async (w) =>
                 {
                     var selected = _editorViewModel.SelectedProject;
-                    if (selected != null)
+                    if (selected == null)
                     {
-                        await Mw(w).NavigateToDashboardAndShowBriefingAsync(selected);
-                        return;
+                        NavigateToPage?.Invoke("DashboardPage");
+                        await _dialogService.ShowMessageAsync(
+                            "Briefing",
+                            "Select a project in Editor first, then run 'briefing'.");
                     }
-
-                    Mw(w).RootNavigation.Navigate(typeof(DashboardPage));
-                    System.Windows.MessageBox.Show(
-                        "Select a project in Editor first, then run 'briefing'.",
-                        "Briefing",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                    // TODO: Phase 1 - NavigateToDashboardAndShowBriefingAsync
                 }
             });
 
@@ -140,7 +140,7 @@ public partial class CommandPaletteViewModel : ObservableObject
                 Display = "[>]  meeting (Import Meeting Notes)",
                 Action = async (w) =>
                 {
-                    Mw(w).RootNavigation.Navigate(typeof(EditorPage));
+                    NavigateToPage?.Invoke("EditorPage");
                     await Task.Delay(50);
                     if (_editorViewModel.ImportMeetingNotesCommand.CanExecute(null))
                         await _editorViewModel.ImportMeetingNotesCommand.ExecuteAsync(null);
@@ -160,13 +160,14 @@ public partial class CommandPaletteViewModel : ObservableObject
                     await _standupGeneratorService.TryGenerateTodayAsync();
                     var standupPath = _standupGeneratorService.GetTodayStandupPath();
                     if (!string.IsNullOrEmpty(standupPath) && File.Exists(standupPath))
-                        Mw(w).NavigateToEditorAndOpenFile(
-                            new ProjectInfo { Name = "Standup", Path = Path.GetDirectoryName(standupPath) ?? "" },
-                            standupPath);
+                    {
+                        // TODO: Phase 1 - NavigateToEditorAndOpenFile
+                        NavigateToPage?.Invoke("EditorPage");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    System.Windows.MessageBox.Show($"Standup error: {ex.Message}");
+                    await _dialogService.ShowMessageAsync("Standup Error", $"Standup error: {ex.Message}");
                 }
             }
         });
@@ -186,9 +187,9 @@ public partial class CommandPaletteViewModel : ObservableObject
                 Category = "project",
                 Display = $"[>]  check {displayName}",
                 Action = (w) => {
-                    _setupViewModel.SelectedTabIndex = 1; // Check tab
+                    _setupViewModel.SelectedTabIndex = 1;
                     _setupViewModel.CheckProjectName = proj.Name;
-                    Mw(w).RootNavigation.Navigate(typeof(SetupPage));
+                    NavigateToPage?.Invoke("SetupPage");
                 }
             });
 
@@ -200,7 +201,7 @@ public partial class CommandPaletteViewModel : ObservableObject
                 Display = $"[>]  edit {displayName}",
                 Action = (w) => {
                     _editorViewModel.SelectedProject = _editorViewModel.Projects.FirstOrDefault(p => p.Name == proj.Name && p.Tier == proj.Tier && p.Category == proj.Category);
-                    Mw(w).RootNavigation.Navigate(typeof(EditorPage));
+                    NavigateToPage?.Invoke("EditorPage");
                 }
             });
 
@@ -210,7 +211,7 @@ public partial class CommandPaletteViewModel : ObservableObject
                 Label = $"term {localName}",
                 Category = "project",
                 Display = $"[>]  term {displayName}",
-                Action = (w) => OpenTerminalAtPath(localPath)
+                Action = (w) => _shellService.OpenTerminal(localPath)
             });
 
             // > dir ProjectName
@@ -221,9 +222,7 @@ public partial class CommandPaletteViewModel : ObservableObject
                 Display = $"[>]  dir {displayName}",
                 Action = (w) => {
                     if (Directory.Exists(localPath))
-                    {
-                        Process.Start(new ProcessStartInfo("explorer.exe", localPath) { UseShellExecute = true });
-                    }
+                        _shellService.OpenFolder(localPath);
                 }
             });
 
@@ -235,7 +234,7 @@ public partial class CommandPaletteViewModel : ObservableObject
                 Display = $"[@]  {displayName}",
                 Action = (w) => {
                     _editorViewModel.SelectedProject = _editorViewModel.Projects.FirstOrDefault(p => p.Name == proj.Name && p.Tier == proj.Tier && p.Category == proj.Category);
-                    Mw(w).RootNavigation.Navigate(typeof(EditorPage));
+                    NavigateToPage?.Invoke("EditorPage");
                 }
             });
 
@@ -247,7 +246,7 @@ public partial class CommandPaletteViewModel : ObservableObject
                 Display = $"[>]  timeline {displayName}",
                 Action = (w) => {
                     _timelineViewModel.SelectedProject = _timelineViewModel.Projects.FirstOrDefault(p => p.Name == proj.Name && p.Tier == proj.Tier && p.Category == proj.Category);
-                    Mw(w).RootNavigation.Navigate(typeof(TimelinePage));
+                    NavigateToPage?.Invoke("TimelinePage");
                 }
             });
 
@@ -258,9 +257,11 @@ public partial class CommandPaletteViewModel : ObservableObject
                 Category = "project",
                 Display = $"[>]  resume {displayName}",
                 Action = async (w) => {
-                    var feature = await ShowResumeDialogAsync(localName);
-                    if (!string.IsNullOrWhiteSpace(feature)) {
-                        InvokeResumeWork(localPath, feature);
+                    if (ShowResumeInputDialog != null)
+                    {
+                        var feature = await ShowResumeInputDialog(localName);
+                        if (!string.IsNullOrWhiteSpace(feature))
+                            InvokeResumeWork(localPath, feature);
                     }
                 }
             });
@@ -269,17 +270,14 @@ public partial class CommandPaletteViewModel : ObservableObject
         _allCommands = commands;
     }
 
-    // Phase 0 helper: CommandItem.Action is Action<object> in Core; cast to MainWindow here.
-    private static MainWindow Mw(object w) => (MainWindow)w;
-
-    private void AddTabCommand(List<CommandItem> commands, string label, Type pageType)
+    private void AddTabCommand(List<CommandItem> commands, string label, string pageTypeName)
     {
         commands.Add(new CommandItem
         {
             Label = label,
             Category = "tab",
             Display = $"[Tab]  {label}",
-            Action = (w) => Mw(w).RootNavigation.Navigate(pageType)
+            Action = (w) => NavigateToPage?.Invoke(pageTypeName)
         });
     }
 
@@ -318,7 +316,6 @@ public partial class CommandPaletteViewModel : ObservableObject
                 return tokens.All(t => label.Contains(t));
             });
 
-            // Sort: exact match > starts-with > contains
             filtered = filtered.OrderBy(c => {
                 string label = c.Label.ToLower();
                 if (label == searchText) return 0;
@@ -341,7 +338,7 @@ public partial class CommandPaletteViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public void ExecuteCommand(MainWindow window)
+    public void ExecuteCommand(object? window = null)
     {
         if (SelectedCommand != null)
         {
@@ -349,77 +346,6 @@ public partial class CommandPaletteViewModel : ObservableObject
             Hide();
             action?.Invoke(window);
         }
-    }
-
-    private void OpenTerminalAtPath(string path)
-    {
-        if (!Directory.Exists(path)) return;
-
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "wt.exe",
-                Arguments = $"-d \"{path}\"",
-                UseShellExecute = true
-            });
-        }
-        catch
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "pwsh.exe",
-                    Arguments = $"-NoExit -Command \"Set-Location '{path}'\"",
-                    UseShellExecute = true
-                });
-            }
-            catch
-            {
-                try
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "powershell.exe",
-                        Arguments = $"-NoExit -Command \"Set-Location '{path}'\"",
-                        UseShellExecute = true
-                    });
-                }
-                catch { }
-            }
-        }
-    }
-
-    private async Task<string?> ShowResumeDialogAsync(string projectName)
-    {
-        var inputControl = new Wpf.Ui.Controls.TextBox
-        {
-            PlaceholderText = "Feature name (e.g. fix-bug-123)",
-            Margin = new Thickness(0, 8, 0, 0)
-        };
-
-        var dialog = new Wpf.Ui.Controls.ContentDialog
-        {
-            Title = $"Resume {projectName}",
-            Content = new StackPanel
-            {
-                Children = {
-                    new TextBlock { Text = "Enter feature name to create a new work directory:", Foreground = (System.Windows.Media.Brush)Application.Current.Resources["AppText"] },
-                    inputControl
-                }
-            },
-            PrimaryButtonText = "OK",
-            CloseButtonText = "Cancel",
-            DefaultButton = Wpf.Ui.Controls.ContentDialogButton.Primary
-        };
-
-        var result = await _contentDialogService.ShowAsync(dialog, default);
-        if (result == Wpf.Ui.Controls.ContentDialogResult.Primary)
-        {
-            return inputControl.Text.Trim();
-        }
-        return null;
     }
 
     private void InvokeResumeWork(string projPath, string featureName)
@@ -436,7 +362,7 @@ public partial class CommandPaletteViewModel : ObservableObject
             Directory.CreateDirectory(workDir);
         }
 
-        Process.Start(new ProcessStartInfo("explorer.exe", workDir) { UseShellExecute = true });
-        OpenTerminalAtPath(workDir);
+        _shellService.OpenFolder(workDir);
+        _shellService.OpenTerminal(workDir);
     }
 }
