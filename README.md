@@ -382,6 +382,8 @@ Language: respond in Japanese unless the document is already in English.
 
 Click 💡 in the Dashboard toolbar to get 3-5 AI-prioritized action suggestions across all projects. The model analyzes overdue tasks, stale focus files, uncommitted changes, and unrecorded decisions, then ranks actions by urgency. Each suggestion has an Open button to navigate directly to the relevant file.
 
+![](_assets/ai-feature/WhatsNext.png)
+
 ### Context Briefing (Dashboard Card)
 
 Click 💡 on a project card to generate a project-specific resume briefing. The model reads `current_focus.md`, recent `decision_log` entries, `tensions.md`, active/completed Asana tasks, and uncommitted repo signals, then outputs:
@@ -392,13 +394,20 @@ Click 💡 on a project card to generate a project-specific resume briefing. The
 
 The dialog supports `Copy`, `Open in Editor`, and `View Debug` (prompt/response inspection).
 
+![](_assets/ai-feature/ContextBriefing.png)
+
 ### Update Focus from Asana (Editor)
 
 Click the `Update Focus from Asana` button in the Editor toolbar to generate a diff-based update proposal for the open `current_focus.md`. The model reads Asana task data and the existing file, then proposes changes while preserving your heading structure and writing style. A backup is saved to `focus_history/` automatically. Supports workstream filtering, natural-language refinement, and a debug view.
 
+![](_assets/ai-feature/UpdateFocusFromAsana.png)
+
 ### AI Decision Log (Editor)
 
 Click `Dec Log` in the Editor toolbar (AI mode) to open the decision log assistant. Describe what was decided; the model generates a structured draft with Options / Why / Risk / Revisit Trigger sections. Supports natural-language refinement and optionally removes the resolved item from `tensions.md`. Saves as `decision_log/YYYY-MM-DD_{topic}.md`.
+
+![](_assets/ai-feature/AI-DecisionLog_1.png)
+![](_assets/ai-feature/AI-DecisionLog_2.png)
 
 ### Import Meeting Notes (Editor)
 
@@ -415,6 +424,10 @@ Click the `Import Meeting Notes` button in the Editor toolbar (or press `Ctrl+En
   - Check each task to include; uncheck to skip
 
 Select which items to apply and click `Apply Selected`. A `View Debug` button in the dialog shows the full LLM prompt and response. Decision logs are saved as `YYYY-MM-DD_{topic}.md`; `current_focus.md` is backed up to `focus_history/` before updating. Created Asana tasks are appended to `asana-tasks.md` with their GID and due date.
+
+![](_assets/ai-feature/ImportMeetingNotes_1.png)
+![](_assets/ai-feature/ImportMeetingNotes_2.png)
+![](_assets/ai-feature/TodaysPlan.png)
 
 ### Quick Capture (Global Hotkey)
 
