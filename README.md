@@ -382,8 +382,6 @@ Language: respond in Japanese unless the document is already in English.
 
 Click 💡 in the Dashboard toolbar to get 3-5 AI-prioritized action suggestions across all projects. The model analyzes overdue tasks, stale focus files, uncommitted changes, and unrecorded decisions, then ranks actions by urgency. Each suggestion has an Open button to navigate directly to the relevant file.
 
-![](_assets/ai-feature/WhatsNext.png)
-
 ### Context Briefing (Dashboard Card)
 
 Click 💡 on a project card to generate a project-specific resume briefing. The model reads `current_focus.md`, recent `decision_log` entries, `tensions.md`, active/completed Asana tasks, and uncommitted repo signals, then outputs:
@@ -394,20 +392,13 @@ Click 💡 on a project card to generate a project-specific resume briefing. The
 
 The dialog supports `Copy`, `Open in Editor`, and `View Debug` (prompt/response inspection).
 
-![](_assets/ai-feature/ContextBriefing.png)
-
 ### Update Focus from Asana (Editor)
 
 Click the `Update Focus from Asana` button in the Editor toolbar to generate a diff-based update proposal for the open `current_focus.md`. The model reads Asana task data and the existing file, then proposes changes while preserving your heading structure and writing style. A backup is saved to `focus_history/` automatically. Supports workstream filtering, natural-language refinement, and a debug view.
 
-![](_assets/ai-feature/UpdateFocusFromAsana.png)
-
 ### AI Decision Log (Editor)
 
 Click `Dec Log` in the Editor toolbar (AI mode) to open the decision log assistant. Describe what was decided; the model generates a structured draft with Options / Why / Risk / Revisit Trigger sections. Supports natural-language refinement and optionally removes the resolved item from `tensions.md`. Saves as `decision_log/YYYY-MM-DD_{topic}.md`.
-
-![](_assets/ai-feature/AI-DecisionLog_1.png)
-![](_assets/ai-feature/AI-DecisionLog_2.png)
 
 ### Import Meeting Notes (Editor)
 
@@ -424,10 +415,6 @@ Click the `Import Meeting Notes` button in the Editor toolbar (or press `Ctrl+En
   - Check each task to include; uncheck to skip
 
 Select which items to apply and click `Apply Selected`. A `View Debug` button in the dialog shows the full LLM prompt and response. Decision logs are saved as `YYYY-MM-DD_{topic}.md`; `current_focus.md` is backed up to `focus_history/` before updating. Created Asana tasks are appended to `asana-tasks.md` with their GID and due date.
-
-![](_assets/ai-feature/ImportMeetingNotes_1.png)
-![](_assets/ai-feature/ImportMeetingNotes_2.png)
-![](_assets/ai-feature/TodaysPlan.png)
 
 ### Quick Capture (Global Hotkey)
 
@@ -511,10 +498,18 @@ Overview of all projects with health indicators, update freshness, and Today Que
 <summary>Dashboard details</summary>
 
 ![](_assets/Dashboard-Card.png)
+This is the standard project card view with health signals, repository status, and quick actions.
+
+<img src="_assets/ai-feature/WhatsNext.png" width="60%" alt="What's Next dialog" />
+When AI Features is enabled, the What's Next button (💡) in the top bar shows 3-5 prioritized actions across all projects, with an `Open` button for direct navigation and `Copy` for plain-text export.
+
+<img src="_assets/ai-feature/ContextBriefing.png" width="60%" alt="Context Briefing dialog" />
+When AI Features is enabled, each project card also shows a Briefing button (💡) that generates a project-specific context-switch summary (`Where you left off` / `Suggested next steps` / `Key context`) with `Copy`, `Open in Editor`, and `View Debug`.
+
+<img src="_assets/ai-feature/TodaysPlan.png" width="60%" alt="Today's Plan dialog" />
+Today's Plan dialog (AI) provides a time-blocked day plan (for example, Morning / Afternoon), with `Open`, `Copy`, `Save`, and `View Debug` actions.
 
 - Use the top bar to refresh the view (`↻`), set auto refresh (`Off / 10 / 15 / 30 / 60 min`), and show hidden projects.
-- When AI Features is enabled, the What's Next button (💡) appears in the top bar. Click it to get 3–5 AI-prioritized action suggestions across all projects, ranked by urgency (overdue tasks, stale focus files, uncommitted changes, unrecorded decisions, etc.). Each suggestion shows the project name, action, and reason, with an Open button to navigate directly to the relevant project or file. A Copy button exports the list as plain text.
-- When AI Features is enabled, each project card also shows a Briefing button (💡). It generates a project-specific context switch briefing (`Where you left off` / `Suggested next steps` / `Key context`) with quick actions for `Copy`, `Open in Editor`, and `View Debug`.
 - Each project card gives a quick health check: project name, tier (`FULL`/`MINI`), optional `DOMAIN` tag, link status dots, decision log count, and uncommitted repo count.
 - Click the uncommitted badge to see repository-by-repository change details.
 - `Focus` and `Summary` show how old each file is (in days), and the background color changes as files get older.
@@ -541,11 +536,19 @@ Tree-based file browser for AI context files (`current_focus.md`, `decision_log`
 - Tree view on the left lists AI context files: `current_focus.md`, `file_map.md`, `project_summary.md`, `tensions.md`, `decision_log/`, `focus_history/`, `obsidian_notes/`, `workstreams/`, `CLAUDE.md`, `AGENTS.md`
 - Syntax-highlighted Markdown editor on the right with section-based coloring
 - Toolbar buttons: Refresh, Dec Log (quick decision log entry), P (pin folder), Save
-- Update Focus from Asana button (visible when AI Features is enabled): reads `asana-tasks.md`, sends it to the configured LLM, and shows a diff-based proposal dialog; optionally filter by workstream; supports natural-language refinement and debug view; backup is saved to `focus_history/` automatically
-- Dec Log button (AI mode, visible when AI Features is enabled): detects implicit decisions from recent `focus_history` changes; accepts description of what was decided, Status (Confirmed / Tentative), Trigger (Solo decision / AI session / Meeting), and optional attached files (.txt / .md); LLM generates a structured decision log draft with Options / Why / Risk / Revisit Trigger sections; preview dialog supports natural-language refinement and debug view; optionally removes the resolved item from `tensions.md`; saves as `YYYY-MM-DD_{topic}.md` under `decision_log/`
-- Import Meeting Notes button (visible when AI Features is enabled): paste raw meeting notes to analyze them with a single LLM call; preview dialog shows Decisions / Focus / Tensions / Asana Tasks tabs with checkboxes per item; Focus tab shows an AI-generated diff view where the LLM rewrites the full `current_focus.md`; Asana Tasks tab lets you select a target project and section, then creates tasks via the Asana API; a `View Debug` button shows the full prompt and response; `current_focus.md` is backed up to `focus_history/` before overwriting
 - Full file path displayed in the header bar
 - Status bar at the bottom shows the current project and file name
+
+<img src="_assets/ai-feature/UpdateFocusFromAsana.png" width="60%" alt="Update Focus from Asana dialog" />
+Update Focus from Asana (AI) reads `asana-tasks.md`, sends context to the configured LLM, and shows a diff-based proposal dialog; it supports workstream filtering, natural-language refinement, and `View Debug`, and saves a backup to `focus_history/`.
+
+<img src="_assets/ai-feature/AI-DecisionLog_1.png" width="60%" alt="AI Decision Log dialog step 1" />
+<img src="_assets/ai-feature/AI-DecisionLog_2.png" width="60%" alt="AI Decision Log dialog step 2" />
+AI Decision Log (Dec Log in AI mode) detects implicit decisions from recent `focus_history`, accepts decision metadata (Status/Trigger/attachments), generates a structured draft (Options / Why / Risk / Revisit Trigger), supports refinement and debug view, and saves to `decision_log/YYYY-MM-DD_{topic}.md`.
+
+<img src="_assets/ai-feature/ImportMeetingNotes_1.png" width="60%" alt="Import Meeting Notes dialog step 1" />
+<img src="_assets/ai-feature/ImportMeetingNotes_2.png" width="60%" alt="Import Meeting Notes dialog step 2" />
+Import Meeting Notes (AI) analyzes raw notes in a single pass and previews Decisions / Focus / Tensions / Asana Tasks tabs; you can choose what to apply, inspect prompt/response via `View Debug`, and `current_focus.md` is backed up before overwrite.
 
 </details>
 
