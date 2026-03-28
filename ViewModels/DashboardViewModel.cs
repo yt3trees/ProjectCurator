@@ -127,6 +127,7 @@ public partial class DashboardViewModel : ObservableObject
     private readonly ProjectDiscoveryService _discoveryService;
     private readonly ConfigService _configService;
     private readonly TodayQueueService _todayQueueService;
+    private readonly StateSnapshotService _stateSnapshotService;
     private System.Timers.Timer? _refreshTimer;
     private List<string> _hiddenKeys = [];
     private List<ProjectCardViewModel> _allCards = [];
@@ -197,11 +198,13 @@ public partial class DashboardViewModel : ObservableObject
     public DashboardViewModel(
         ProjectDiscoveryService discoveryService,
         ConfigService configService,
-        TodayQueueService todayQueueService)
+        TodayQueueService todayQueueService,
+        StateSnapshotService stateSnapshotService)
     {
         _discoveryService = discoveryService;
         _configService = configService;
         _todayQueueService = todayQueueService;
+        _stateSnapshotService = stateSnapshotService;
         var settings = configService.LoadSettings();
         AutoRefreshMinutes = settings.DashboardAutoRefreshMinutes;
         TodayQueueLimit = settings.DashboardTodayQueueLimit;
@@ -232,6 +235,8 @@ public partial class DashboardViewModel : ObservableObject
             ApplyFilter();
             // Today Queue もキャッシュ済みリストで更新
             await LoadTodayQueueInternalAsync(list);
+            // State Snapshot をバックグラウンドで書き出す
+            _ = _stateSnapshotService.ExportAsync(list);
         }
         finally
         {

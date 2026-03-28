@@ -13,13 +13,7 @@ public class ContextCompressionLayerService
     private static readonly UTF8Encoding Utf8NoBom = new(false);
     private static readonly string SkillRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "ContextCompressionLayer", "skills");
     private static readonly Assembly Assembly = typeof(ContextCompressionLayerService).Assembly;
-    private static readonly string[] EmbeddedSkillNames =
-    [
-        "context-decision-log",
-        "context-session-end",
-        "obsidian-knowledge",
-        "update-focus-from-asana"
-    ];
+    private static readonly string[] EmbeddedSkillNames = ["project-curator"];
     private readonly ConfigService _configService;
 
     public ContextCompressionLayerService(ConfigService configService)
@@ -200,17 +194,15 @@ public class ContextCompressionLayerService
             EnsureDirectory(dstSkillsDir, logs);
             foreach (var skillName in EmbeddedSkillNames)
             {
-                var skillContent = ReadCclAssetText($"skills/{skillName}/SKILL.md");
-                if (skillContent == null)
+                var skillFiles = ReadEmbeddedSkillFiles(skillName);
+                if (skillFiles.Count == 0)
                 {
                     logs.Add($"[WARN] Skill template not found: {skillName}");
                     continue;
                 }
 
                 var dstSkillDir = Path.Combine(dstSkillsDir, skillName);
-                var dstSkillFile = Path.Combine(dstSkillDir, "SKILL.md");
-                EnsureDirectory(dstSkillDir, logs);
-                var existedBefore = File.Exists(dstSkillFile);
+                var existedBefore = File.Exists(Path.Combine(dstSkillDir, "SKILL.md"));
 
                 if (existedBefore && !force)
                 {
@@ -218,7 +210,13 @@ public class ContextCompressionLayerService
                     continue;
                 }
 
-                File.WriteAllText(dstSkillFile, skillContent, Utf8NoBom);
+                foreach (var (relativePath, content) in skillFiles)
+                {
+                    var dstFile = Path.Combine(dstSkillDir, relativePath);
+                    EnsureDirectory(Path.GetDirectoryName(dstFile)!, logs);
+                    File.WriteAllText(dstFile, content, Utf8NoBom);
+                }
+
                 logs.Add(existedBefore
                     ? $"[UPDATE] {cli}/skills/{skillName} (overwritten)"
                     : $"[CREATE] {cli}/skills/{skillName}");
@@ -419,6 +417,34 @@ public class ContextCompressionLayerService
 - Project: {{projectName}} / Created: {{DateTime.Now:yyyy-MM-dd}}
 """;
         }
+    }
+
+    /// <summary>
+    /// Reads all files for a skill using MANIFEST for discovery, ReadCclAssetText for content.
+    /// MANIFEST lists relative paths (e.g. "reference/decision-log.md"), one per line.
+    /// </summary>
+    private static List<(string RelativePath, string Content)> ReadEmbeddedSkillFiles(string skillName)
+    {
+        var manifest = ReadCclAssetText($"skills/{skillName}/MANIFEST");
+        if (manifest != null)
+        {
+            var results = new List<(string, string)>();
+            foreach (var line in manifest.Split('\n'))
+            {
+                var relativePath = line.Trim().Replace('/', Path.DirectorySeparatorChar);
+                if (string.IsNullOrEmpty(relativePath)) continue;
+                var content = ReadCclAssetText($"skills/{skillName}/{line.Trim()}");
+                if (content != null) results.Add((relativePath, content));
+            }
+            return results;
+        }
+
+        // Fallback for skills without MANIFEST: try SKILL.md only
+        var skillContent = ReadCclAssetText($"skills/{skillName}/SKILL.md");
+        if (skillContent != null)
+            return [("SKILL.md", skillContent)];
+
+        return [];
     }
 
     private static string? ReadCclAssetText(string relativePath)
@@ -776,21 +802,26 @@ Last Update: YYYY-MM-DD
     private const string CclSectionFallback = """
 ## Context Compression Layer
 
-### Session Start Protocol
+### Session Start
 
-Before responding to the first user message, read:
+Before responding to the first message, read in order:
 
 1. `_ai-context/context/current_focus.md`
+   (shared_work mode: prefer `workstreams/<workstreamId>/current_focus.md` when the
+   workstream is known; fall back to the root `current_focus.md`)
 2. `_ai-context/context/project_summary.md`
-3. `_ai-context/context/tensions.md`
-4. `_ai-context/obsidian_notes/asana-tasks.md` (if present)
+3. `_ai-context/context/tensions.md` (if it exists)
+4. `_ai-context/obsidian_notes/asana-tasks.md` (if it exists)
+5. Other files on demand only.
 
-Summarize unfinished work in 1-2 lines and confirm progress once if the context is stale (3+ days).
+After reading, present a 1-2 line summary of open items (factor in any tensions).
+If focus is 3+ days old, ask about progress once.
+If any context file is oversized, suggest archiving to `focus_history/`.
 
-### AI Behavior
+### Active Behaviors
 
-- Auto: append to `current_focus.md`
-- Notify: low-impact updates to `tensions.md` / `decision_log`
-- Confirm: high-impact `project_summary.md` or major decisions
+Decision logging, session-end focus updates, Obsidian knowledge integration,
+and Asana focus sync are handled by the `/project-curator` skill.
+Invoke `/project-curator` at the start of a session to activate these behaviors.
 """;
 }

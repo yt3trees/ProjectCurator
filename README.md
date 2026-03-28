@@ -268,14 +268,15 @@ Claude Code or Codex CLI automatically reads the `AGENTS.md` and skill definitio
 
 ### What the Agent Does Autonomously
 
-The embedded skills enable the agent to act without explicit commands:
+The `/project-curator` skill enables the agent to act without explicit commands:
 
-| Skill | Behavior |
+| Behavior | Trigger |
 |---|---|
-| context-session-end | Detects natural work boundaries and proposes updates to `current_focus.md` with `[AI]` prefix |
-| context-decision-log | Monitors conversation for implicit decisions and proposes structured logging to `decision_log/` |
-| obsidian-knowledge | Proposes writing session summaries, technical notes, or meeting records to Obsidian vault |
-| update-focus-from-asana | Slash command to sync Asana task status into `current_focus.md` |
+| Decision Logging | Architecture / tech decisions detected in conversation → proposes structured logging to `decision_log/` |
+| Session End | Wrap-up phrases detected → proposes `current_focus.md` update |
+| Obsidian Knowledge | After notable work → proposes writing session summaries or technical notes to the Obsidian vault |
+| Update Focus from Asana | Explicit: "update focus from Asana" → syncs Asana task status into `current_focus.md` |
+| Cross-project access | Invoke `/project-curator` → query status, today's tasks, and file paths across all projects |
 
 All proposals require user confirmation before writing. The agent never modifies existing human-written content.
 
@@ -294,12 +295,13 @@ flowchart TD
 
 ### Skill Deployment
 
-ProjectCurator automatically deploys skill files when creating or checking a project from the Setup page:
+ProjectCurator automatically deploys the `/project-curator` skill when creating or checking a project from the Setup page:
 
-- `.claude/skills/` for Claude Code
-- `.codex/skills/` for Codex CLI
+- `.claude/skills/project-curator/` for Claude Code
+- `.codex/skills/project-curator/` for Codex CLI
+- `.gemini/skills/project-curator/` for Gemini CLI
 
-Skills are sourced from the app's embedded `Assets/ContextCompressionLayer/skills/` and kept in sync with the shared folder via junctions.
+Skills are sourced from the app's embedded assets and kept in sync with the shared folder via junctions. Use the `Overwrite existing skills` option in Setup to force re-deploy.
 
 ## Core Features
 
@@ -521,7 +523,8 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 ├── settings.json
 ├── hidden_projects.json
 ├── asana_global.json
-└── pinned_folders.json
+├── pinned_folders.json
+└── curator_state.json      ← auto-generated; updated on every Dashboard refresh
 ```
 
 `settings.json` and `asana_global.json` are gitignored.
