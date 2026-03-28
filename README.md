@@ -54,6 +54,51 @@ flowchart TD
     ST -->|"Apply settings"| AS
 ```
 
+## Core Features
+
+| Page | What You Can Do |
+|---|---|
+| Dashboard | Project health overview, Today Queue visibility, workstream status checks, AI-powered What's Next suggestions (requires AI Features enabled) |
+| Editor | Markdown context editing, search, link open, quick decision log creation, AI-powered "Update Focus from Asana", "AI Decision Log", and "Import Meeting Notes" (all require AI Features enabled) |
+| Timeline | Review recent project activity in chronological order |
+| Git Repos | Recursively scan workspace roots for repositories |
+| Asana Sync | Sync Asana tasks to project/workstream Markdown outputs |
+| Setup | Create/check/archive projects, tier conversion, workstream management |
+| Settings | Theme, hotkey, workspace paths, refresh behavior, LLM API configuration, Enable AI Features toggle |
+
+## Recommended Daily Flow
+
+1. Open `Dashboard`
+2. (If AI Features is enabled) Click the What's Next button (💡) to see AI-prioritized action suggestions across all projects
+3. Click a project or workstream and open `current_focus.md`
+4. Update context in `Editor` and save with `Ctrl+S`
+5. Add a `decision_log` entry if needed (when AI Features is enabled, the Dec Log button opens an AI-assisted dialog)
+6. If you have meeting notes from a recent meeting, click `Import Meeting Notes` in the Editor toolbar to analyze and apply them
+7. If using Asana, run `Asana Sync` to refresh task files
+8. If AI Features is enabled, click `Update Focus from Asana` in the Editor toolbar to get an LLM-generated update proposal
+
+```mermaid
+flowchart TD
+    A["Open Dashboard"] --> B["What's Next (optional, AI)"]
+    B --> C["Pick project or workstream"]
+    C --> D["Open current_focus.md in Editor"]
+    D --> E["Update context and save"]
+    E --> F["Add decision_log entry (optional)"]
+    F --> G["Run Asana Sync (optional)"]
+    G --> H["Update Focus from Asana (optional, AI)"]
+```
+
+## Core Context Files
+
+The application relies on maintaining the following Markdown files to preserve project context:
+
+- **`current_focus.md`**
+  The "you are here" map of the project. Tracks what you are currently doing and what's next.
+- **`tensions.md`**
+  A log of open technical questions, unmitigated risks, and unresolved trade-offs.
+- **`decision_log/`**
+  A structured folder recording "why we chose this" and "what was decided" for critical architecture choices.
+
 ## Quick Start (5 Minutes)
 
 ### 1. Download the app from GitHub Releases
@@ -113,17 +158,23 @@ Required config files are created automatically when you save.
 
 </details>
 
-### 6. Start with these pages
+### 6. Create Your First Project
 
-- `Setup`: first, use the Setup page features to prepare your working structure
-  - Use `Setup Project` / `Check` to create or validate the project folder and `_work` workspace
-  - Use setup options to create the links for shared files and AI context folders
-  - After setup, open the project from `Dashboard` and `Editor`
-- `Dashboard`: decide what needs attention today
-- `Editor`: update `current_focus.md`
-- `Asana Sync` (optional): sync tasks into Today Queue sources
+Let's use the Setup page to create your first project.
+
+1. **Open the `Setup` page**
+2. **Type your project name into `Project Name`** (e.g., `TestProject`)
+3. **Click `Setup Project`**
+   *(This automatically creates the folder structure and required Markdown files)*
+4. **Go to `Dashboard` to see your new project**
+5. **Open `Editor` and start updating `current_focus.md`**
+
+Your environment is now ready. Configure Asana Sync later if needed.
 
 ## Folder Layout (Local vs Cloud Sync)
+
+<details>
+<summary>View basic folder structure</summary>
 
 ```mermaid
 flowchart LR
@@ -167,9 +218,14 @@ In short:
 - `shared/_work/<workstream-id>/` is for workstream-level shared work.
 - Date-based work folder example: `shared/_work/2026/202603/20260321_fix-login-bug/`
 
+</details>
+
 ## Template Folder Structure (What Setup Creates)
 
 When you run `Setup Project` with `Also run AI Context Setup` checked, ProjectCurator creates a standardized directory tree across three separate root locations. This section shows what gets created and why.
+
+<details>
+<summary>View detailed folder layouts and junctions</summary>
 
 ### Overview of the Three Roots
 
@@ -297,27 +353,7 @@ flowchart LR
 
 By using junctions, you get a single unified view under the local project folder while the actual data lives in the appropriate synced location. AI agents, Obsidian, and your cloud sync all see their own slice of the same data.
 
-## Recommended Daily Flow
-
-1. Open `Dashboard`
-2. (If AI Features is enabled) Click the What's Next button (💡) to see AI-prioritized action suggestions across all projects
-3. Click a project or workstream and open `current_focus.md`
-4. Update context in `Editor` and save with `Ctrl+S`
-5. Add a `decision_log` entry if needed (when AI Features is enabled, the Dec Log button opens an AI-assisted dialog)
-6. If you have meeting notes from a recent meeting, click `Import Meeting Notes` in the Editor toolbar to analyze and apply them
-7. If using Asana, run `Asana Sync` to refresh task files
-8. If AI Features is enabled, click `Update Focus from Asana` in the Editor toolbar to get an LLM-generated update proposal
-
-```mermaid
-flowchart TD
-    A["Open Dashboard"] --> B["What's Next (optional, AI)"]
-    B --> C["Pick project or workstream"]
-    C --> D["Open current_focus.md in Editor"]
-    D --> E["Update context and save"]
-    E --> F["Add decision_log entry (optional)"]
-    F --> G["Run Asana Sync (optional)"]
-    G --> H["Update Focus from Asana (optional, AI)"]
-```
+</details>
 
 ## AI Features
 
@@ -449,18 +485,6 @@ ProjectCurator automatically deploys the `/project-curator` skill when creating 
 - `.gemini/skills/project-curator/` for Gemini CLI
 
 Skills are sourced from the app's embedded assets and kept in sync with the shared folder via junctions. Use the `Overwrite existing skills` option in Setup to force re-deploy.
-
-## Core Features
-
-| Page | What You Can Do |
-|---|---|
-| Dashboard | Project health overview, Today Queue visibility, workstream status checks, AI-powered What's Next suggestions (requires AI Features enabled) |
-| Editor | Markdown context editing, search, link open, quick decision log creation, AI-powered "Update Focus from Asana", "AI Decision Log", and "Import Meeting Notes" (all require AI Features enabled) |
-| Timeline | Review recent project activity in chronological order |
-| Git Repos | Recursively scan workspace roots for repositories |
-| Asana Sync | Sync Asana tasks to project/workstream Markdown outputs |
-| Setup | Create/check/archive projects, tier conversion, workstream management |
-| Settings | Theme, hotkey, workspace paths, refresh behavior, LLM API configuration, Enable AI Features toggle |
 
 ## UI Overview
 
@@ -691,20 +715,6 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 - AvalonEdit
 - CommunityToolkit.Mvvm
 - Microsoft.Extensions.DependencyInjection
-
-## Helpful Extra: Daily Standup
-
-ProjectCurator includes an automatic standup generator:
-
-- Starts at app startup and checks every hour
-- Generates today's file only if it does not exist yet (idempotent)
-- Target file: `{ObsidianVaultRoot}\standup\YYYY-MM-DD_standup.md`
-- Command Palette command: `standup` (manual generate/open)
-
-The generated sections are:
-- `Yesterday` (focus history, decision logs, completed Asana tasks)
-- `Today` (high-priority queue items)
-- `This Week` (upcoming queue items)
 
 ## Notes
 
