@@ -12,11 +12,22 @@
     <PackageReference Include="Avalonia" Version="11.*" />
     <PackageReference Include="Avalonia.Desktop" Version="11.*" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.*" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.*" />
     <PackageReference Include="FluentAvaloniaUI" Version="2.4.1" />
     <PackageReference Include="SharpHook" Version="5.*" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.*" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ProjectCurator.Core\ProjectCurator.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\Assets\Markdown.xshd">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Assets\Markdown.xshd</Link>
+    </Content>
+    <Content Include="..\Assets\app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Assets\app.ico</Link>
+    </Content>
   </ItemGroup>
 </Project>

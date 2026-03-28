@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:avaloniaEdit="https://github.com/avaloniaui/avaloniaedit"
+             x:Class="ProjectCurator.Desktop.Views.Pages.EditorPage">
+    <Grid RowDefinitions="Auto, *, Auto">
+        <!-- Toolbar -->
+        <Border Grid.Row="0" Background="#252526" Padding="4,2">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding IsDirty}"/>
+                <Button Content="Reload" Command="{Binding RefreshCommand}"/>
+                <Separator/>
+                <Button Content="Diff" Command="{Binding ToggleDiffViewCommand}" IsVisible="{Binding CanUseDiff}"/>
+                <Button Content="Update Focus" Command="{Binding UpdateFocusCommand}" IsVisible="{Binding IsAiEnabled}"/>
+                <Button Content="Import Meeting Notes" Command="{Binding ImportMeetingNotesCommand}" IsVisible="{Binding IsAiEnabled}"/>
+                <Separator/>
+                <TextBlock Text="{Binding CurrentFile}" VerticalAlignment="Center" Foreground="#cccccc" FontSize="12"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Editor area -->
+        <Grid Grid.Row="1">
+            <!-- Normal editor -->
+            <avaloniaEdit:TextEditor x:Name="TextEditor"
+                                      IsVisible="{Binding !IsDiffViewActive}"
+                                      Background="#1e1e1e"
+                                      Foreground="#d4d4d4"
+                                      FontFamily="Consolas, Courier New, monospace"
+                                      FontSize="14"
+                                      ShowLineNumbers="True"
+                                      WordWrap="False"/>
+
+            <!-- No-file placeholder -->
+            <TextBlock Text="Select a file to open"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="#888888"
+                       FontSize="14"
+                       IsHitTestVisible="False"
+                       IsVisible="{Binding !CurrentFile.Length, FallbackValue=True}"/>
+
+            <!-- Loading overlay -->
+            <Panel IsVisible="{Binding IsLoading}" Background="#40000000">
+                <TextBlock Text="Loading..." HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="White" FontSize="16"/>
+            </Panel>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Grid.Row="2" Background="#007acc" Height="22">
+            <StackPanel Orientation="Horizontal" Spacing="16" Margin="8,0">
+                <TextBlock Text="{Binding Encoding}" VerticalAlignment="Center" FontSize="12" Foreground="White"/>
+                <TextBlock Text="{Binding IsDirty, StringFormat='{}●'}" IsVisible="{Binding IsDirty}"
+                           VerticalAlignment="Center" FontSize="12" Foreground="White"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
