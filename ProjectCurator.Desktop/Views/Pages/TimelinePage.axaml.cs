@@ -36,13 +36,15 @@ public partial class TimelinePage : UserControl
 
     private void OnHeatmapBodyScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
+        if (sender is not ScrollViewer bodyScroll) return;
+
         if (HeatmapHeaderScrollViewer != null && e.OffsetDelta.X != 0)
-            HeatmapHeaderScrollViewer.Offset = HeatmapHeaderScrollViewer.Offset.WithX(e.Offset.X);
+            HeatmapHeaderScrollViewer.Offset = HeatmapHeaderScrollViewer.Offset.WithX(bodyScroll.Offset.X);
 
         if (HeatmapProjectScrollViewer != null && e.OffsetDelta.Y != 0)
         {
             _isSyncingVerticalScroll = true;
-            HeatmapProjectScrollViewer.Offset = HeatmapProjectScrollViewer.Offset.WithY(e.Offset.Y);
+            HeatmapProjectScrollViewer.Offset = HeatmapProjectScrollViewer.Offset.WithY(bodyScroll.Offset.Y);
             _isSyncingVerticalScroll = false;
         }
     }
@@ -50,10 +52,11 @@ public partial class TimelinePage : UserControl
     private void OnHeatmapProjectScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
         if (_isSyncingVerticalScroll) return;
+        if (sender is not ScrollViewer projScroll) return;
         if (HeatmapBodyScrollViewer == null || e.OffsetDelta.Y == 0) return;
 
         _isSyncingVerticalScroll = true;
-        HeatmapBodyScrollViewer.Offset = HeatmapBodyScrollViewer.Offset.WithY(e.Offset.Y);
+        HeatmapBodyScrollViewer.Offset = HeatmapBodyScrollViewer.Offset.WithY(projScroll.Offset.Y);
         _isSyncingVerticalScroll = false;
     }
 
