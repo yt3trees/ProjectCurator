@@ -25,14 +25,8 @@
                 <ui:NavigationViewItem Content="Settings" Tag="Settings"/>
             </ui:NavigationView.FooterMenuItems>
 
-            <!-- Content area placeholder -->
-            <Grid x:Name="ContentArea" Background="#1e1e1e">
-                <TextBlock Text="ProjectCurator"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           FontSize="24"
-                           Foreground="#cccccc"/>
-            </Grid>
+            <!-- Page content -->
+            <ContentControl x:Name="PageContent"/>
         </ui:NavigationView>
 
         <!-- Status bar -->

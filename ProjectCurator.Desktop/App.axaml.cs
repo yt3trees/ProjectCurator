@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCurator.Desktop.Services;
 using ProjectCurator.Desktop.Views;
+using ProjectCurator.Desktop.Views.Pages;
 using ProjectCurator.Interfaces;
 using ProjectCurator.Services;
 using ProjectCurator.ViewModels;
@@ -13,6 +14,8 @@ namespace ProjectCurator.Desktop;
 public class App : Application
 {
     private static IServiceProvider? _services;
+    private static Mutex? _mutex;
+
     public static IServiceProvider Services => _services ?? throw new InvalidOperationException("Services not initialized");
 
     public override void Initialize()
@@ -22,13 +25,22 @@ public class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        _mutex = new Mutex(true, "Global\\ProjectCurator_SingleInstance", out var isNew);
+        if (!isNew)
+        {
+            // Another instance is already running - exit
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                desktop.Shutdown();
+            return;
+        }
+
         var services = new ServiceCollection();
         ConfigureServices(services);
         _services = services.BuildServiceProvider();
 
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
         {
-            desktop.MainWindow = _services.GetRequiredService<MainWindow>();
+            desktopLifetime.MainWindow = _services.GetRequiredService<MainWindow>();
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -90,5 +102,14 @@ public class App : Application
 
         // Views
         services.AddSingleton<MainWindow>();
+
+        // Pages
+        services.AddSingleton<DashboardPage>();
+        services.AddSingleton<EditorPage>();
+        services.AddSingleton<TimelinePage>();
+        services.AddSingleton<GitReposPage>();
+        services.AddSingleton<AsanaSyncPage>();
+        services.AddSingleton<SetupPage>();
+        services.AddSingleton<SettingsPage>();
     }
 }
