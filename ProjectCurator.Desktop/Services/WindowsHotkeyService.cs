@@ -1,106 +1,60 @@
-using SharpHook;
-using SharpHook.Native;
+using Avalonia.Controls;
+using Avalonia.Win32;
+using ProjectCurator.Desktop.Helpers;
 using ProjectCurator.Interfaces;
 
 namespace ProjectCurator.Desktop.Services;
 
+/// <summary>
+/// Windows global hotkey via Win32 RegisterHotKey + WndProc hook.
+/// Matches the WPF HotkeyService approach.
+/// </summary>
 public class WindowsHotkeyService : IHotkeyService, IDisposable
 {
-    private TaskPoolGlobalHook? _hook;
-    private bool _registered;
+    private IntPtr _hwnd;
+    private Window? _window;
+    private Win32Properties.CustomWndProcHookCallback? _wndProcCallback;
 
     private string _mainModifiers = "Ctrl+Shift";
     private string _mainKey = "P";
     private string _captureModifiers = "Ctrl+Shift";
     private string _captureKey = "C";
 
-    public bool HotkeyRegistered => _registered;
-    public string HotkeyDisplayText => $"{_mainModifiers}+{_mainKey}";
+    public bool HotkeyRegistered { get; private set; }
+    public string HotkeyDisplayText => BuildDisplayText(_mainModifiers, _mainKey);
     public Action? OnActivated { get; set; }
     public Action? OnCaptureActivated { get; set; }
 
-    private static ModifierMask ParseModifiers(string modifiers)
+    public void Register(Window window)
     {
-        ModifierMask mask = ModifierMask.None;
-        if (modifiers.Contains("Shift", StringComparison.OrdinalIgnoreCase))
-            mask |= ModifierMask.Shift;
-        if (modifiers.Contains("Ctrl", StringComparison.OrdinalIgnoreCase))
-            mask |= ModifierMask.Ctrl;
-        if (modifiers.Contains("Alt", StringComparison.OrdinalIgnoreCase))
-            mask |= ModifierMask.Alt;
-        if (modifiers.Contains("Win", StringComparison.OrdinalIgnoreCase) ||
-            modifiers.Contains("Meta", StringComparison.OrdinalIgnoreCase))
-            mask |= ModifierMask.Meta;
-        return mask;
-    }
-
-    private static KeyCode ParseKeyCode(string key)
-    {
-        if (key.Length == 1)
-        {
-            return key.ToUpper() switch
-            {
-                "A" => KeyCode.VcA, "B" => KeyCode.VcB, "C" => KeyCode.VcC,
-                "D" => KeyCode.VcD, "E" => KeyCode.VcE, "F" => KeyCode.VcF,
-                "G" => KeyCode.VcG, "H" => KeyCode.VcH, "I" => KeyCode.VcI,
-                "J" => KeyCode.VcJ, "K" => KeyCode.VcK, "L" => KeyCode.VcL,
-                "M" => KeyCode.VcM, "N" => KeyCode.VcN, "O" => KeyCode.VcO,
-                "P" => KeyCode.VcP, "Q" => KeyCode.VcQ, "R" => KeyCode.VcR,
-                "S" => KeyCode.VcS, "T" => KeyCode.VcT, "U" => KeyCode.VcU,
-                "V" => KeyCode.VcV, "W" => KeyCode.VcW, "X" => KeyCode.VcX,
-                "Y" => KeyCode.VcY, "Z" => KeyCode.VcZ,
-                _ => KeyCode.VcUndefined
-            };
-        }
-
-        return key.ToUpper() switch
-        {
-            "F1" => KeyCode.VcF1, "F2" => KeyCode.VcF2, "F3" => KeyCode.VcF3, "F4" => KeyCode.VcF4,
-            "F5" => KeyCode.VcF5, "F6" => KeyCode.VcF6, "F7" => KeyCode.VcF7, "F8" => KeyCode.VcF8,
-            "F9" => KeyCode.VcF9, "F10" => KeyCode.VcF10, "F11" => KeyCode.VcF11, "F12" => KeyCode.VcF12,
-            _ => KeyCode.VcUndefined
-        };
-    }
-
-    private bool IsMatch(KeyboardHookEventArgs e, ModifierMask expectedMask, KeyCode expectedKey)
-    {
-        if (e.Data.KeyCode != expectedKey)
-            return false;
-        var actualMask = e.RawEvent.Mask;
-        return (actualMask & expectedMask) == expectedMask;
-    }
-
-    public void Register(IntPtr hwnd)
-    {
-        if (_hook != null)
+        if (_window != null)
             return;
 
-        _hook = new TaskPoolGlobalHook(globalHookType: GlobalHookType.Keyboard);
-        _hook.KeyPressed += OnKeyPressed;
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await _hook.RunAsync();
-                _registered = true;
-            }
-            catch
-            {
-                _registered = false;
-            }
-        });
-        _registered = true;
+        _window = window;
+        _hwnd = window.TryGetPlatformHandle()!.Handle;
+
+        // Hook WndProc – fires on the UI thread (same as WPF HwndSource.AddHook).
+        _wndProcCallback = WndProc;
+        Win32Properties.AddWndProcHookCallback(window, _wndProcCallback);
+
+        RegisterBothHotkeys();
     }
 
     public void Unregister()
     {
-        if (_hook != null)
+        if (_hwnd != IntPtr.Zero)
         {
-            _hook.KeyPressed -= OnKeyPressed;
-            try { _hook.Dispose(); } catch { }
-            _hook = null;
+            Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.HOTKEY_ID);
+            Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.CAPTURE_HOTKEY_ID);
+            _hwnd = IntPtr.Zero;
+            HotkeyRegistered = false;
         }
-        _registered = false;
+        if (_window != null && _wndProcCallback != null)
+        {
+            Win32Properties.RemoveWndProcHookCallback(_window, _wndProcCallback);
+            _window = null;
+            _wndProcCallback = null;
+        }
     }
 
     public void UpdateDisplay(string modifiers, string key)
@@ -113,29 +67,96 @@ public class WindowsHotkeyService : IHotkeyService, IDisposable
     {
         _mainModifiers = modifiers;
         _mainKey = key;
+        if (_hwnd != IntPtr.Zero)
+        {
+            Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.HOTKEY_ID);
+            HotkeyRegistered = Win32Interop.RegisterHotKey(
+                _hwnd, Win32Interop.HOTKEY_ID, ConvertModifiers(modifiers), ConvertVirtualKey(key));
+        }
     }
 
     public void ReRegisterCapture(string modifiers, string key)
     {
         _captureModifiers = modifiers;
         _captureKey = key;
-    }
-
-    private void OnKeyPressed(object? sender, KeyboardHookEventArgs e)
-    {
-        var mainMask = ParseModifiers(_mainModifiers);
-        var mainKey = ParseKeyCode(_mainKey);
-        if (mainKey != KeyCode.VcUndefined && IsMatch(e, mainMask, mainKey))
+        if (_hwnd != IntPtr.Zero)
         {
-            OnActivated?.Invoke();
-            return;
+            Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.CAPTURE_HOTKEY_ID);
+            Win32Interop.RegisterHotKey(
+                _hwnd, Win32Interop.CAPTURE_HOTKEY_ID, ConvertModifiers(modifiers), ConvertVirtualKey(key));
         }
-
-        var captureMask = ParseModifiers(_captureModifiers);
-        var captureKey = ParseKeyCode(_captureKey);
-        if (captureKey != KeyCode.VcUndefined && IsMatch(e, captureMask, captureKey))
-            OnCaptureActivated?.Invoke();
     }
+
+    private void RegisterBothHotkeys()
+    {
+        Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.HOTKEY_ID);
+        Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.CAPTURE_HOTKEY_ID);
+
+        HotkeyRegistered = Win32Interop.RegisterHotKey(
+            _hwnd, Win32Interop.HOTKEY_ID,
+            ConvertModifiers(_mainModifiers), ConvertVirtualKey(_mainKey));
+
+        Win32Interop.RegisterHotKey(
+            _hwnd, Win32Interop.CAPTURE_HOTKEY_ID,
+            ConvertModifiers(_captureModifiers), ConvertVirtualKey(_captureKey));
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == (uint)Win32Interop.WM_HOTKEY)
+        {
+            var id = wParam.ToInt32();
+            if (id == Win32Interop.HOTKEY_ID)
+            {
+                OnActivated?.Invoke();
+                handled = true;
+            }
+            else if (id == Win32Interop.CAPTURE_HOTKEY_ID)
+            {
+                OnCaptureActivated?.Invoke();
+                handled = true;
+            }
+        }
+        return IntPtr.Zero;
+    }
+
+    private static uint ConvertModifiers(string modifiers)
+    {
+        uint result = Win32Interop.MOD_NOREPEAT;
+        foreach (var part in modifiers.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            result |= part.ToUpperInvariant() switch
+            {
+                "CTRL" or "CONTROL" => Win32Interop.MOD_CONTROL,
+                "ALT"               => Win32Interop.MOD_ALT,
+                "SHIFT"             => Win32Interop.MOD_SHIFT,
+                "WIN" or "WINDOWS"  => Win32Interop.MOD_WIN,
+                _                   => 0u,
+            };
+        }
+        return result;
+    }
+
+    private static uint ConvertVirtualKey(string key)
+    {
+        if (key.Length == 1)
+            return (uint)char.ToUpperInvariant(key[0]);
+
+        if (key.StartsWith("F", StringComparison.OrdinalIgnoreCase) &&
+            int.TryParse(key[1..], out var fNum) && fNum is >= 1 and <= 12)
+            return (uint)(0x70 + fNum - 1);
+
+        return key.ToUpperInvariant() switch
+        {
+            "SPACE"          => 0x20u,
+            "TAB"            => 0x09u,
+            "ESCAPE" or "ESC"=> 0x1Bu,
+            _                => 0u,
+        };
+    }
+
+    private static string BuildDisplayText(string modifiers, string key)
+        => string.IsNullOrWhiteSpace(modifiers) ? key : $"{modifiers}+{key}";
 
     public void Dispose() => Unregister();
 }

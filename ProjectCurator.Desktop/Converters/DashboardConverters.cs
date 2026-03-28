@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia.Data.Converters;
+using Avalonia.Media;
 
 namespace ProjectCurator.Desktop.Converters;
 
@@ -26,6 +27,39 @@ public class BoolToOpacityConverter : IValueConverter
             }
         }
         return flag ? 1.0 : 0.45;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+
+/// <summary>
+/// Converts bool to IBrush.
+/// ConverterParameter: "falseColor|trueColor" in hex (e.g. "#3B4252|#A3BE8C")
+/// Default: false=#3B4252 (dim gray), true=#A3BE8C (green)
+/// </summary>
+public class BoolToColorBrushConverter : IValueConverter
+{
+    public static readonly BoolToColorBrushConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        bool flag = value is true;
+        string falseColor = "#3B4252";
+        string trueColor = "#A3BE8C";
+
+        if (parameter is string param)
+        {
+            var parts = param.Split('|');
+            if (parts.Length == 2)
+            {
+                falseColor = parts[0];
+                trueColor = parts[1];
+            }
+        }
+
+        var hex = flag ? trueColor : falseColor;
+        return new SolidColorBrush(Color.Parse(hex));
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

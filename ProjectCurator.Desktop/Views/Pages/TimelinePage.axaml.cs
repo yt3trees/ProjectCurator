@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using ProjectCurator.ViewModels;
 
 namespace ProjectCurator.Desktop.Views.Pages;
@@ -7,11 +8,25 @@ namespace ProjectCurator.Desktop.Views.Pages;
 public partial class TimelinePage : UserControl
 {
     private bool _isSyncingVerticalScroll;
+    private bool _isInitialized;
 
     public TimelinePage()
     {
         InitializeComponent();
         DataContext = App.Services.GetService(typeof(TimelineViewModel));
+    }
+
+    protected override void OnLoaded(RoutedEventArgs e)
+    {
+        base.OnLoaded(e);
+        if (_isInitialized) return;
+        _isInitialized = true;
+
+        var vm = DataContext as TimelineViewModel;
+        if (vm == null) return;
+
+        PeriodComboBox.SelectedIndex = 0;
+        _ = vm.InitAsync();
     }
 
     private void OnPeriodChanged(object? sender, SelectionChangedEventArgs e)

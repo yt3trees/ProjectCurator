@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private UserControl? _currentPage;
     private CaptureWindow? _activeCaptureWindow;
     private bool _allowClose;
+    private bool _shiftHeld;
 
     public MainWindow()
     {
@@ -49,6 +50,7 @@ public partial class MainWindow : Window
         _timelineViewModel = timelineViewModel;
         _editorViewModel = editorViewModel;
 
+        // WM_HOTKEY fires on the UI thread (Win32 message loop), so no dispatch needed.
         _hotkeyService.OnActivated = ToggleVisibility;
         _hotkeyService.OnCaptureActivated = ShowCaptureWindow;
 
@@ -76,12 +78,22 @@ public partial class MainWindow : Window
         if (_configService != null)
             RestoreWindowPosition(_configService);
 
+        // Load saved hotkey config before registering
+        if (_configService != null && _hotkeyService != null)
+        {
+            var settings = _configService.LoadSettings();
+            var hk = settings.Hotkey;
+            if (hk != null && !string.IsNullOrWhiteSpace(hk.Key))
+                _hotkeyService.UpdateDisplay(hk.Modifiers, hk.Key);
+            var chk = settings.CaptureHotkey;
+            if (chk != null && !string.IsNullOrWhiteSpace(chk.Key))
+                _hotkeyService.ReRegisterCapture(chk.Modifiers, chk.Key);
+        }
+
         // Register global hotkey
         if (_hotkeyService is WindowsHotkeyService winHotkey)
         {
-            var handle = TryGetPlatformHandle();
-            if (handle != null)
-                winHotkey.Register(handle.Handle);
+            winHotkey.Register(this);
         }
         else if (_hotkeyService is MacOSHotkeyService macHotkey)
         {
@@ -91,6 +103,12 @@ public partial class MainWindow : Window
 
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
+        // Shift+close button = full exit (matches WPF behavior)
+        if (_shiftHeld)
+        {
+            _allowClose = true;
+        }
+
         if (!_allowClose && !App.ExitRequested)
         {
             e.Cancel = true;
@@ -197,9 +215,19 @@ public partial class MainWindow : Window
         Close();
     }
 
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        if (e.Key is Key.LeftShift or Key.RightShift)
+            _shiftHeld = false;
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+
+        if (e.Key is Key.LeftShift or Key.RightShift)
+            _shiftHeld = true;
 
         var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
 
@@ -292,7 +320,7 @@ public partial class MainWindow : Window
         NavigateTo("Timeline");
     }
 
-    private void NavigateToEditorAndOpenFile(ProjectInfo project, string filePath)
+    internal void NavigateToEditorAndOpenFile(ProjectInfo project, string filePath)
     {
         if (_editorViewModel == null)
             return;

@@ -8,6 +8,7 @@
 
     <UserControl.Resources>
         <conv:BoolToOpacityConverter x:Key="BoolToOpacityConverter"/>
+        <conv:BoolToColorBrushConverter x:Key="BoolToColorBrushConverter"/>
         <conv:StringEqualsToBoolConverter x:Key="StringEqualsToBoolConverter"/>
         <conv:BoolToStringConverter x:Key="BoolToStringConverter"/>
     </UserControl.Resources>
@@ -114,7 +115,7 @@
                                     Margin="4"
                                     Width="270"
                                     Padding="12,8"
-                                    Opacity="{Binding IsHidden, Converter={StaticResource BoolToOpacityConverter}, ConverterParameter=0.45|1.0}">
+                                    Opacity="{Binding IsHidden, Converter={StaticResource BoolToOpacityConverter}, ConverterParameter=1.0|0.45}">
                                 <StackPanel Spacing="0">
 
                                     <!-- Header: project name + tier badge + hide button -->
@@ -210,21 +211,25 @@
                                                    ToolTip.Tip="Decision log count"
                                                    Text="{Binding DecisionLogCount, StringFormat='&#x1F4DD; {0}'}"/>
 
-                                        <!-- Uncommitted changes badge -->
-                                        <StackPanel Orientation="Horizontal" Spacing="2"
-                                                    Margin="8,0,0,0"
-                                                    VerticalAlignment="Center"
-                                                    IsVisible="{Binding HasUncommittedChanges}"
-                                                    ToolTip.Tip="{Binding UncommittedChangesTooltip}"
-                                                    Cursor="Hand">
-                                            <TextBlock Text="&#x2387;" FontSize="11"
-                                                       Foreground="#FAB387"
-                                                       VerticalAlignment="Center"/>
-                                            <TextBlock FontSize="11" FontWeight="SemiBold"
-                                                       Foreground="#FAB387"
-                                                       VerticalAlignment="Center"
-                                                       Text="{Binding UncommittedBadgeText}"/>
-                                        </StackPanel>
+                                        <!-- Uncommitted changes badge (clickable) -->
+                                        <Button Background="Transparent" BorderThickness="0"
+                                                Padding="0" Margin="8,0,0,0"
+                                                VerticalAlignment="Center"
+                                                IsVisible="{Binding HasUncommittedChanges}"
+                                                ToolTip.Tip="{Binding UncommittedChangesTooltip}"
+                                                Cursor="Hand"
+                                                x:Name="UncommittedBadgeButton"
+                                                Tag="{Binding}">
+                                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                                <TextBlock Text="&#x2387;" FontSize="11"
+                                                           Foreground="#FAB387"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="#FAB387"
+                                                           VerticalAlignment="Center"
+                                                           Text="{Binding UncommittedBadgeText}"/>
+                                            </StackPanel>
+                                        </Button>
                                     </StackPanel>
 
                                     <!-- Focus / Summary freshness indicators -->
@@ -270,7 +275,7 @@
                                                 <DataTemplate x:DataType="vm:ActivityDay">
                                                     <Rectangle Width="7" Height="7" Margin="0.5,0"
                                                                RadiusX="1" RadiusY="1"
-                                                               Fill="{Binding IsActive, Converter={StaticResource BoolToOpacityConverter}}"/>
+                                                               Fill="{Binding IsActive, Converter={StaticResource BoolToColorBrushConverter}}"/>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
@@ -281,7 +286,8 @@
                                             IsVisible="{Binding HasWorkstreams}">
                                         <StackPanel>
                                             <!-- Header (click to expand/collapse) -->
-                                            <Button Background="Transparent" BorderThickness="0"
+                                            <Grid ColumnDefinitions="*,Auto">
+                                            <Button Grid.Column="0" Background="Transparent" BorderThickness="0"
                                                     Padding="0" HorizontalContentAlignment="Left"
                                                     Cursor="Hand"
                                                     x:Name="ToggleWorkstreamButton"
@@ -295,6 +301,18 @@
                                                                VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
+                                            <!-- Show/hide closed workstreams -->
+                                            <Button Grid.Column="1"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    Padding="4,0" FontSize="9"
+                                                    Foreground="#6C7086"
+                                                    VerticalAlignment="Center"
+                                                    ToolTip.Tip="Toggle closed workstreams"
+                                                    IsVisible="{Binding HasClosedWorkstreams}"
+                                                    x:Name="ShowClosedWorkstreamsButton"
+                                                    Tag="{Binding}"
+                                                    Content="{Binding ShowClosedWorkstreams, Converter={StaticResource BoolToStringConverter}, ConverterParameter='Hide Closed|+Closed'}"/>
+                                            </Grid>
 
                                             <!-- Expanded list -->
                                             <ItemsControl ItemsSource="{Binding Workstreams}"
@@ -302,44 +320,61 @@
                                                           IsVisible="{Binding IsWorkstreamExpanded}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:WorkstreamCardItem">
-                                                        <Grid Margin="0,1" ColumnDefinitions="*,Auto,Auto,Auto">
-                                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4"
-                                                                        Opacity="{Binding IsClosed, Converter={StaticResource BoolToOpacityConverter}, ConverterParameter=0.4|1.0}">
-                                                                <Ellipse Width="5" Height="5"
-                                                                         VerticalAlignment="Center">
-                                                                    <Ellipse.Fill>
-                                                                        <SolidColorBrush Color="White"/>
-                                                                    </Ellipse.Fill>
-                                                                </Ellipse>
-                                                                <TextBlock Text="{Binding Label}" FontSize="11"
-                                                                           VerticalAlignment="Center"
-                                                                           Foreground="White"
-                                                                           MaxWidth="105"
-                                                                           TextTrimming="CharacterEllipsis"/>
-                                                                <Border Padding="3,1" CornerRadius="2"
-                                                                        VerticalAlignment="Center"
-                                                                        Background="#30F38BA8">
-                                                                    <TextBlock Text="{Binding FocusAgeText}"
-                                                                               FontSize="9"
+                                                        <Grid Margin="0,1" ColumnDefinitions="*,Auto,Auto,Auto,Auto">
+                                                            <!-- Workstream label (click to open focus file) -->
+                                                            <Button Grid.Column="0"
+                                                                    Background="Transparent" BorderThickness="0"
+                                                                    Padding="0" HorizontalContentAlignment="Left"
+                                                                    x:Name="WorkstreamFocusButton"
+                                                                    Tag="{Binding}"
+                                                                    ToolTip.Tip="{Binding FocusFile}"
+                                                                    Opacity="{Binding IsClosed, Converter={StaticResource BoolToOpacityConverter}, ConverterParameter=0.4|1.0}">
+                                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                    <Ellipse Width="5" Height="5"
+                                                                             VerticalAlignment="Center">
+                                                                        <Ellipse.Fill>
+                                                                            <SolidColorBrush Color="White"/>
+                                                                        </Ellipse.Fill>
+                                                                    </Ellipse>
+                                                                    <TextBlock Text="{Binding Label}" FontSize="11"
+                                                                               VerticalAlignment="Center"
+                                                                               Foreground="White"
+                                                                               MaxWidth="105"
+                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                    <Border Padding="3,1" CornerRadius="2"
+                                                                            VerticalAlignment="Center"
+                                                                            Background="#30F38BA8">
+                                                                        <TextBlock Text="{Binding FocusAgeText}"
+                                                                                   FontSize="9"
+                                                                                   Foreground="#A6ADC8"/>
+                                                                    </Border>
+                                                                    <TextBlock Text="{Binding DecisionLogCount, StringFormat='&#x1F4DD;{0}'}"
+                                                                               FontSize="10"
+                                                                               VerticalAlignment="Center"
                                                                                Foreground="#A6ADC8"/>
-                                                                </Border>
-                                                                <TextBlock Text="{Binding DecisionLogCount, StringFormat='&#x1F4DD;{0}'}"
-                                                                           FontSize="10"
-                                                                           VerticalAlignment="Center"
-                                                                           Foreground="#A6ADC8"/>
-                                                            </StackPanel>
+                                                                </StackPanel>
+                                                            </Button>
 
                                                             <Button Grid.Column="1" Padding="6,2" Margin="4,0,2,0"
                                                                     ToolTip.Tip="Open workstream work root"
                                                                     FontSize="12" Content="&#x1F4C2;"
+                                                                    x:Name="WorkstreamWorkRootButton"
                                                                     Tag="{Binding}"/>
                                                             <Button Grid.Column="2" Padding="6,2"
                                                                     ToolTip.Tip="Create today folder in workstream work"
                                                                     FontSize="12" Content="+"
+                                                                    x:Name="WorkstreamTodayFolderButton"
                                                                     Tag="{Binding}"/>
                                                             <Button Grid.Column="3" Padding="6,2" Margin="2,0,0,0"
                                                                     ToolTip.Tip="Pin a recent work folder"
                                                                     FontSize="12" Content="&#x1F4CC;"
+                                                                    x:Name="WorkstreamPinFolderButton"
+                                                                    Tag="{Binding}"/>
+                                                            <Button Grid.Column="4" Padding="6,2" Margin="2,0,0,0"
+                                                                    ToolTip.Tip="Open workstream terminal"
+                                                                    FontSize="12" Content="&gt;_"
+                                                                    FontFamily="Consolas,Monospace"
+                                                                    x:Name="WorkstreamTerminalButton"
                                                                     Tag="{Binding}"/>
                                                         </Grid>
                                                     </DataTemplate>
@@ -363,10 +398,28 @@
                                             <TextBlock Text="&gt;_" FontSize="12" FontFamily="Consolas,Monospace"/>
                                         </Button>
                                         <Button Padding="8,3"
+                                                ToolTip.Tip="Open in VS Code"
+                                                x:Name="OpenVSCodeButton"
+                                                Tag="{Binding}">
+                                            <TextBlock Text="&#x23F5;" FontSize="12"/>
+                                        </Button>
+                                        <Button Padding="8,3"
                                                 ToolTip.Tip="Open in Editor"
                                                 x:Name="OpenEditorButton"
                                                 Tag="{Binding}">
                                             <TextBlock Text="&#x270F;" FontSize="14"/>
+                                        </Button>
+                                        <Button Padding="8,3"
+                                                ToolTip.Tip="Open _work Root"
+                                                x:Name="OpenWorkRootButton"
+                                                Tag="{Binding}">
+                                            <TextBlock Text="&#x1F4C2;" FontSize="14"/>
+                                        </Button>
+                                        <Button Padding="8,3"
+                                                ToolTip.Tip="Create today work folder"
+                                                x:Name="CreateTodayFolderButton"
+                                                Tag="{Binding}">
+                                            <TextBlock Text="+" FontSize="16" FontWeight="Bold"/>
                                         </Button>
                                         <Button Padding="8,3"
                                                 ToolTip.Tip="Pin a general work folder"

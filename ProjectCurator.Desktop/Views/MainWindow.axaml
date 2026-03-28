@@ -6,13 +6,16 @@
         Title="ProjectCurator"
         Width="1200" Height="800"
         MinWidth="800" MinHeight="600"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="False">
 
     <Grid RowDefinitions="*,Auto">
         <ui:NavigationView x:Name="NavView"
                            Grid.Row="0"
                            PaneDisplayMode="Left"
                            IsBackButtonVisible="False"
+                           IsSettingsVisible="False"
+                           OpenPaneLength="200"
                            IsPaneOpen="True">
             <ui:NavigationView.MenuItems>
                 <ui:NavigationViewItem Content="Dashboard" Tag="Dashboard"/>
@@ -20,9 +23,9 @@
                 <ui:NavigationViewItem Content="Timeline" Tag="Timeline"/>
                 <ui:NavigationViewItem Content="Git Repos" Tag="GitRepos"/>
                 <ui:NavigationViewItem Content="Asana Sync" Tag="AsanaSync"/>
-                <ui:NavigationViewItem Content="Setup" Tag="Setup"/>
             </ui:NavigationView.MenuItems>
             <ui:NavigationView.FooterMenuItems>
+                <ui:NavigationViewItem Content="Setup" Tag="Setup"/>
                 <ui:NavigationViewItem Content="Settings" Tag="Settings"/>
             </ui:NavigationView.FooterMenuItems>
 

@@ -28,6 +28,7 @@ public partial class EditorPage : UserControl
 {
     private TextEditor? _editor;
     private TextEditor? _diffViewer;
+    private IHighlightingDefinition? _markdownDefinition;
     private DiffLineBackgroundRenderer? _diffViewerRenderer;
     private EditorViewModel? _viewModel;
     private readonly IDialogService? _dialogService;
@@ -55,27 +56,36 @@ public partial class EditorPage : UserControl
 
         try
         {
-            _editor = this.FindControl<TextEditor>("TextEditor");
-            _diffViewer = this.FindControl<TextEditor>("DiffViewer");
-            if (_editor == null) return;
-            var diffPanel = this.FindControl<Grid>("DiffPanel");
-            if (diffPanel != null)
-                diffPanel.IsVisible = false;
-            _editor.IsVisible = true;
+            // Use x:Name generated fields directly (more reliable than FindControl with a type-name conflict).
+            _editor = this.TextEditor;
+            _diffViewer = this.DiffViewer;
 
-            _ = _viewModel?.LoadProjectsAsync();
+            // Build markdown highlighting definition in code (same as WPF version).
+            // xshd loading can fail silently; code-based definition always works.
+            _markdownDefinition = BuildMarkdownHighlightingDefinition();
 
-            TryApplyMarkdownHighlighting(_editor);
-
-            // Register diff background renderer
-            _diffRenderer = new DiffLineBackgroundRenderer();
-            _editor.TextArea.TextView.BackgroundRenderers.Add(_diffRenderer);
-            if (_diffViewer != null)
+            if (_editor != null)
             {
-                _diffViewerRenderer = new DiffLineBackgroundRenderer();
-                _diffViewer.TextArea.TextView.BackgroundRenderers.Add(_diffViewerRenderer);
+                DiffPanel.IsVisible = false;
+                _editor.IsVisible = true;
+
+                // Apply explicit colors to override any FluentAvalonia theme interference.
+                ApplyEditorTheme(_editor);
+                ApplyMarkdownHighlighting(_editor);
+
+                // Register diff background renderer
+                _diffRenderer = new DiffLineBackgroundRenderer();
+                _editor.TextArea.TextView.BackgroundRenderers.Add(_diffRenderer);
+                if (_diffViewer != null)
+                {
+                    _diffViewerRenderer = new DiffLineBackgroundRenderer();
+                    _diffViewer.TextArea.TextView.BackgroundRenderers.Add(_diffViewerRenderer);
+                }
+
+                _editor.TextChanged += OnEditorTextChanged;
             }
 
+            // Register ViewModel callbacks and PropertyChanged regardless of _editor state.
             if (_viewModel != null)
             {
                 _viewModel.RequestNewDecisionLogName = ShowTextInputDialogAsync;
@@ -91,16 +101,20 @@ public partial class EditorPage : UserControl
                 _viewModel.RequestMeetingNotesPreview = ShowMeetingNotesPreviewDialogAsync;
 
                 _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-                _editor.TextChanged += OnEditorTextChanged;
 
-                NoFileText.IsVisible = string.IsNullOrWhiteSpace(_viewModel.CurrentFile);
-                _suppressTextSync = true;
-                _editor.Text = _viewModel.EditorText ?? string.Empty;
-                _suppressTextSync = false;
-                ResetEditorViewport();
-                UpdateEditorPanelsVisibility();
-                RefreshDebugState();
+                if (_editor != null)
+                {
+                    NoFileText.IsVisible = string.IsNullOrWhiteSpace(_viewModel.CurrentFile);
+                    _suppressTextSync = true;
+                    _editor.Text = _viewModel.EditorText ?? string.Empty;
+                    _suppressTextSync = false;
+                    ResetEditorViewport();
+                    UpdateEditorPanelsVisibility();
+                    RefreshDebugState();
+                }
             }
+
+            _ = _viewModel?.LoadProjectsAsync();
 
             _isInitialized = true;
         }
@@ -112,15 +126,20 @@ public partial class EditorPage : UserControl
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (_viewModel == null || _editor == null)
+        if (_viewModel == null)
             return;
 
         if (args.PropertyName == nameof(EditorViewModel.CurrentFile))
         {
-            _suppressTextSync = true;
-            _editor.Text = _viewModel.EditorText ?? string.Empty;
-            _suppressTextSync = false;
-            ResetEditorViewport();
+            if (_editor != null)
+            {
+                _suppressTextSync = true;
+                _editor.Text = _viewModel.EditorText ?? string.Empty;
+                _suppressTextSync = false;
+                // Re-apply syntax highlighting on every file change (matches WPF behavior).
+                ApplyMarkdownHighlighting(_editor);
+                Dispatcher.UIThread.Post(ResetEditorViewport, DispatcherPriority.Render);
+            }
             NoFileText.IsVisible = string.IsNullOrWhiteSpace(_viewModel.CurrentFile);
             _focusDiffBaseContent = null;
             _focusDiffBaseLabel = null;
@@ -130,7 +149,8 @@ public partial class EditorPage : UserControl
 
         if (args.PropertyName == nameof(EditorViewModel.IsDiffViewActive))
         {
-            UpdateEditorPanelsVisibility();
+            if (_editor != null)
+                UpdateEditorPanelsVisibility();
             if (_viewModel.IsDiffViewActive)
                 _ = UpdateDiffViewAsync();
             else
@@ -148,38 +168,97 @@ public partial class EditorPage : UserControl
 
     private void OnEditorTextChanged(object? sender, EventArgs e)
     {
-        if (_viewModel == null || _editor == null || _suppressTextSync)
+        if (_viewModel == null || _suppressTextSync)
             return;
 
-        _viewModel.NotifyTextChanged(_editor.Text ?? string.Empty);
+        _viewModel.NotifyTextChanged(_editor?.Text ?? string.Empty);
         if (_viewModel.IsDiffViewActive)
             _ = UpdateDiffViewAsync();
         RefreshDebugState();
     }
 
-    private static void TryApplyMarkdownHighlighting(TextEditor editor)
+    private static void ApplyEditorTheme(TextEditor editor)
     {
-        var candidateUris = new[]
-        {
-            "avares://ProjectCurator/Assets/Markdown.xshd",
-            "avares://ProjectCurator.Desktop/Assets/Markdown.xshd"
-        };
+        editor.Background = new SolidColorBrush(Color.Parse("#1e1e1e"));
+        editor.Foreground = new SolidColorBrush(Color.Parse("#d4d4d4"));
+        editor.TextArea.Foreground = new SolidColorBrush(Color.Parse("#d4d4d4"));
+        editor.LineNumbersForeground = new SolidColorBrush(Color.Parse("#94a3b8"));
+    }
 
-        foreach (var uriText in candidateUris)
+    private void ApplyMarkdownHighlighting(TextEditor editor)
+    {
+        editor.SyntaxHighlighting = _markdownDefinition;
+    }
+
+    /// <summary>
+    /// Builds the Markdown highlighting definition in code (same as WPF version).
+    /// Avoids xshd loading which can fail silently.
+    /// </summary>
+    private static IHighlightingDefinition BuildMarkdownHighlightingDefinition()
+    {
+        try
         {
-            try
-            {
-                var uri = new Uri(uriText);
-                using var stream = AssetLoader.Open(uri);
-                using var reader = new XmlTextReader(stream);
-                editor.SyntaxHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
-                return;
-            }
-            catch
-            {
-                // Try next candidate URI.
-            }
+            static HighlightingColor Clr(byte r, byte g, byte b) =>
+                new() { Foreground = new SimpleHighlightingBrush(Color.FromRgb(r, g, b)) };
+            static HighlightingColor ClrBold(byte r, byte g, byte b) =>
+                new() { Foreground = new SimpleHighlightingBrush(Color.FromRgb(r, g, b)), FontWeight = FontWeight.Bold };
+            static HighlightingColor ClrItalic(byte r, byte g, byte b) =>
+                new() { Foreground = new SimpleHighlightingBrush(Color.FromRgb(r, g, b)), FontStyle = FontStyle.Italic };
+            static HighlightingColor ClrBoldItalic(byte r, byte g, byte b) =>
+                new() { Foreground = new SimpleHighlightingBrush(Color.FromRgb(r, g, b)), FontWeight = FontWeight.Bold, FontStyle = FontStyle.Italic };
+
+            var heading    = ClrBold     (0x58, 0xa6, 0xff);
+            var code       = Clr         (0xff, 0xa6, 0x57);
+            var emphasis   = ClrItalic   (0xff, 0xa8, 0xcc);
+            var strong     = ClrBold     (0xff, 0xa8, 0xcc);
+            var boldItalic = ClrBoldItalic(0xff, 0xa8, 0xcc);
+            var blockquote = Clr         (0x7e, 0xe7, 0x87);
+            var link       = Clr         (0x79, 0xc0, 0xff);
+            var list       = Clr         (0xf0, 0x88, 0x3e);
+            var comment    = Clr         (0x8b, 0x94, 0x9e);
+            var plain      = Clr         (0xd4, 0xd4, 0xd4);
+
+            var rs = new HighlightingRuleSet();
+
+            rs.Rules.Add(new HighlightingRule { Color = heading,    Regex = new Regex(@"^\#{1,6}[^\n]*",   RegexOptions.Multiline) });
+            rs.Rules.Add(new HighlightingRule { Color = blockquote, Regex = new Regex(@"^\s*>[^\n]*",       RegexOptions.Multiline) });
+            rs.Rules.Add(new HighlightingRule { Color = link,       Regex = new Regex(@"!\[.*?\]\([^\)]*\)") });
+            rs.Rules.Add(new HighlightingRule { Color = link,       Regex = new Regex(@"\[.*?\]\([^\)]*\)") });
+            rs.Rules.Add(new HighlightingRule { Color = list,       Regex = new Regex(@"^\s*[\*\+\-]\s",   RegexOptions.Multiline) });
+            rs.Rules.Add(new HighlightingRule { Color = list,       Regex = new Regex(@"^\s*\d+\.\s",      RegexOptions.Multiline) });
+            rs.Rules.Add(new HighlightingRule { Color = plain,      Regex = new Regex(@"[^\n]+") });
+
+            rs.Spans.Add(new HighlightingSpan { StartColor = comment,    SpanColor = comment,    EndColor = comment,
+                StartExpression = new Regex(@"<!--"), EndExpression = new Regex(@"-->") });
+            rs.Spans.Add(new HighlightingSpan { StartColor = code,       SpanColor = code,       EndColor = code,
+                StartExpression = new Regex(@"```"), EndExpression = new Regex(@"```") });
+            rs.Spans.Add(new HighlightingSpan { StartColor = code,       SpanColor = code,       EndColor = code,
+                StartExpression = new Regex(@"`"), EndExpression = new Regex(@"`") });
+            rs.Spans.Add(new HighlightingSpan { StartColor = boldItalic, SpanColor = boldItalic, EndColor = boldItalic,
+                StartExpression = new Regex(@"\*\*\*"), EndExpression = new Regex(@"\*\*\*") });
+            rs.Spans.Add(new HighlightingSpan { StartColor = strong,     SpanColor = strong,     EndColor = strong,
+                StartExpression = new Regex(@"\*\*"), EndExpression = new Regex(@"\*\*") });
+            rs.Spans.Add(new HighlightingSpan { StartColor = emphasis,   SpanColor = emphasis,   EndColor = emphasis,
+                StartExpression = new Regex(@"\*"), EndExpression = new Regex(@"\*") });
+
+            return new MarkdownHighlightingDefinition(rs);
         }
+        catch
+        {
+            return HighlightingManager.Instance.GetDefinition("None") ?? new MarkdownHighlightingDefinition(new HighlightingRuleSet());
+        }
+    }
+
+    private sealed class MarkdownHighlightingDefinition : IHighlightingDefinition
+    {
+        private readonly HighlightingRuleSet _mainRuleSet;
+        public MarkdownHighlightingDefinition(HighlightingRuleSet mainRuleSet) => _mainRuleSet = mainRuleSet;
+        public string Name => "Markdown";
+        public HighlightingRuleSet MainRuleSet => _mainRuleSet;
+        public IEnumerable<HighlightingColor> NamedHighlightingColors => [];
+        public IDictionary<string, string> Properties { get; } = new Dictionary<string, string>();
+        public HighlightingColor? GetNamedColor(string name) => null;
+        public HighlightingRuleSet? GetNamedRuleSet(string name) => null;
     }
 
     private async void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -294,8 +373,9 @@ public partial class EditorPage : UserControl
             _editor.CaretOffset = 0;
             _editor.ScrollToLine(1);
             _editor.ScrollTo(1, 1);
+            // Redraw() forces AvaloniaEdit to rebuild visual lines (InvalidateVisual alone is insufficient).
+            _editor.TextArea.TextView.Redraw();
             _editor.InvalidateVisual();
-            _editor.TextArea.TextView.InvalidateVisual();
         }
         catch
         {
@@ -376,13 +456,12 @@ public partial class EditorPage : UserControl
 
     private void UpdateEditorPanelsVisibility()
     {
-        var diffPanel = this.FindControl<Grid>("DiffPanel");
-        if (_editor == null || diffPanel == null || _viewModel == null)
+        if (_editor == null || _viewModel == null)
             return;
 
         var showDiff = _viewModel.IsDiffViewActive;
         _editor.IsVisible = !showDiff;
-        diffPanel.IsVisible = showDiff;
+        DiffPanel.IsVisible = showDiff;
     }
 
     private static (string text, List<(int line, bool isAdd)> lines) BuildSimpleDiff(string previous, string current)

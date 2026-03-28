@@ -64,6 +64,13 @@
                           SelectionChanged="OnTreeSelectionChanged"
                           PointerPressed="OnFileTreePointerPressed"
                           DoubleTapped="OnFileTreeDoubleTapped">
+                    <TreeView.Styles>
+                        <Style Selector="TreeViewItem">
+                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                            <Setter Property="FontSize" Value="12"/>
+                        </Style>
+                    </TreeView.Styles>
                     <TreeView.ContextMenu>
                         <ContextMenu Opened="OnFileTreeContextMenuOpened">
                             <MenuItem x:Name="AddObsidianNoteMenuItem" Header="Add Note" Click="OnAddObsidianNote"/>
