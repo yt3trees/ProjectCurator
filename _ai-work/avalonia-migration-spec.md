@@ -173,15 +173,15 @@ ProjectCurator.sln
 
 ### 2-3. SetupPage (490 XAML行, 42 CS行)
 
-- [ ] `SetupPage.axaml` - フォーム・出力ログ
-- [ ] `SetupPage.axaml.cs` - コードビハインド移植
+- [x] `SetupPage.axaml` - フォーム・出力ログ
+- [x] `SetupPage.axaml.cs` - コードビハインド移植
 - [ ] 動作確認: プロジェクトセットアップ、バリデーション
 
 ### 2-4. TimelinePage (452 XAML行, 109 CS行)
 
-- [ ] `TimelinePage.axaml` - リスト・ヒートマップ
-- [ ] `HeatmapIntensityToBrushConverter` Avalonia版作成
-- [ ] `TimelinePage.axaml.cs` - コードビハインド移植
+- [x] `TimelinePage.axaml` - リスト・ヒートマップ
+- [x] `HeatmapIntensityToBrushConverter` Avalonia版作成
+- [x] `TimelinePage.axaml.cs` - コードビハインド移植
 - [ ] 動作確認: タイムライン表示、ヒートマップレンダリング
 
 ### 2-5. DashboardPage (最大・最複雑: 970 XAML行, 4417 CS行)
