@@ -161,6 +161,11 @@
                             <CheckBox Content="Overwrite existing skills (-Force)"
                                       IsChecked="{Binding NewAiContextForce}"
                                       IsEnabled="{Binding NewAiContextForceEnabled}"
+                                      Margin="16,0,0,6"/>
+
+                            <CheckBox Content="Reset skills folder (delete all before re-deploy)"
+                                      IsChecked="{Binding NewAiContextResetSkills}"
+                                      IsEnabled="{Binding NewAiContextResetSkillsEnabled}"
                                       Margin="16,0,0,16"/>
 
                             <ui:Button Content="Setup Project"

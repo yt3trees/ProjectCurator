@@ -81,7 +81,11 @@ public partial class SetupViewModel : ObservableObject
     [ObservableProperty]
     private bool newAiContextForce = false;
 
+    [ObservableProperty]
+    private bool newAiContextResetSkills = false;
+
     public bool NewAiContextForceEnabled => NewAlsoRunAiContext && !IsRunning;
+    public bool NewAiContextResetSkillsEnabled => NewAlsoRunAiContext && !IsRunning;
 
     // --- Check / Archive / Convert 共通: プロジェクト名リスト ---
 
@@ -172,6 +176,7 @@ public partial class SetupViewModel : ObservableObject
         var category = NewCategory;
         var alsoRunAiContext = NewAlsoRunAiContext;
         var aiContextForce = NewAiContextForce;
+        var aiContextResetSkills = NewAiContextResetSkills;
 
         await RunScript(async () =>
         {
@@ -200,6 +205,7 @@ public partial class SetupViewModel : ObservableObject
                         tier,
                         category,
                         aiContextForce,
+                        aiContextResetSkills,
                         _cts!.Token);
 
                     foreach (var log in contextResult.Logs)
@@ -530,12 +536,16 @@ public partial class SetupViewModel : ObservableObject
         }
     }
 
-    partial void OnNewAlsoRunAiContextChanged(bool value) =>
+    partial void OnNewAlsoRunAiContextChanged(bool value)
+    {
         OnPropertyChanged(nameof(NewAiContextForceEnabled));
+        OnPropertyChanged(nameof(NewAiContextResetSkillsEnabled));
+    }
 
     partial void OnIsRunningChanged(bool value)
     {
         OnPropertyChanged(nameof(NewAiContextForceEnabled));
+        OnPropertyChanged(nameof(NewAiContextResetSkillsEnabled));
         OnPropertyChanged(nameof(CanManageWorkstreams));
         OnPropertyChanged(nameof(CanDetectBoxProjects));
     }

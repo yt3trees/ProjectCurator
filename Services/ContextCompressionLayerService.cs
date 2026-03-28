@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -26,6 +26,7 @@ public class ContextCompressionLayerService
         string tier,
         string category,
         bool force,
+        bool resetSkills = false,
         CancellationToken ct = default)
     {
         return await Task.Run(() =>
@@ -39,7 +40,7 @@ public class ContextCompressionLayerService
                 var obsidianRoot = Environment.ExpandEnvironmentVariables(paths.ObsidianVaultRoot);
 
                 SetupWorkspace(obsidianRoot, localRoot, result.Logs);
-                var projectSetupOk = SetupProject(projectName, tier, category, localRoot, boxRoot, obsidianRoot, force, result.Logs);
+                var projectSetupOk = SetupProject(projectName, tier, category, localRoot, boxRoot, obsidianRoot, force, resetSkills, result.Logs);
                 if (!projectSetupOk)
                 {
                     result.Success = false;
@@ -80,6 +81,7 @@ public class ContextCompressionLayerService
         string boxRoot,
         string obsidianRoot,
         bool force,
+        bool resetSkills,
         List<string> logs)
     {
         logs.Add($"[DEBUG] SetupProject: name={projectName} tier={tier} category={category} force={force}");
@@ -127,7 +129,7 @@ public class ContextCompressionLayerService
 
         try
         {
-            SetupCliSkills(projectRoot, boxProjectRoot, force, logs);
+            SetupCliSkills(projectRoot, boxProjectRoot, force, resetSkills, logs);
         }
         catch (Exception ex)
         {
@@ -139,7 +141,7 @@ public class ContextCompressionLayerService
         return true;
     }
 
-    private static void SetupCliSkills(string localProjectRoot, string boxProjectRoot, bool force, List<string> logs)
+    private static void SetupCliSkills(string localProjectRoot, string boxProjectRoot, bool force, bool resetSkills, List<string> logs)
     {
         var skillFolders = Directory.Exists(SkillRoot)
             ? Directory.GetDirectories(SkillRoot)
@@ -151,6 +153,21 @@ public class ContextCompressionLayerService
             foreach (var cli in new[] { ".claude", ".codex", ".gemini" })
             {
                 var dstSkillsDir = Path.Combine(boxProjectRoot, cli, "skills");
+
+                if (resetSkills && Directory.Exists(dstSkillsDir))
+                {
+                    try
+                    {
+                        Directory.Delete(dstSkillsDir, recursive: true);
+                        logs.Add($"[RESET] {cli}/skills/ (deleted before re-deploy)");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[SetupCliSkills] Reset delete failed: {ex.Message}");
+                        logs.Add($"[WARN] {cli}/skills/ could not be reset: {ex.Message}");
+                    }
+                }
+
                 EnsureDirectory(dstSkillsDir, logs);
                 foreach (var srcSkillDir in skillFolders)
                 {
@@ -191,6 +208,21 @@ public class ContextCompressionLayerService
         foreach (var cli in new[] { ".claude", ".codex", ".gemini" })
         {
             var dstSkillsDir = Path.Combine(boxProjectRoot, cli, "skills");
+
+            if (resetSkills && Directory.Exists(dstSkillsDir))
+            {
+                try
+                {
+                    Directory.Delete(dstSkillsDir, recursive: true);
+                    logs.Add($"[RESET] {cli}/skills/ (deleted before re-deploy)");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[SetupCliSkills] Reset delete failed: {ex.Message}");
+                    logs.Add($"[WARN] {cli}/skills/ could not be reset: {ex.Message}");
+                }
+            }
+
             EnsureDirectory(dstSkillsDir, logs);
             foreach (var skillName in EmbeddedSkillNames)
             {
