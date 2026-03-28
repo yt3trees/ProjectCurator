@@ -196,12 +196,12 @@ ProjectCurator.sln
 
 ### 2-6. EditorPage (297 XAML行, 2923 CS行)
 
-- [ ] `EditorPage.axaml` - AvaloniaEdit TextEditorへ置換
-- [ ] AvaloniaEdit統合:
-  - [ ] Markdown.xshd 構文ハイライト適用 (AvaloniaEditは.xshd互換)
-  - [ ] `DiffLineBackgroundRenderer` Avalonia IBackgroundRenderer版に移植
+- [x] `EditorPage.axaml` - AvaloniaEdit TextEditorへ置換
+- [x] AvaloniaEdit統合:
+  - [x] Markdown.xshd 構文ハイライト適用 (AvaloniaEditは.xshd互換)
+  - [x] `DiffLineBackgroundRenderer` Avalonia IBackgroundRenderer版に移植
   - [ ] SearchPanel統合
-- [ ] `EditorPage.axaml.cs` - コードビハインド移植
+- [x] `EditorPage.axaml.cs` - コードビハインド移植
 - [ ] `ProposalReviewDialog` Avalonia版作成
 - [ ] 動作確認: ファイル読み込み・編集・保存、Diff表示、構文ハイライト
 
