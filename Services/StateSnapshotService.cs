@@ -60,7 +60,7 @@ public class StateSnapshotService
             AppVersion = version,
             ConfigDir = NormalizePath(_configService.ConfigDir),
             LocalProjectsRoot = NormalizePath(settings.LocalProjectsRoot),
-            BoxProjectsRoot = NormalizePath(settings.BoxProjectsRoot),
+            CloudSyncRoot = NormalizePath(settings.CloudSyncRoot),
             ObsidianVaultRoot = NormalizePath(settings.ObsidianVaultRoot),
             StandupDir = NormalizePath(Path.Combine(settings.ObsidianVaultRoot, "standup")),
             Projects = projects.Select(BuildProjectEntry).ToList(),

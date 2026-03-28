@@ -49,10 +49,10 @@ public class AsanaSyncService
         if (string.IsNullOrWhiteSpace(userGid))
             throw new InvalidOperationException("_config/asana_global.json の user_gid (または ASANA_USER_GID) が必要です。");
 
-        var boxRoot = paths.BoxProjectsRoot.Trim();
+        var syncRoot = paths.CloudSyncRoot.Trim();
         var obsidianRoot = paths.ObsidianVaultRoot.Trim();
-        if (string.IsNullOrWhiteSpace(boxRoot) || string.IsNullOrWhiteSpace(obsidianRoot))
-            throw new InvalidOperationException("paths 設定 (boxProjectsRoot / obsidianVaultRoot) が不足しています。");
+        if (string.IsNullOrWhiteSpace(syncRoot) || string.IsNullOrWhiteSpace(obsidianRoot))
+            throw new InvalidOperationException("paths 設定 (cloudSyncRoot / obsidianVaultRoot) が不足しています。");
 
         var personalProjectGids = asanaGlobal.PersonalProjectGids ?? [];
 
@@ -82,7 +82,7 @@ public class AsanaSyncService
         }
 
         Log("[1/5] Discovering projects with asana_config.json...");
-        var discovered = DiscoverProjects(boxRoot, Log);
+        var discovered = DiscoverProjects(syncRoot, Log);
 
         // 非表示プロジェクトを除外
         if (hiddenSet != null && hiddenSet.Count > 0)

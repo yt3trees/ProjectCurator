@@ -66,7 +66,7 @@ public partial class SettingsViewModel : ObservableObject
     private string localProjectsRoot = "";
 
     [ObservableProperty]
-    private string boxProjectsRoot = "";
+    private string cloudSyncRoot = "";
 
     [ObservableProperty]
     private string obsidianVaultRoot = "";
@@ -165,7 +165,7 @@ public partial class SettingsViewModel : ObservableObject
             TodayQueueLimit = settings.DashboardTodayQueueLimit;
             AutoRefreshMinutes = settings.DashboardAutoRefreshMinutes;
             LocalProjectsRoot = settings.LocalProjectsRoot;
-            BoxProjectsRoot = settings.BoxProjectsRoot;
+            CloudSyncRoot = settings.CloudSyncRoot;
             ObsidianVaultRoot = settings.ObsidianVaultRoot;
             UpdateWorkspacePathsWarning();
 
@@ -270,7 +270,7 @@ public partial class SettingsViewModel : ObservableObject
         settings.DashboardTodayQueueLimit = TodayQueueLimit;
         settings.DashboardAutoRefreshMinutes = AutoRefreshMinutes;
         settings.LocalProjectsRoot = LocalProjectsRoot.Trim();
-        settings.BoxProjectsRoot = BoxProjectsRoot.Trim();
+        settings.CloudSyncRoot = CloudSyncRoot.Trim();
         settings.ObsidianVaultRoot = ObsidianVaultRoot.Trim();
         // LLM 設定も同時に保存 (どちらの Save ボタンを押してもすべて反映される)
         settings.LlmProvider    = LlmProvider.Trim();
@@ -398,7 +398,7 @@ public partial class SettingsViewModel : ObservableObject
         UpdateWorkspacePathsWarning();
     }
 
-    partial void OnBoxProjectsRootChanged(string value)
+    partial void OnCloudSyncRootChanged(string value)
     {
         if (_loading) return;
         UpdateWorkspacePathsWarning();
@@ -429,7 +429,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         var missing = new List<string>();
         if (string.IsNullOrWhiteSpace(LocalProjectsRoot)) missing.Add("Local Projects Root");
-        if (string.IsNullOrWhiteSpace(BoxProjectsRoot)) missing.Add("Box Projects Root");
+        if (string.IsNullOrWhiteSpace(CloudSyncRoot)) missing.Add("Cloud Sync Root");
         if (string.IsNullOrWhiteSpace(ObsidianVaultRoot)) missing.Add("Obsidian Vault Root");
 
         WorkspacePathsWarning = missing.Count == 0

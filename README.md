@@ -71,7 +71,7 @@ Open `Settings`, set these values, then save:
 
 - `Local Projects Root` (parent folder for your local working projects)
   Example: `C:\Users\<your-user>\Documents\Projects`
-- `Box Projects Root` (parent folder synced by Box for shared project files)
+- `Cloud Sync Root` (parent folder synced by Box for shared project files)
   Example: `C:\Users\<your-user>\Box\Projects`
 - `Obsidian Vault Root` (parent folder for your Obsidian vault)
   Example: `C:\Users\<your-user>\Box\ObsidianVault`
@@ -120,12 +120,12 @@ Required config files are created automatically when you save.
 - `Editor`: update `current_focus.md`
 - `Asana Sync` (optional): sync tasks into Today Queue sources
 
-## Folder Layout (Local vs BOX Sync)
+## Folder Layout (Local vs Cloud Sync)
 
 ```mermaid
 flowchart LR
     L["Local Projects Root (local disk)"]
-    B["Box Projects Root (remote sync)"]
+    B["Cloud Sync Root (remote sync)"]
     O["Obsidian Vault Root (notes sync)"]
 
     L --> P["MyProject/development/source (local)"]
@@ -142,8 +142,8 @@ flowchart LR
 Local Projects Root/
 └── MyProject/
     ├── development/
-    │   └── source/                  # Local working repos (not BOX)
-    ├── shared/                      # Junction -> Box Projects Root/MyProject/
+    │   └── source/                  # Local working repos (not synced to cloud)
+    ├── shared/                      # Junction -> Cloud Sync Root/MyProject/
     │   ├── _work/
     │   │   ├── <workstream-id>/      # Workstream shared directory created from Setup tab
     │   │   └── 2026/
@@ -159,7 +159,7 @@ Local Projects Root/
 
 In short:
 - Local-only working code lives under `development/source/`.
-- Data under `shared/` is managed through the Box-linked location.
+- Data under `shared/` is managed through the Cloud-linked location.
 - Context/notes under `_ai-context/` are linked to your Obsidian vault path.
 - `shared/_work/<workstream-id>/` is for workstream-level shared work.
 - Date-based work folder example: `shared/_work/2026/202603/20260321_fix-login-bug/`
@@ -172,8 +172,8 @@ When you run `Setup Project` with `Also run AI Context Setup` checked, ProjectCu
 
 ```text
 Local Projects Root          ... Your local machine only (not synced)
-Box Projects Root            ... Cloud-synced via Box Drive (shared files)
-Obsidian Vault Root          ... Cloud-synced via Box Drive (knowledge notes)
+Cloud Sync Root            ... Cloud-synced via Box Drive (or similar) (shared files)
+Obsidian Vault Root          ... Cloud-synced via Box Drive (or similar) (knowledge notes)
 ```
 
 These three locations are connected by junctions (Windows directory links) so that everything appears as one unified tree under the local project folder.
@@ -195,15 +195,15 @@ Local Projects Root/
     ├── _ai-workspace/                 # (full tier only) Local AI working area
     ├── development/
     │   └── source/                    # Git-managed local repositories
-    ├── shared/             ← junction → Box Projects Root/MyProject/
+    ├── shared/             ← junction → Cloud Sync Root/MyProject/
     ├── external_shared/               # (optional) Junctions to external paths
-    ├── .claude/            ← junction → Box Projects Root/MyProject/.claude/
-    ├── .codex/             ← junction → Box Projects Root/MyProject/.codex/
-    ├── .gemini/            ← junction → Box Projects Root/MyProject/.gemini/
-    ├── AGENTS.md                      # AI agent instructions (copied from BOX)
+    ├── .claude/            ← junction → Cloud Sync Root/MyProject/.claude/
+    ├── .codex/             ← junction → Cloud Sync Root/MyProject/.codex/
+    ├── .gemini/            ← junction → Cloud Sync Root/MyProject/.gemini/
+    ├── AGENTS.md                      # AI agent instructions (copied from Cloud)
     └── CLAUDE.md                      # Points to @AGENTS.md
 
-Box Projects Root/
+Cloud Sync Root/
 └── MyProject/
     ├── docs/                          # Shared documents
     ├── _work/                         # Shared work folders
@@ -276,7 +276,7 @@ flowchart LR
         LCLI["MyProject/.claude/ .codex/ .gemini/"]
     end
 
-    subgraph Box["Box Projects Root"]
+    subgraph Box["Cloud Sync Root"]
         BS["MyProject/"]
         BCLI["MyProject/.claude/ .codex/ .gemini/"]
     end
@@ -292,7 +292,7 @@ flowchart LR
     LCLI -->|junction| BCLI
 ```
 
-By using junctions, you get a single unified view under the local project folder while the actual data lives in the appropriate synced location. AI agents, Obsidian, and Box all see their own slice of the same data.
+By using junctions, you get a single unified view under the local project folder while the actual data lives in the appropriate synced location. AI agents, Obsidian, and your cloud sync all see their own slice of the same data.
 
 ## Recommended Daily Flow
 
@@ -537,7 +537,7 @@ Scans workspace roots and lists repositories with remote URLs, branches, and las
 
 - Project dropdown to filter repositories by project
 - Scan button to trigger a recursive repository search under workspace roots
-- Save to BOX / Load from BOX buttons to back up or restore clone metadata
+- Save to Cloud / Load from Cloud buttons to back up or restore clone metadata
 - Copy Clone Script button generates a shell script to re-clone all listed repositories
 - Table columns: Project, Repository, Remote URL, Branch, Last Commit date
 
@@ -590,7 +590,7 @@ If tasks do not appear:
 
 Reference (you usually do not edit these directly):
 - Global Asana values are stored in `Documents\Projects\_config\asana_global.json`
-- Per-project advanced settings are stored in `{BoxProject}\asana_config.json`
+- Per-project advanced settings are stored in `{CloudSyncProject}\asana_config.json`
 
 </details>
 

@@ -126,8 +126,8 @@
                              Foreground="{DynamicResource AppText}"
                              BorderBrush="{DynamicResource AppSurface2}"/>
 
-                    <TextBlock Text="Box Projects Root" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
-                    <TextBox Text="{Binding BoxProjectsRoot, UpdateSourceTrigger=PropertyChanged}"
+                    <TextBlock Text="Cloud Sync Root" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
+                    <TextBox Text="{Binding CloudSyncRoot, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,2,0,8" Padding="6,4"
                              Background="{DynamicResource AppSurface1}"
                              Foreground="{DynamicResource AppText}"

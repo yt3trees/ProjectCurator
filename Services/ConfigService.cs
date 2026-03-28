@@ -50,7 +50,7 @@ public class ConfigService
 
         // EnvironmentVariables 展開
         settings.LocalProjectsRoot = Environment.ExpandEnvironmentVariables(settings.LocalProjectsRoot);
-        settings.BoxProjectsRoot = Environment.ExpandEnvironmentVariables(settings.BoxProjectsRoot);
+        settings.CloudSyncRoot = Environment.ExpandEnvironmentVariables(settings.CloudSyncRoot);
         settings.ObsidianVaultRoot = Environment.ExpandEnvironmentVariables(settings.ObsidianVaultRoot);
 
         // デフォルト補正

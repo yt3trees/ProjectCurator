@@ -36,11 +36,11 @@ public class ContextCompressionLayerService
             {
                 var paths = _configService.LoadSettings();
                 var localRoot = Environment.ExpandEnvironmentVariables(paths.LocalProjectsRoot);
-                var boxRoot = Environment.ExpandEnvironmentVariables(paths.BoxProjectsRoot);
+                var syncRoot = Environment.ExpandEnvironmentVariables(paths.CloudSyncRoot);
                 var obsidianRoot = Environment.ExpandEnvironmentVariables(paths.ObsidianVaultRoot);
 
                 SetupWorkspace(obsidianRoot, localRoot, result.Logs);
-                var projectSetupOk = SetupProject(projectName, tier, category, localRoot, boxRoot, obsidianRoot, force, resetSkills, result.Logs);
+                var projectSetupOk = SetupProject(projectName, tier, category, localRoot, syncRoot, obsidianRoot, force, resetSkills, result.Logs);
                 if (!projectSetupOk)
                 {
                     result.Success = false;

@@ -8,7 +8,7 @@ public class CuratorStateSnapshot
     public string AppVersion { get; set; } = "";
     public string ConfigDir { get; set; } = "";
     public string LocalProjectsRoot { get; set; } = "";
-    public string BoxProjectsRoot { get; set; } = "";
+    public string CloudSyncRoot { get; set; } = "";
     public string ObsidianVaultRoot { get; set; } = "";
     public string StandupDir { get; set; } = "";
     public List<CuratorProjectEntry> Projects { get; set; } = [];

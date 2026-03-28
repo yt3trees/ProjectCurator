@@ -57,7 +57,7 @@ public class AppSettings
     public int DashboardTodayQueueLimit { get; set; } = 5;
     public int DashboardAutoRefreshMinutes { get; set; } = 0;
     public string LocalProjectsRoot { get; set; } = "";
-    public string BoxProjectsRoot { get; set; } = "";
+    public string CloudSyncRoot { get; set; } = "";
     public string ObsidianVaultRoot { get; set; } = "";
     public HotkeyConfig? Hotkey { get; set; }
     public HotkeyConfig? CaptureHotkey { get; set; }

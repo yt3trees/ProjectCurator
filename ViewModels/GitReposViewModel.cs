@@ -114,7 +114,7 @@ public partial class GitReposViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SaveToBox()
+    private void SaveToCloud()
     {
         if (Repos.Count == 0)
         {
@@ -171,7 +171,7 @@ public partial class GitReposViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void LoadFromBox()
+    private void LoadFromCloud()
     {
         if (SelectedProject == null)
         {

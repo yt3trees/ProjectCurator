@@ -90,7 +90,7 @@ public class ProjectDiscoveryService
             var result = new ProjectArchiveResult { Success = true };
             var paths = _configService.LoadSettings();
             var localRoot = Environment.ExpandEnvironmentVariables(paths.LocalProjectsRoot);
-            var boxRoot = Environment.ExpandEnvironmentVariables(paths.BoxProjectsRoot);
+            var syncRoot = Environment.ExpandEnvironmentVariables(paths.CloudSyncRoot);
             var obsidianRoot = Environment.ExpandEnvironmentVariables(paths.ObsidianVaultRoot);
 
             string categoryPrefix = project.Category == "domain" ? "_domains" : "";
@@ -98,11 +98,11 @@ public class ProjectDiscoveryService
             string archiveSubPath = project.Tier == "mini" ? Path.Combine("_archive", categoryPrefix, "_mini", project.Name) : Path.Combine("_archive", categoryPrefix, project.Name);
 
             string docRoot = Path.Combine(localRoot, projectSubPath);
-            string boxShared = Path.Combine(boxRoot, projectSubPath);
+            string boxShared = Path.Combine(syncRoot, projectSubPath);
             string obsidianProject = project.Name == "_INHOUSE" ? Path.Combine(obsidianRoot, "_INHOUSE") : Path.Combine(obsidianRoot, "Projects", projectSubPath);
 
             string localArchive = Path.Combine(localRoot, archiveSubPath);
-            string boxArchive = Path.Combine(boxRoot, archiveSubPath);
+            string boxArchive = Path.Combine(syncRoot, archiveSubPath);
             string obsidianArchive = project.Name == "_INHOUSE" ? Path.Combine(obsidianRoot, "_archive", "_INHOUSE") : Path.Combine(obsidianRoot, "Projects", archiveSubPath);
 
             if (Directory.Exists(localArchive) || Directory.Exists(boxArchive) || Directory.Exists(obsidianArchive))
@@ -141,7 +141,7 @@ public class ProjectDiscoveryService
             var result = new ProjectConvertResult { Success = true };
             var paths = _configService.LoadSettings();
             var localRoot = Environment.ExpandEnvironmentVariables(paths.LocalProjectsRoot);
-            var boxRoot = Environment.ExpandEnvironmentVariables(paths.BoxProjectsRoot);
+            var syncRoot = Environment.ExpandEnvironmentVariables(paths.CloudSyncRoot);
             var obsidianRoot = Environment.ExpandEnvironmentVariables(paths.ObsidianVaultRoot);
 
             string categoryPrefix = project.Category == "domain" ? "_domains" : "";
@@ -150,8 +150,8 @@ public class ProjectDiscoveryService
 
             string srcLocal = Path.Combine(localRoot, srcSubPath);
             string dstLocal = Path.Combine(localRoot, dstSubPath);
-            string srcBox = Path.Combine(boxRoot, srcSubPath);
-            string dstBox = Path.Combine(boxRoot, dstSubPath);
+            string srcBox = Path.Combine(syncRoot, srcSubPath);
+            string dstBox = Path.Combine(syncRoot, dstSubPath);
             string srcObsidian = project.Name == "_INHOUSE" ? Path.Combine(obsidianRoot, "_INHOUSE") : Path.Combine(obsidianRoot, "Projects", srcSubPath);
             string dstObsidian = project.Name == "_INHOUSE" ? Path.Combine(obsidianRoot, "_INHOUSE") : Path.Combine(obsidianRoot, "Projects", dstSubPath);
 
@@ -193,14 +193,14 @@ public class ProjectDiscoveryService
             var result = new ProjectSetupResult { Success = true };
             var paths = _configService.LoadSettings();
             var localRoot = Environment.ExpandEnvironmentVariables(paths.LocalProjectsRoot);
-            var boxRoot = Environment.ExpandEnvironmentVariables(paths.BoxProjectsRoot);
+            var syncRoot = Environment.ExpandEnvironmentVariables(paths.CloudSyncRoot);
             var obsidianRoot = Environment.ExpandEnvironmentVariables(paths.ObsidianVaultRoot);
 
             string categoryPrefix = category == "domain" ? "_domains" : "";
             string subPath = tier == "mini" ? Path.Combine(categoryPrefix, "_mini", projectName) : Path.Combine(categoryPrefix, projectName);
 
             string docRoot = Path.Combine(localRoot, subPath);
-            string boxShared = Path.Combine(boxRoot, subPath);
+            string boxShared = Path.Combine(syncRoot, subPath);
             string obsidianProject = projectName == "_INHOUSE" ? Path.Combine(obsidianRoot, "_INHOUSE") : Path.Combine(obsidianRoot, "Projects", subPath);
 
             Directory.CreateDirectory(docRoot);
@@ -533,14 +533,14 @@ public class ProjectDiscoveryService
         {
             var settings  = _configService.LoadSettings();
             var localRoot = settings.LocalProjectsRoot;
-            var boxRoot   = settings.BoxProjectsRoot;
+            var syncRoot   = settings.CloudSyncRoot;
 
-            if (!Directory.Exists(boxRoot)) return [];
+            if (!Directory.Exists(syncRoot)) return [];
 
             var results = new List<BoxOnlyProjectCandidate>();
 
             // tier=full, category=project (root 直下, ScanProjects と同ルール)
-            foreach (var dir in SafeEnumerateDirectories(boxRoot))
+            foreach (var dir in SafeEnumerateDirectories(syncRoot))
             {
                 var name = Path.GetFileName(dir);
                 if (name != "_INHOUSE" && (name.StartsWith('_') || name.StartsWith('.'))) continue;
@@ -549,7 +549,7 @@ public class ProjectDiscoveryService
             }
 
             // tier=mini, category=project
-            var boxMini = Path.Combine(boxRoot, "_mini");
+            var boxMini = Path.Combine(syncRoot, "_mini");
             if (Directory.Exists(boxMini))
             {
                 foreach (var dir in SafeEnumerateDirectories(boxMini))
@@ -562,7 +562,7 @@ public class ProjectDiscoveryService
             }
 
             // tier=full, category=domain
-            var boxDomains = Path.Combine(boxRoot, "_domains");
+            var boxDomains = Path.Combine(syncRoot, "_domains");
             if (Directory.Exists(boxDomains))
             {
                 foreach (var dir in SafeEnumerateDirectories(boxDomains))

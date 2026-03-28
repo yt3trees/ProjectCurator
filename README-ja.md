@@ -68,7 +68,7 @@ flowchart TD
 
 - `Local Projects Root` (ローカル作業用の親フォルダ)
   例: `C:\Users\<あなたのユーザー名>\Documents\Projects`
-- `Box Projects Root` (BOX同期される共有フォルダの親)
+- `Cloud Sync Root` (クラウド同期される共有フォルダの親)
   例: `C:\Users\<あなたのユーザー名>\Box\Projects`
 - `Obsidian Vault Root` (Obsidian保管庫の親フォルダ)
   例: `C:\Users\<あなたのユーザー名>\Box\ObsidianVault`
@@ -117,12 +117,12 @@ flowchart TD
 - `Editor`: `current_focus.md` を更新
 - `Asana Sync` (任意): タスクを同期してToday Queueへ反映
 
-## フォルダ構成(ローカル管理 / BOX同期)
+## フォルダ構成(ローカル管理 / クラウド同期)
 
 ```mermaid
 flowchart LR
     L["Local Projects Root(ローカル)"]
-    B["Box Projects Root(BOX同期)"]
+    B["Cloud Sync Root(クラウド同期)"]
     O["Obsidian Vault Root(ノート同期)"]
 
     L --> P["MyProject/development/source(ローカル)"]
@@ -139,8 +139,8 @@ flowchart LR
 Local Projects Root/
 └── MyProject/
     ├── development/
-    │   └── source/                  # ローカル作業用リポジトリ(BOX外)
-    ├── shared/                      # ジャンクション -> Box Projects Root/MyProject/
+    │   └── source/                  # ローカル作業用リポジトリ(クラウド同期外)
+    ├── shared/                      # ジャンクション -> Cloud Sync Root/MyProject/
     │   ├── _work/
     │   │   ├── <workstream-id>/      # Setupタブで作る Workstream ごとの共有作業ディレクトリ
     │   │   └── 2026/
@@ -156,7 +156,7 @@ Local Projects Root/
 
 要点:
 - `development/source/` はローカル作業領域です。
-- `shared/` は BOX 側のパスにリンクして管理します。
+- `shared/` は クラウド同期側のパスにリンクして管理します。
 - `_ai-context/` 配下は Obsidian 側パスにリンクして扱います。
 - `shared/_work/<workstream-id>/` は Workstream 単位の共有作業に使います。
 - 日付管理の作業フォルダ例: `shared/_work/2026/202603/20260321_fix-login-bug/`
@@ -169,8 +169,8 @@ Local Projects Root/
 
 ```text
 Local Projects Root          ... ローカルマシン上のみ(クラウド同期しない)
-Box Projects Root            ... Box Drive でクラウド同期(共有ファイル)
-Obsidian Vault Root          ... Box Drive でクラウド同期(ナレッジノート)
+Cloud Sync Root            ... Box Drive 等でクラウド同期(共有ファイル)
+Obsidian Vault Root          ... Box Drive 等でクラウド同期(ナレッジノート)
 ```
 
 この3か所は「ジャンクション」(Windowsのディレクトリリンク)で接続され、ローカルのプロジェクトフォルダ配下に統合的にアクセスできるようになっています。
@@ -192,15 +192,15 @@ Local Projects Root/
     ├── _ai-workspace/                 # (full tierのみ) ローカルAI作業領域
     ├── development/
     │   └── source/                    # ローカルGitリポジトリ
-    ├── shared/             ← junction → Box Projects Root/MyProject/
+    ├── shared/             ← junction → Cloud Sync Root/MyProject/
     ├── external_shared/               # (任意) 外部パスへのジャンクション
-    ├── .claude/            ← junction → Box Projects Root/MyProject/.claude/
-    ├── .codex/             ← junction → Box Projects Root/MyProject/.codex/
-    ├── .gemini/            ← junction → Box Projects Root/MyProject/.gemini/
-    ├── AGENTS.md                      # AIエージェント用指示書(BOXからコピー)
+    ├── .claude/            ← junction → Cloud Sync Root/MyProject/.claude/
+    ├── .codex/             ← junction → Cloud Sync Root/MyProject/.codex/
+    ├── .gemini/            ← junction → Cloud Sync Root/MyProject/.gemini/
+    ├── AGENTS.md                      # AIエージェント用指示書(クラウドからコピー)
     └── CLAUDE.md                      # @AGENTS.md への参照
 
-Box Projects Root/
+Cloud Sync Root/
 └── MyProject/
     ├── docs/                          # 共有ドキュメント
     ├── _work/                         # 共有作業フォルダ
@@ -273,7 +273,7 @@ flowchart LR
         LCLI["MyProject/.claude/ .codex/ .gemini/"]
     end
 
-    subgraph Box["Box Projects Root"]
+    subgraph Box["Cloud Sync Root"]
         BS["MyProject/"]
         BCLI["MyProject/.claude/ .codex/ .gemini/"]
     end
@@ -289,7 +289,7 @@ flowchart LR
     LCLI -->|junction| BCLI
 ```
 
-ジャンクションを使うことで、ローカルのプロジェクトフォルダ配下に統合ビューが構成されつつ、実データはそれぞれの同期先に格納されます。AIエージェント・Obsidian・Box がそれぞれ必要なデータに自然にアクセスできます。
+ジャンクションを使うことで、ローカルのプロジェクトフォルダ配下に統合ビューが構成されつつ、実データはそれぞれの同期先に格納されます。AIエージェント・Obsidian・クラウド同期アプリ等がそれぞれ必要なデータに自然にアクセスできます。
 
 ## 日々のおすすめ運用フロー
 
@@ -534,7 +534,7 @@ AI コンテキストファイル(`current_focus.md`、`decision_log` など)を
 
 - Project ドロップダウンでプロジェクト単位にリポジトリを絞り込み
 - Scan ボタンでワークスペースルート配下を再帰的にスキャン
-- Save to BOX / Load from BOX でクローン情報のバックアップ・復元
+- Save to Cloud / Load from Cloud でクローン情報のバックアップ・復元
 - Copy Clone Script で一覧のリポジトリを再クローンするシェルスクリプトを生成
 - テーブル列: Project、Repository、Remote URL、Branch、Last Commit
 
@@ -587,7 +587,7 @@ Asanaを使う場合のみ設定します。
 
 補足(通常は直接編集不要):
 - Asana の設定値は `Documents\Projects\_config\asana_global.json` に保存されます
-- プロジェクト単位の詳細設定は `{BoxProject}\asana_config.json` に保存されます
+- プロジェクト単位の詳細設定は `{CloudSyncProject}\asana_config.json` に保存されます
 
 </details>
 

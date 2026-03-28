@@ -49,13 +49,13 @@
                                Appearance="Primary"
                                IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBoolConverter}}"
                                Margin="6,0,0,0"/>
-                    <ui:Button Content="Save to BOX"
-                               Command="{Binding SaveToBoxCommand}"
+                    <ui:Button Content="Save to Cloud"
+                               Command="{Binding SaveToCloudCommand}"
                                Appearance="Secondary"
                                IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBoolConverter}}"
                                Margin="6,0,0,0"/>
-                    <ui:Button Content="Load from BOX"
-                               Command="{Binding LoadFromBoxCommand}"
+                    <ui:Button Content="Load from Cloud"
+                               Command="{Binding LoadFromCloudCommand}"
                                Appearance="Secondary"
                                IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBoolConverter}}"
                                Margin="6,0,0,0"/>

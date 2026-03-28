@@ -304,14 +304,14 @@ public partial class AsanaSyncViewModel : ObservableObject
     private string ResolveAsanaConfigPath(ProjectInfo project)
     {
         var paths = _configService.LoadSettings();
-        var boxRoot = paths.BoxProjectsRoot.TrimEnd('\\', '/');
+        var syncRoot = paths.CloudSyncRoot.TrimEnd('\\', '/');
 
         return project.Category == "domain"
             ? project.Tier == "mini"
-                ? Path.Combine(boxRoot, "_domains", "_mini", project.Name, "asana_config.json")
-                : Path.Combine(boxRoot, "_domains", project.Name, "asana_config.json")
+                ? Path.Combine(syncRoot, "_domains", "_mini", project.Name, "asana_config.json")
+                : Path.Combine(syncRoot, "_domains", project.Name, "asana_config.json")
             : project.Tier == "mini"
-                ? Path.Combine(boxRoot, "_mini", project.Name, "asana_config.json")
-                : Path.Combine(boxRoot, project.Name, "asana_config.json");
+                ? Path.Combine(syncRoot, "_mini", project.Name, "asana_config.json")
+                : Path.Combine(syncRoot, project.Name, "asana_config.json");
     }
 }
