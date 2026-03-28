@@ -16,6 +16,11 @@ public partial class CommandPaletteOverlay : UserControl
         DataContext = _viewModel;
     }
 
+    public void FocusSearchBox()
+    {
+        SearchBox.Focus();
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);

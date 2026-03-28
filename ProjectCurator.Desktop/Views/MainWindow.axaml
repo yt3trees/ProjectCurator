@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="using:FluentAvalonia.UI.Controls"
+        xmlns:controls="using:ProjectCurator.Desktop.Views.Controls"
         x:Class="ProjectCurator.Desktop.Views.MainWindow"
         Title="ProjectCurator"
         Width="1200" Height="800"
@@ -38,5 +39,8 @@
                        FontSize="12"
                        Foreground="White"/>
         </Border>
+
+        <controls:CommandPaletteOverlay x:Name="CommandPalette"
+                                        Grid.RowSpan="2"/>
     </Grid>
 </Window>

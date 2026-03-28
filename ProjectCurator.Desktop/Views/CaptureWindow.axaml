@@ -2,9 +2,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ProjectCurator.Desktop.Views.CaptureWindow"
         Title="Quick Capture"
-        Width="500" Height="300"
+        Width="620" Height="520"
         WindowStartupLocation="CenterScreen"
-        CanResize="False">
+        CanResize="False"
+        Background="#111827">
     <Grid>
         <!-- Input state -->
         <StackPanel x:Name="InputPanel" Spacing="12" Margin="20" IsVisible="True">
@@ -12,12 +13,17 @@
             <TextBox x:Name="InputBox"
                      Watermark="Enter capture text..."
                      AcceptsReturn="True"
-                     Height="100"
+                     Height="140"
                      Background="#1e1e1e"
                      Foreground="White"/>
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                <TextBlock Grid.Column="0" Text="Project" Foreground="#a5b4fc" VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="1" x:Name="ProjectCombo" MinWidth="220"/>
+                <ComboBox Grid.Column="2" x:Name="CategoryCombo" MinWidth="120"/>
+                <Button Grid.Column="3" Content="Capture" x:Name="CaptureBtn"/>
+            </Grid>
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                 <Button Content="Cancel" x:Name="CancelBtn"/>
-                <Button Content="Capture" x:Name="CaptureBtn" Classes="accent"/>
             </StackPanel>
         </StackPanel>
 
@@ -28,11 +34,64 @@
             <TextBlock Text="Processing..." Foreground="White" HorizontalAlignment="Center"/>
         </StackPanel>
 
+        <!-- Confirm state -->
+        <StackPanel x:Name="ConfirmPanel" IsVisible="False" Spacing="10" Margin="20">
+            <TextBlock Text="Review classification" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+            <TextBlock x:Name="ConfirmInputPreview" Foreground="#cbd5e1" TextWrapping="Wrap"/>
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Category" Foreground="#a5b4fc" VerticalAlignment="Center"/>
+                <ComboBox Grid.Row="0" Grid.Column="1" x:Name="ConfirmCategoryCombo"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Project" Foreground="#a5b4fc" VerticalAlignment="Center"/>
+                <ComboBox Grid.Row="1" Grid.Column="1" x:Name="ConfirmProjectCombo"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Summary" Foreground="#a5b4fc" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="2" Grid.Column="1" x:Name="ConfirmSummaryBox"/>
+
+                <TextBlock Grid.Row="3" Grid.Column="0" x:Name="AsanaProjectLabel" Text="Asana Project" Foreground="#a5b4fc" VerticalAlignment="Center" IsVisible="False"/>
+                <ComboBox Grid.Row="3" Grid.Column="1" x:Name="AsanaProjectCombo" IsVisible="False"/>
+
+                <TextBlock Grid.Row="4" Grid.Column="0" x:Name="AsanaSectionLabel" Text="Section" Foreground="#a5b4fc" VerticalAlignment="Center" IsVisible="False"/>
+                <ComboBox Grid.Row="4" Grid.Column="1" x:Name="AsanaSectionCombo" IsVisible="False"/>
+
+                <TextBlock Grid.Row="5" Grid.Column="0" x:Name="DueDateLabel" Text="Due Date" Foreground="#a5b4fc" VerticalAlignment="Center" IsVisible="False"/>
+                <StackPanel Grid.Row="5" Grid.Column="1" x:Name="DueDateRow" Orientation="Horizontal" Spacing="8" IsVisible="False">
+                    <DatePicker x:Name="DueDatePicker"/>
+                    <CheckBox x:Name="SetTimeCheckBox" Content="Set time"/>
+                    <ComboBox x:Name="HourCombo" Width="70"/>
+                    <ComboBox x:Name="MinuteCombo" Width="70"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="6" Grid.ColumnSpan="2" x:Name="ConfirmErrorText" Foreground="#fda4af" IsVisible="False" TextWrapping="Wrap"/>
+            </Grid>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button x:Name="BackToInputBtn" Content="Back"/>
+                <Button x:Name="RouteBtn" Content="Route"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Task approval state -->
+        <StackPanel x:Name="TaskApprovalPanel" IsVisible="False" Spacing="10" Margin="20">
+            <TextBlock Text="Approve Asana request" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+            <TextBox x:Name="RequestPreviewBox" Height="300" AcceptsReturn="True" IsReadOnly="True"
+                     TextWrapping="NoWrap" Background="#1e1e1e" Foreground="#e5e7eb"/>
+            <TextBlock x:Name="TaskApprovalErrorText" Foreground="#fda4af" IsVisible="False" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button x:Name="BackToConfirmBtn" Content="Back"/>
+                <Button x:Name="SaveAsMemoBtn" Content="Save as memo" IsVisible="False"/>
+                <Button x:Name="ApproveBtn" Content="Approve"/>
+            </StackPanel>
+        </StackPanel>
+
         <!-- Complete state -->
         <StackPanel x:Name="CompletePanel" IsVisible="False"
-                    HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-            <TextBlock Text="Captured!" FontSize="24" Foreground="#4CAF50" HorizontalAlignment="Center"/>
-            <Button Content="Close" HorizontalAlignment="Center" x:Name="CloseBtn"/>
+                    HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Margin="20">
+            <TextBlock x:Name="CompleteMessageText" Text="Captured!" FontSize="20" Foreground="#4CAF50" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                <Button Content="Open File" x:Name="OpenFileBtn" IsVisible="False"/>
+                <Button Content="Open Asana" x:Name="OpenAsanaBtn" IsVisible="False"/>
+                <Button Content="Close" x:Name="CloseBtn"/>
+            </StackPanel>
         </StackPanel>
     </Grid>
 </Window>

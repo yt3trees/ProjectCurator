@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <SyntaxDefinition name="Markdown" extensions=".md;.markdown" xmlns="http://icsharpcode.net/sharpdevelop/avalonedit/syntaxdefinition/2008">
+    <Color name="PlainText"      foreground="#d4d4d4" />
     <Color name="Heading"        foreground="#58a6ff" fontWeight="bold" />
     <Color name="Emphasis"       foreground="#ffa8cc" fontStyle="italic" />
     <Color name="StrongEmphasis" foreground="#ffa8cc" fontWeight="bold" />
@@ -96,5 +97,10 @@
             <Begin>&lt;!--</Begin>
             <End>--&gt;</End>
         </Span>
+
+        <!-- Plain text fallback: keep normal markdown body readable on dark background -->
+        <Rule color="PlainText">
+            [^\n]+
+        </Rule>
     </RuleSet>
 </SyntaxDefinition>

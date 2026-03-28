@@ -1,56 +1,147 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:avaloniaEdit="https://github.com/avaloniaui/avaloniaedit"
+             xmlns:vm="using:ProjectCurator.ViewModels"
              x:Class="ProjectCurator.Desktop.Views.Pages.EditorPage">
-    <Grid RowDefinitions="Auto, *, Auto">
+    <Grid RowDefinitions="Auto, Auto, *, Auto">
         <!-- Toolbar -->
         <Border Grid.Row="0" Background="#252526" Padding="4,2">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-                <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding IsDirty}"/>
-                <Button Content="Reload" Command="{Binding RefreshCommand}"/>
-                <Separator/>
-                <Button Content="Diff" Command="{Binding ToggleDiffViewCommand}" IsVisible="{Binding CanUseDiff}"/>
-                <Button Content="Update Focus" Command="{Binding UpdateFocusCommand}" IsVisible="{Binding IsAiEnabled}"/>
-                <Button Content="Import Meeting Notes" Command="{Binding ImportMeetingNotesCommand}" IsVisible="{Binding IsAiEnabled}"/>
-                <Separator/>
-                <TextBlock Text="{Binding CurrentFile}" VerticalAlignment="Center" Foreground="#cccccc" FontSize="12"/>
-            </StackPanel>
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="Project:" VerticalAlignment="Center" Foreground="#94a3b8"/>
+                    <ComboBox x:Name="ProjectComboBox"
+                              Width="240"
+                              ItemsSource="{Binding Projects}"
+                              SelectedItem="{Binding SelectedProject}"
+                              DisplayMemberBinding="{Binding Name}"
+                              SelectionChanged="OnProjectSelectionChanged"/>
+                </StackPanel>
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding CurrentFile}"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           Foreground="#94a3b8"
+                           TextTrimming="CharacterEllipsis"/>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                    <Button Content="Reload" Command="{Binding RefreshCommand}"/>
+                    <Button Content="New Log" Command="{Binding NewDecisionLogCommand}"/>
+                    <Button Content="Diff" Command="{Binding ToggleDiffViewCommand}" IsEnabled="{Binding CanUseDiff}"/>
+                    <Button Content="Search" Command="{Binding ToggleSearchBarCommand}"/>
+                    <Button Content="Meeting" Command="{Binding ImportMeetingNotesCommand}" IsVisible="{Binding IsAiEnabled}"/>
+                    <Button Content="Update Focus" Command="{Binding UpdateFocusCommand}" IsVisible="{Binding IsAiEnabled}"/>
+                    <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding IsDirty}"/>
+                </StackPanel>
+            </Grid>
         </Border>
 
-        <!-- Editor area -->
-        <Grid Grid.Row="1">
-            <!-- Normal editor -->
-            <avaloniaEdit:TextEditor x:Name="TextEditor"
-                                      IsVisible="{Binding !IsDiffViewActive}"
-                                      Background="#1e1e1e"
-                                      Foreground="#d4d4d4"
-                                      FontFamily="Consolas, Courier New, monospace"
-                                      FontSize="14"
-                                      ShowLineNumbers="True"
-                                      WordWrap="False"/>
+        <!-- Search bar -->
+        <Border Grid.Row="1"
+                IsVisible="{Binding IsSearchBarVisible}"
+                Background="#1f2937"
+                BorderBrush="#374151"
+                BorderThickness="0,1,0,1"
+                Padding="8,4">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
+                <TextBox x:Name="SearchTextBox" Grid.Column="0"
+                         Text="{Binding SearchText}" KeyDown="OnSearchKeyDown"/>
+                <Button Grid.Column="1" Content="▲" Click="OnSearchPrev"/>
+                <Button Grid.Column="2" Content="▼" Click="OnSearchNext"/>
+                <Button Grid.Column="3" Content="✕" Click="OnSearchClose"/>
+            </Grid>
+        </Border>
 
-            <!-- No-file placeholder -->
-            <TextBlock Text="Select a file to open"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       Foreground="#888888"
-                       FontSize="14"
-                       IsHitTestVisible="False"
-                       IsVisible="{Binding !CurrentFile.Length, FallbackValue=True}"/>
+        <!-- Main area -->
+        <Grid Grid.Row="2" ColumnDefinitions="240,4,*">
+            <Grid Grid.Column="0" RowDefinitions="Auto,*">
+                <Border Grid.Row="0" Background="#1f2937" Padding="8,4">
+                    <TextBlock Text="FILES" Foreground="#94a3b8"/>
+                </Border>
+                <TreeView Grid.Row="1"
+                          x:Name="FileTreeView"
+                          ItemsSource="{Binding TreeNodes}"
+                          SelectionChanged="OnTreeSelectionChanged"
+                          PointerPressed="OnFileTreePointerPressed"
+                          DoubleTapped="OnFileTreeDoubleTapped">
+                    <TreeView.ContextMenu>
+                        <ContextMenu Opened="OnFileTreeContextMenuOpened">
+                            <MenuItem x:Name="AddObsidianNoteMenuItem" Header="Add Note" Click="OnAddObsidianNote"/>
+                            <MenuItem x:Name="DeleteNodeMenuItem" Header="Delete" Click="OnDeleteNode"/>
+                        </ContextMenu>
+                    </TreeView.ContextMenu>
+                    <TreeView.ItemTemplate>
+                        <TreeDataTemplate DataType="vm:FileTreeNode" ItemsSource="{Binding Children}">
+                            <TextBlock Text="{Binding Name}"/>
+                        </TreeDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </Grid>
 
-            <!-- Loading overlay -->
-            <Panel IsVisible="{Binding IsLoading}" Background="#40000000">
-                <TextBlock Text="Loading..." HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Foreground="White" FontSize="16"/>
-            </Panel>
+            <GridSplitter Grid.Column="1" Background="#374151"/>
+
+            <Grid Grid.Column="2">
+                <avaloniaEdit:TextEditor x:Name="TextEditor"
+                                         IsVisible="True"
+                                         Background="#1e1e1e"
+                                         Foreground="#d4d4d4"
+                                         LineNumbersForeground="#94a3b8"
+                                         FontFamily="Consolas, Courier New, monospace"
+                                         FontSize="14"
+                                         ShowLineNumbers="True"
+                                         WordWrap="False"
+                                         PointerPressed="OnEditorPointerPressed"
+                                         PointerWheelChanged="OnEditorPointerWheelChanged">
+                    <avaloniaEdit:TextEditor.ContextMenu>
+                        <ContextMenu Opened="OnEditorContextMenuOpened"/>
+                    </avaloniaEdit:TextEditor.ContextMenu>
+                </avaloniaEdit:TextEditor>
+
+                <Grid x:Name="DiffPanel" IsVisible="False" RowDefinitions="Auto,*">
+                    <Border Grid.Row="0" Background="#111827" Padding="8,4">
+                        <TextBlock x:Name="DiffHeaderText" Text="Diff" Foreground="#cbd5e1"/>
+                    </Border>
+                    <avaloniaEdit:TextEditor Grid.Row="1"
+                                             x:Name="DiffViewer"
+                                             IsReadOnly="True"
+                                             Background="#0f172a"
+                                             Foreground="#d4d4d4"
+                                             LineNumbersForeground="#94a3b8"
+                                             FontFamily="Consolas, Courier New, monospace"
+                                             FontSize="13"
+                                             ShowLineNumbers="True"
+                                             WordWrap="False"/>
+                </Grid>
+
+                <!-- No-file placeholder -->
+                <TextBlock x:Name="NoFileText"
+                           Text="Select a file to open"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="#888888"
+                           FontSize="14"
+                           IsHitTestVisible="False"
+                           IsVisible="False"/>
+
+                <!-- Loading overlay -->
+                <Panel IsVisible="{Binding IsLoading}" Background="#40000000">
+                    <TextBlock Text="Loading..." HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="White" FontSize="16"/>
+                </Panel>
+            </Grid>
         </Grid>
 
         <!-- Status bar -->
-        <Border Grid.Row="2" Background="#007acc" Height="22">
+        <Border Grid.Row="3" Background="#007acc" Height="22">
             <StackPanel Orientation="Horizontal" Spacing="16" Margin="8,0">
                 <TextBlock Text="{Binding Encoding}" VerticalAlignment="Center" FontSize="12" Foreground="White"/>
                 <TextBlock Text="{Binding IsDirty, StringFormat='{}●'}" IsVisible="{Binding IsDirty}"
                            VerticalAlignment="Center" FontSize="12" Foreground="White"/>
+                <TextBlock x:Name="DebugStateText"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="White"
+                           TextTrimming="CharacterEllipsis"/>
             </StackPanel>
         </Border>
     </Grid>

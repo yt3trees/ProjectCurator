@@ -1,21 +1,170 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="ProjectCurator.Desktop.Views.Pages.SettingsPage">
-    <ScrollViewer>
-        <StackPanel Margin="20" Spacing="16">
-            <TextBlock Text="Settings" FontSize="20" FontWeight="Bold"/>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20" Spacing="14" MaxWidth="760">
+            <TextBlock Text="Settings" FontSize="22" FontWeight="Bold"/>
 
-            <StackPanel Spacing="8">
-                <TextBlock Text="Local Projects Root"/>
-                <TextBox x:Name="LocalRootBox" Watermark="C:\path\to\projects"/>
-            </StackPanel>
+            <TextBlock Text="Global Hotkey" FontSize="16" FontWeight="SemiBold"/>
+            <Border Background="#1f2937" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Global shortcut to show/hide the window" Foreground="#94a3b8"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <CheckBox Content="Ctrl" IsChecked="{Binding HotkeyCtrl}"/>
+                        <CheckBox Content="Shift" IsChecked="{Binding HotkeyShift}"/>
+                        <CheckBox Content="Alt" IsChecked="{Binding HotkeyAlt}"/>
+                        <CheckBox Content="Win" IsChecked="{Binding HotkeyWin}"/>
+                        <TextBlock Text="+" VerticalAlignment="Center" Foreground="#94a3b8"/>
+                        <TextBox Text="{Binding HotkeyKey}" Width="56"/>
+                        <Button Content="Apply" Click="OnApplyHotkey"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
 
-            <StackPanel Spacing="8">
-                <TextBlock Text="Box Projects Root (Cloud Sync)"/>
-                <TextBox x:Name="BoxRootBox" Watermark="C:\path\to\box"/>
-            </StackPanel>
+            <TextBlock Text="Quick Capture Hotkey" FontSize="16" FontWeight="SemiBold"/>
+            <Border Background="#1f2937" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Global shortcut to open Quick Capture" Foreground="#94a3b8"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <CheckBox Content="Ctrl" IsChecked="{Binding CaptureHotkeyCtrl}"/>
+                        <CheckBox Content="Shift" IsChecked="{Binding CaptureHotkeyShift}"/>
+                        <CheckBox Content="Alt" IsChecked="{Binding CaptureHotkeyAlt}"/>
+                        <CheckBox Content="Win" IsChecked="{Binding CaptureHotkeyWin}"/>
+                        <TextBlock Text="+" VerticalAlignment="Center" Foreground="#94a3b8"/>
+                        <TextBox Text="{Binding CaptureHotkeyKey}" Width="56"/>
+                        <Button Content="Apply" Click="OnApplyCaptureHotkey"/>
+                    </StackPanel>
+                    <CheckBox Content="Append to asana-tasks.md on task creation"
+                              IsChecked="{Binding CaptureTaskLogEnabled}"/>
+                </StackPanel>
+            </Border>
 
-            <Button Content="Save Settings" HorizontalAlignment="Left"/>
+            <TextBlock Text="Workspace Paths" FontSize="16" FontWeight="SemiBold"/>
+            <Border Background="#1f2937" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Local Projects Root" Foreground="#94a3b8"/>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Text="{Binding LocalProjectsRoot}"/>
+                        <Button Grid.Column="1" Content="Open" x:Name="OpenLocalRootButton" Click="OnOpenLocalRoot"/>
+                    </Grid>
+                    <TextBlock Text="Cloud Sync Root" Foreground="#94a3b8"/>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Text="{Binding CloudSyncRoot}"/>
+                        <Button Grid.Column="1" Content="Open" x:Name="OpenCloudRootButton" Click="OnOpenCloudRoot"/>
+                    </Grid>
+                    <TextBlock Text="Obsidian Vault Root" Foreground="#94a3b8"/>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Text="{Binding ObsidianVaultRoot}"/>
+                        <Button Grid.Column="1" Content="Open" x:Name="OpenObsidianRootButton" Click="OnOpenObsidianRoot"/>
+                    </Grid>
+                    <TextBlock Text="{Binding WorkspacePathsWarning}" Foreground="#fda4af" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="System" FontSize="16" FontWeight="SemiBold"/>
+            <Border Background="#1f2937" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="12">
+                <CheckBox Content="Launch at Windows startup" IsChecked="{Binding StartupEnabled}"/>
+            </Border>
+
+            <TextBlock Text="Dashboard Settings" FontSize="16" FontWeight="SemiBold"/>
+            <Border Background="#1f2937" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" Text="Today Queue limit" VerticalAlignment="Center"/>
+                        <NumericUpDown Grid.Column="1" Value="{Binding TodayQueueLimit}" Minimum="1" Maximum="50"/>
+                    </Grid>
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" Text="Auto-refresh interval" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Column="1" x:Name="SettingsAutoRefreshComboBox" SelectionChanged="OnAutoRefreshChanged">
+                            <ComboBoxItem Tag="0" Content="Off"/>
+                            <ComboBoxItem Tag="10" Content="10 min"/>
+                            <ComboBoxItem Tag="15" Content="15 min"/>
+                            <ComboBoxItem Tag="30" Content="30 min"/>
+                            <ComboBoxItem Tag="60" Content="60 min"/>
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Asana Global Config" FontSize="16" FontWeight="SemiBold"/>
+            <Border Background="#1f2937" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Asana Token" Foreground="#94a3b8"/>
+                    <TextBox x:Name="AsanaTokenBox"
+                             PasswordChar="*"
+                             TextChanged="OnAsanaTokenChanged"/>
+                    <TextBlock Text="Workspace GID" Foreground="#94a3b8"/>
+                    <TextBox Text="{Binding AsanaWorkspaceGid}"/>
+                    <TextBlock Text="User GID" Foreground="#94a3b8"/>
+                    <TextBox Text="{Binding AsanaUserGid}"/>
+                    <TextBlock Text="Personal Project GIDs (1 per line)" Foreground="#94a3b8"/>
+                    <TextBox Text="{Binding AsanaPersonalProjectGids}" AcceptsReturn="True" Height="90"/>
+                    <TextBlock Text="Output File" Foreground="#94a3b8"/>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Text="{Binding AsanaOutputFile}"/>
+                        <Button Grid.Column="1" Content="Open" x:Name="OpenAsanaOutputButton" Click="OnOpenAsanaOutput"/>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Save Asana Config" Command="{Binding SaveAsanaGlobalCommand}"/>
+                        <TextBlock Text="{Binding AsanaGlobalStatus}" VerticalAlignment="Center" Foreground="#94a3b8"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="LLM API" FontSize="16" FontWeight="SemiBold"/>
+            <Border Background="#1f2937" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Provider" Foreground="#94a3b8"/>
+                    <ComboBox x:Name="LlmProviderComboBox" SelectionChanged="OnLlmProviderChanged">
+                        <ComboBoxItem Tag="openai" Content="OpenAI"/>
+                        <ComboBoxItem Tag="azure_openai" Content="Azure OpenAI"/>
+                    </ComboBox>
+
+                    <TextBlock Text="API Key" Foreground="#94a3b8"/>
+                    <TextBox x:Name="LlmApiKeyBox"
+                             PasswordChar="*"
+                             TextChanged="OnLlmApiKeyChanged"/>
+
+                    <TextBlock Text="Model" Foreground="#94a3b8"/>
+                    <TextBox Text="{Binding LlmModel}"/>
+
+                    <StackPanel IsVisible="{Binding LlmIsAzure}" Spacing="8">
+                        <TextBlock Text="Endpoint URL" Foreground="#94a3b8"/>
+                        <TextBox Text="{Binding LlmEndpoint}"/>
+                        <TextBlock Text="API Version" Foreground="#94a3b8"/>
+                        <TextBox Text="{Binding LlmApiVersion}"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Extra Parameters (key = value)" Foreground="#94a3b8"/>
+                    <TextBox Text="{Binding LlmParametersText}" AcceptsReturn="True" Height="72"/>
+
+                    <TextBlock Text="User Profile" Foreground="#94a3b8"/>
+                    <TextBox Text="{Binding LlmUserProfile}" AcceptsReturn="True" Height="90"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Save LLM Settings" Command="{Binding SaveLlmCommand}"/>
+                        <Button Content="Test Connection" Command="{Binding TestLlmConnectionCommand}"/>
+                    </StackPanel>
+                    <TextBox Text="{Binding LlmStatus}" IsReadOnly="True" AcceptsReturn="True" Height="68"/>
+
+                    <Separator/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Enable AI Features" VerticalAlignment="Center"/>
+                        <ToggleSwitch IsChecked="{Binding AiEnabled}" IsEnabled="{Binding AiToggleCanEnable}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="About" FontSize="16" FontWeight="SemiBold"/>
+            <Border Background="#1f2937" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="ProjectCurator" FontSize="14" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding AppVersion}" Foreground="#94a3b8"/>
+                </StackPanel>
+            </Border>
+
+            <Button Content="Save Settings" Command="{Binding SaveCommand}"
+                    HorizontalAlignment="Right" Margin="0,8,0,0"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

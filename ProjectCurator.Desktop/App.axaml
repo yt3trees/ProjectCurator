@@ -9,11 +9,14 @@
     <TrayIcon.Icons>
         <TrayIcons>
             <TrayIcon Icon="avares://ProjectCurator/Assets/app.ico"
-                      ToolTipText="ProjectCurator">
+                      ToolTipText="ProjectCurator"
+                      Clicked="OnTrayIconClicked">
                 <TrayIcon.Menu>
                     <NativeMenu>
                         <NativeMenuItem Header="Show" Command="{Binding ShowWindowCommand}"/>
                         <NativeMenuItem Header="Quick Capture" Command="{Binding QuickCaptureCommand}"/>
+                        <NativeMenuItemSeparator/>
+                        <NativeMenuItem Header="{Binding HotkeyMenuHeader}" IsEnabled="False"/>
                         <NativeMenuItemSeparator/>
                         <NativeMenuItem Header="Exit" Command="{Binding ExitCommand}"/>
                     </NativeMenu>

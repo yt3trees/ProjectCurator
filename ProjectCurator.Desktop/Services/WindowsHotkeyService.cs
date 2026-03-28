@@ -1,19 +1,13 @@
-using System.Runtime.InteropServices;
+using SharpHook;
+using SharpHook.Native;
 using ProjectCurator.Interfaces;
 
 namespace ProjectCurator.Desktop.Services;
 
 public class WindowsHotkeyService : IHotkeyService, IDisposable
 {
-    private const int WM_HOTKEY = 0x0312;
-    private const int HOTKEY_MAIN = 1;
-    private const int HOTKEY_CAPTURE = 2;
-
-    [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-    [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-
-    private IntPtr _hwnd = IntPtr.Zero;
-    private bool _registered = false;
+    private TaskPoolGlobalHook? _hook;
+    private bool _registered;
 
     private string _mainModifiers = "Ctrl+Shift";
     private string _mainKey = "P";
@@ -25,51 +19,88 @@ public class WindowsHotkeyService : IHotkeyService, IDisposable
     public Action? OnActivated { get; set; }
     public Action? OnCaptureActivated { get; set; }
 
-    private static uint ParseModifiers(string modifiers)
+    private static ModifierMask ParseModifiers(string modifiers)
     {
-        uint mods = 0;
-        if (modifiers.Contains("Ctrl", StringComparison.OrdinalIgnoreCase)) mods |= 0x2;
-        if (modifiers.Contains("Shift", StringComparison.OrdinalIgnoreCase)) mods |= 0x4;
-        if (modifiers.Contains("Alt", StringComparison.OrdinalIgnoreCase)) mods |= 0x1;
-        if (modifiers.Contains("Win", StringComparison.OrdinalIgnoreCase)) mods |= 0x8;
-        return mods;
+        ModifierMask mask = ModifierMask.None;
+        if (modifiers.Contains("Shift", StringComparison.OrdinalIgnoreCase))
+            mask |= ModifierMask.Shift;
+        if (modifiers.Contains("Ctrl", StringComparison.OrdinalIgnoreCase))
+            mask |= ModifierMask.Ctrl;
+        if (modifiers.Contains("Alt", StringComparison.OrdinalIgnoreCase))
+            mask |= ModifierMask.Alt;
+        if (modifiers.Contains("Win", StringComparison.OrdinalIgnoreCase) ||
+            modifiers.Contains("Meta", StringComparison.OrdinalIgnoreCase))
+            mask |= ModifierMask.Meta;
+        return mask;
     }
 
-    private static uint ParseVirtualKey(string key)
+    private static KeyCode ParseKeyCode(string key)
     {
-        if (key.Length == 1 && char.IsLetter(key[0]))
-            return (uint)char.ToUpper(key[0]);
+        if (key.Length == 1)
+        {
+            return key.ToUpper() switch
+            {
+                "A" => KeyCode.VcA, "B" => KeyCode.VcB, "C" => KeyCode.VcC,
+                "D" => KeyCode.VcD, "E" => KeyCode.VcE, "F" => KeyCode.VcF,
+                "G" => KeyCode.VcG, "H" => KeyCode.VcH, "I" => KeyCode.VcI,
+                "J" => KeyCode.VcJ, "K" => KeyCode.VcK, "L" => KeyCode.VcL,
+                "M" => KeyCode.VcM, "N" => KeyCode.VcN, "O" => KeyCode.VcO,
+                "P" => KeyCode.VcP, "Q" => KeyCode.VcQ, "R" => KeyCode.VcR,
+                "S" => KeyCode.VcS, "T" => KeyCode.VcT, "U" => KeyCode.VcU,
+                "V" => KeyCode.VcV, "W" => KeyCode.VcW, "X" => KeyCode.VcX,
+                "Y" => KeyCode.VcY, "Z" => KeyCode.VcZ,
+                _ => KeyCode.VcUndefined
+            };
+        }
+
         return key.ToUpper() switch
         {
-            "F1" => 0x70, "F2" => 0x71, "F3" => 0x72, "F4" => 0x73,
-            "F5" => 0x74, "F6" => 0x75, "F7" => 0x76, "F8" => 0x77,
-            "F9" => 0x78, "F10" => 0x79, "F11" => 0x7A, "F12" => 0x7B,
-            _ => 0
+            "F1" => KeyCode.VcF1, "F2" => KeyCode.VcF2, "F3" => KeyCode.VcF3, "F4" => KeyCode.VcF4,
+            "F5" => KeyCode.VcF5, "F6" => KeyCode.VcF6, "F7" => KeyCode.VcF7, "F8" => KeyCode.VcF8,
+            "F9" => KeyCode.VcF9, "F10" => KeyCode.VcF10, "F11" => KeyCode.VcF11, "F12" => KeyCode.VcF12,
+            _ => KeyCode.VcUndefined
         };
+    }
+
+    private bool IsMatch(KeyboardHookEventArgs e, ModifierMask expectedMask, KeyCode expectedKey)
+    {
+        if (e.Data.KeyCode != expectedKey)
+            return false;
+        var actualMask = e.RawEvent.Mask;
+        return (actualMask & expectedMask) == expectedMask;
     }
 
     public void Register(IntPtr hwnd)
     {
-        _hwnd = hwnd;
-        var mainMods = ParseModifiers(_mainModifiers);
-        var mainVk = ParseVirtualKey(_mainKey);
-        if (mainVk != 0)
-            _registered = RegisterHotKey(_hwnd, HOTKEY_MAIN, mainMods, mainVk);
+        if (_hook != null)
+            return;
 
-        var captureMods = ParseModifiers(_captureModifiers);
-        var captureVk = ParseVirtualKey(_captureKey);
-        if (captureVk != 0)
-            RegisterHotKey(_hwnd, HOTKEY_CAPTURE, captureMods, captureVk);
+        _hook = new TaskPoolGlobalHook(globalHookType: GlobalHookType.Keyboard);
+        _hook.KeyPressed += OnKeyPressed;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _hook.RunAsync();
+                _registered = true;
+            }
+            catch
+            {
+                _registered = false;
+            }
+        });
+        _registered = true;
     }
 
     public void Unregister()
     {
-        if (_hwnd != IntPtr.Zero)
+        if (_hook != null)
         {
-            UnregisterHotKey(_hwnd, HOTKEY_MAIN);
-            UnregisterHotKey(_hwnd, HOTKEY_CAPTURE);
-            _registered = false;
+            _hook.KeyPressed -= OnKeyPressed;
+            try { _hook.Dispose(); } catch { }
+            _hook = null;
         }
+        _registered = false;
     }
 
     public void UpdateDisplay(string modifiers, string key)
@@ -80,39 +111,30 @@ public class WindowsHotkeyService : IHotkeyService, IDisposable
 
     public void ReRegister(string modifiers, string key)
     {
-        if (_hwnd != IntPtr.Zero)
-            UnregisterHotKey(_hwnd, HOTKEY_MAIN);
         _mainModifiers = modifiers;
         _mainKey = key;
-        if (_hwnd != IntPtr.Zero)
-        {
-            var mods = ParseModifiers(modifiers);
-            var vk = ParseVirtualKey(key);
-            if (vk != 0) _registered = RegisterHotKey(_hwnd, HOTKEY_MAIN, mods, vk);
-        }
     }
 
     public void ReRegisterCapture(string modifiers, string key)
     {
-        if (_hwnd != IntPtr.Zero)
-            UnregisterHotKey(_hwnd, HOTKEY_CAPTURE);
         _captureModifiers = modifiers;
         _captureKey = key;
-        if (_hwnd != IntPtr.Zero)
-        {
-            var mods = ParseModifiers(modifiers);
-            var vk = ParseVirtualKey(key);
-            if (vk != 0) RegisterHotKey(_hwnd, HOTKEY_CAPTURE, mods, vk);
-        }
     }
 
-    public void ProcessMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam)
+    private void OnKeyPressed(object? sender, KeyboardHookEventArgs e)
     {
-        if (msg == WM_HOTKEY)
+        var mainMask = ParseModifiers(_mainModifiers);
+        var mainKey = ParseKeyCode(_mainKey);
+        if (mainKey != KeyCode.VcUndefined && IsMatch(e, mainMask, mainKey))
         {
-            if (wParam.ToInt32() == HOTKEY_MAIN) OnActivated?.Invoke();
-            else if (wParam.ToInt32() == HOTKEY_CAPTURE) OnCaptureActivated?.Invoke();
+            OnActivated?.Invoke();
+            return;
         }
+
+        var captureMask = ParseModifiers(_captureModifiers);
+        var captureKey = ParseKeyCode(_captureKey);
+        if (captureKey != KeyCode.VcUndefined && IsMatch(e, captureMask, captureKey))
+            OnCaptureActivated?.Invoke();
     }
 
     public void Dispose() => Unregister();

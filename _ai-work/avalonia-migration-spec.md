@@ -6,6 +6,19 @@
 
 ProjectCuratorをWPF (.NET 9, Windows専用) からAvalonia UIへ移行し、macOSクロスプラットフォーム対応を実現する。
 
+## 進捗追記 (2026-03-28)
+
+- Windows版Avaloniaで、WPF相当の「×ボタンで終了せず非表示」挙動を実装。
+- Trayメニューに `Hotkey: ...` 表示を追加し、Settingsのホットキー再適用時に即時更新されるように実装。
+- Trayアイコンのクリックでメインウィンドウを表示する配線を追加。
+- Editor移植の継続対応として、ファイルツリー選択時のファイルオープン経路を冗長化（SelectionChanged / Pointer / DoubleTap）し、本文同期のフォールバックを追加。
+- Settings移植の継続対応として、WPF側にあったセクション（About、Openボタン群、機密入力保護）を補完。
+- Editor表示不具合の切り分けを実施し、診断表示を追加（`CurrentFile`, `VM/ED/DOC文字数`, `NUL数`, `Diff/Loading/Panel`）。
+- 診断結果: `VM/ED/DOC` は非0かつ `NUL:0` を確認。ファイル読み込み・ViewModel同期は成功しており、未表示は描画層側の問題である可能性が高い。
+- Editorで以下を実装済み: 初期化1回化、`CurrentFile`変更時同期、`NotifyTextChanged`経路統一、Diff強制OFF、キャレット/スクロール先頭リセット。
+- `Markdown.xshd` にプレーンテキスト色フォールバック追加、`LineNumbersForeground`明示指定を追加。
+- ただしユーザー環境では「本文が表示されない」事象が継続中。Phase 2-6 は継続調査扱い。
+
 ## プロジェクト構成
 
 ```
@@ -202,8 +215,25 @@ ProjectCurator.sln
   - [x] `DiffLineBackgroundRenderer` Avalonia IBackgroundRenderer版に移植
   - [ ] SearchPanel統合
 - [x] `EditorPage.axaml.cs` - コードビハインド移植
+- [x] 診断オーバーレイ追加 (読み込み/描画切り分け用)
+- [x] ファイル切替時の先頭表示リセット (`CaretOffset`, `ScrollToLine`, `ScrollTo`)
+- [x] UTF-16 BOMなし誤判定対策ヒューリスティックを `EncodingDetector` に追加
 - [ ] `ProposalReviewDialog` Avalonia版作成
 - [ ] 動作確認: ファイル読み込み・編集・保存、Diff表示、構文ハイライト
+  - 現状: 読み込みは成立 (`VM/ED/DOC>0`, `NUL=0`) だが本文描画が空に見える。描画層の追加調査が必要。
+
+### Editor未解決事象メモ (2026-03-28)
+
+- 症状:
+  - ファイル選択時に `Loading...` は表示される。
+  - ステータス診断で `F:file_map.md VM:1842 ED:1842 DOC:1842/61 NUL:0 D:off L:off P:editor` を確認。
+  - それでもエディタ本文表示領域が空に見える。
+- ここまでで除外できた点:
+  - File I/O失敗、空データ同期、NUL混入、Diffパネル表示誤り。
+- 次回調査の優先順:
+  1. AvaloniaEdit描画スタイル干渉の排除（SyntaxHighlighting一時無効化と素の描画確認）。
+  2. `TextView` の描画色/ブラシ/opacityをコードで強制指定してテーマ上書きの影響を確認。
+  3. AvaloniaEdit最小再現ページを別途作成し、同一環境で再現するかを比較。
 
 ### 2-7. CommandPaletteOverlay (81 XAML行)
 

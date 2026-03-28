@@ -32,6 +32,37 @@ public static class EncodingDetector
             return (content, "UTF16BE");
         }
 
+        // Heuristic detection for UTF-16 without BOM.
+        // Many markdown files created by external tools can be UTF-16LE/BE without BOM,
+        // which otherwise gets misread as UTF-8 and introduces NUL characters.
+        if (bytes.Length >= 4)
+        {
+            var evenZero = 0;
+            var oddZero = 0;
+            var pairCount = bytes.Length / 2;
+            for (var i = 0; i < pairCount * 2; i++)
+            {
+                if (bytes[i] != 0) continue;
+                if ((i & 1) == 0) evenZero++;
+                else oddZero++;
+            }
+
+            var evenRatio = pairCount == 0 ? 0.0 : (double)evenZero / pairCount;
+            var oddRatio = pairCount == 0 ? 0.0 : (double)oddZero / pairCount;
+
+            // UTF-16LE ASCII-like text: odd bytes are often zero.
+            if (oddRatio > 0.30 && evenRatio < 0.05)
+            {
+                return (Encoding.Unicode.GetString(bytes), "UTF16LE");
+            }
+
+            // UTF-16BE ASCII-like text: even bytes are often zero.
+            if (evenRatio > 0.30 && oddRatio < 0.05)
+            {
+                return (Encoding.BigEndianUnicode.GetString(bytes), "UTF16BE");
+            }
+        }
+
         // UTF-8 strict (throwOnInvalidBytes=true)
         try
         {

@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,10 +13,11 @@ using System.Windows.Input;
 
 namespace ProjectCurator.Desktop;
 
-public class App : Application
+public partial class App : Application
 {
     private static IServiceProvider? _services;
     private static Mutex? _mutex;
+    public static bool ExitRequested { get; private set; }
 
     public static IServiceProvider Services => _services ?? throw new InvalidOperationException("Services not initialized");
 
@@ -23,12 +25,21 @@ public class App : Application
     public ICommand ShowWindowCommand { get; }
     public ICommand QuickCaptureCommand { get; }
     public ICommand ExitCommand { get; }
+    public static readonly StyledProperty<string> HotkeyMenuHeaderProperty =
+        AvaloniaProperty.Register<App, string>(nameof(HotkeyMenuHeader), "Hotkey: (none)");
+
+    public string HotkeyMenuHeader
+    {
+        get => GetValue(HotkeyMenuHeaderProperty);
+        private set => SetValue(HotkeyMenuHeaderProperty, value);
+    }
 
     public App()
     {
         ShowWindowCommand = new RelayCommand(ShowWindow);
         QuickCaptureCommand = new RelayCommand(QuickCapture);
         ExitCommand = new RelayCommand(Exit);
+        DataContext = this;
     }
 
     public override void Initialize()
@@ -54,6 +65,14 @@ public class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
         {
             desktopLifetime.MainWindow = _services.GetRequiredService<MainWindow>();
+
+            var trayService = _services.GetRequiredService<ITrayService>();
+            var hotkeyService = _services.GetRequiredService<IHotkeyService>();
+            trayService.UpdateHotkeyDisplay(hotkeyService.HotkeyDisplayText);
+
+            // Start background schedulers on app startup (same behavior as WPF)
+            _services.GetRequiredService<StandupGeneratorService>().StartScheduler();
+            _services.GetRequiredService<AsanaSyncViewModel>().StartScheduler();
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -68,15 +87,33 @@ public class App : Application
         }
     }
 
+    private void OnTrayIconClicked(object? sender, EventArgs e)
+        => ShowWindow();
+
     private void QuickCapture()
     {
-        // TODO: Phase 3 - open CaptureWindow
+        if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+
+        if (desktop.MainWindow is MainWindow mainWindow)
+            mainWindow.ShowCaptureWindow();
     }
 
     private void Exit()
     {
+        ExitRequested = true;
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            desktop.Shutdown();
+        {
+            if (desktop.MainWindow is MainWindow mw)
+                mw.RequestExit();
+            else
+                desktop.Shutdown();
+        }
+    }
+
+    public void UpdateTrayHotkeyDisplay(string hotkeyText)
+    {
+        HotkeyMenuHeader = $"Hotkey: {hotkeyText}";
     }
 
     private static void ConfigureServices(IServiceCollection services)
