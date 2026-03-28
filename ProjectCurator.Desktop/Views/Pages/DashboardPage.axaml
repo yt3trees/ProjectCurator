@@ -1,0 +1,624 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ProjectCurator.ViewModels"
+             xmlns:models="using:ProjectCurator.Models"
+             xmlns:svc="using:ProjectCurator.Services"
+             xmlns:conv="using:ProjectCurator.Desktop.Converters"
+             x:Class="ProjectCurator.Desktop.Views.Pages.DashboardPage">
+
+    <UserControl.Resources>
+        <conv:BoolToOpacityConverter x:Key="BoolToOpacityConverter"/>
+        <conv:StringEqualsToBoolConverter x:Key="StringEqualsToBoolConverter"/>
+        <conv:BoolToStringConverter x:Key="BoolToStringConverter"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Toolbar -->
+            <RowDefinition Height="*"/>
+            <!-- Projects -->
+            <RowDefinition Height="Auto"/>
+            <!-- Pinned Folders -->
+            <RowDefinition Height="Auto"/>
+            <!-- Today Queue -->
+        </Grid.RowDefinitions>
+
+        <!-- ===== Toolbar ===== -->
+        <Border Grid.Row="0" Background="#1E1E2E" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="Dashboard"
+                           FontSize="14" FontWeight="SemiBold"
+                           Foreground="White"
+                           VerticalAlignment="Center"/>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+
+                    <!-- AI: What's Next -->
+                    <Button ToolTip.Tip="What should I do next? — AI analyzes all projects and suggests top priority actions"
+                            IsVisible="{Binding IsAiEnabled}"
+                            Padding="10,0" FontSize="13"
+                            x:Name="WhatsNextButton">
+                        <TextBlock Text="&#x1F4A1;" FontSize="14"/>
+                    </Button>
+
+                    <!-- AI: Plan My Day -->
+                    <Button ToolTip.Tip="Plan my day — AI generates a time-blocked plan with project signals and task priorities"
+                            IsVisible="{Binding IsAiEnabled}"
+                            Padding="10,0" FontSize="13"
+                            x:Name="TimeBlockButton">
+                        <TextBlock Text="&#x2600;" FontSize="14"/>
+                    </Button>
+
+                    <!-- Capture Log -->
+                    <Button ToolTip.Tip="View capture log"
+                            Padding="10,0" FontSize="13"
+                            x:Name="CaptureLogButton">
+                        <TextBlock Text="&#x1F4CB;" FontSize="14"/>
+                    </Button>
+
+                    <!-- Auto Refresh -->
+                    <TextBlock Text="Auto:" VerticalAlignment="Center"
+                               Foreground="#A6ADC8" FontSize="12"/>
+                    <ComboBox x:Name="AutoRefreshComboBox"
+                              MinWidth="110" FontSize="12">
+                        <ComboBoxItem Tag="0" Content="Off"/>
+                        <ComboBoxItem Tag="10" Content="10 min"/>
+                        <ComboBoxItem Tag="15" Content="15 min"/>
+                        <ComboBoxItem Tag="30" Content="30 min"/>
+                        <ComboBoxItem Tag="60" Content="60 min"/>
+                    </ComboBox>
+
+                    <!-- Force Refresh -->
+                    <Button Content="&#x21BB;" ToolTip.Tip="Force Refresh"
+                            Padding="10,0" FontSize="13"
+                            x:Name="RefreshButton"/>
+
+                    <!-- Toggle Hidden -->
+                    <Button ToolTip.Tip="Toggle hidden projects"
+                            Padding="8,0"
+                            x:Name="ToggleHiddenButton">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding HiddenCount}"
+                                       VerticalAlignment="Center" FontSize="12"
+                                       Foreground="White"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ===== Projects Area ===== -->
+        <Grid Grid.Row="1">
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Projects}" Margin="8">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ProjectCardViewModel">
+                            <Border Background="#313244"
+                                    BorderBrush="#45475A"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Margin="4"
+                                    Width="270"
+                                    Padding="12,8"
+                                    Opacity="{Binding IsHidden, Converter={StaticResource BoolToOpacityConverter}, ConverterParameter=0.45|1.0}">
+                                <StackPanel Spacing="0">
+
+                                    <!-- Header: project name + tier badge + hide button -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding Info.Name}"
+                                                   FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="White"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip.Tip="{Binding DisplayName}"
+                                                   VerticalAlignment="Center"/>
+
+                                        <!-- Tier badge -->
+                                        <Border Grid.Column="1" Margin="4,0,0,0" Padding="4,1"
+                                                CornerRadius="3" VerticalAlignment="Center"
+                                                Background="#89B4FA">
+                                            <TextBlock FontSize="9" FontWeight="Bold"
+                                                       Foreground="#11111B"
+                                                       Text="{Binding Tier}"/>
+                                        </Border>
+
+                                        <!-- Domain badge (always declared, hidden if not domain) -->
+                                        <Border Grid.Column="2" Margin="3,0,0,0" Padding="4,1"
+                                                CornerRadius="3" VerticalAlignment="Center"
+                                                Background="#A6E3A1"
+                                                IsVisible="{Binding Category, Converter={StaticResource StringEqualsToBoolConverter}, ConverterParameter=domain}">
+                                            <TextBlock Text="DOMAIN" FontSize="9" FontWeight="Bold"
+                                                       Foreground="#11111B"/>
+                                        </Border>
+
+                                        <!-- Hide / Restore buttons -->
+                                        <Panel Grid.Column="3">
+                                            <Button Content="&#xD7;"
+                                                    FontSize="10" Width="18" Height="18"
+                                                    Padding="0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Foreground="#7F849C"
+                                                    ToolTip.Tip="Hide this project"
+                                                    IsVisible="{Binding !IsHidden}"
+                                                    x:Name="HideProjectButton"
+                                                    Tag="{Binding}"/>
+                                            <Button Content="&#x21A9;"
+                                                    FontSize="10" Width="18" Height="18"
+                                                    Padding="0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Foreground="#A6E3A1"
+                                                    ToolTip.Tip="Restore hidden project"
+                                                    IsVisible="{Binding IsHidden}"
+                                                    x:Name="UnhideProjectButton"
+                                                    Tag="{Binding}"/>
+                                        </Panel>
+                                    </Grid>
+
+                                    <!-- Junction status + DecisionLog count -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0" Spacing="2">
+                                        <!-- Junction: Shared -->
+                                        <Ellipse Width="7" Height="7"
+                                                 VerticalAlignment="Center"
+                                                 ToolTip.Tip="Shared folder junction&#10;Green=OK  Red=Broken  Gray=Unknown">
+                                            <Ellipse.Fill>
+                                                <SolidColorBrush Color="#6C7086"/>
+                                            </Ellipse.Fill>
+                                        </Ellipse>
+                                        <!-- Junction: Obsidian -->
+                                        <Ellipse Width="7" Height="7"
+                                                 VerticalAlignment="Center"
+                                                 ToolTip.Tip="Obsidian vault junction&#10;Green=OK  Red=Broken  Gray=Unknown">
+                                            <Ellipse.Fill>
+                                                <SolidColorBrush Color="#6C7086"/>
+                                            </Ellipse.Fill>
+                                        </Ellipse>
+                                        <!-- Junction: Context -->
+                                        <Ellipse Width="7" Height="7" Margin="0,0,6,0"
+                                                 VerticalAlignment="Center"
+                                                 ToolTip.Tip="Context folder junction&#10;Green=OK  Red=Broken  Gray=Unknown">
+                                            <Ellipse.Fill>
+                                                <SolidColorBrush Color="#6C7086"/>
+                                            </Ellipse.Fill>
+                                        </Ellipse>
+
+                                        <!-- DecisionLog count -->
+                                        <TextBlock FontSize="11" Foreground="#A6ADC8"
+                                                   VerticalAlignment="Center"
+                                                   ToolTip.Tip="Decision log count"
+                                                   Text="{Binding DecisionLogCount, StringFormat='&#x1F4DD; {0}'}"/>
+
+                                        <!-- Uncommitted changes badge -->
+                                        <StackPanel Orientation="Horizontal" Spacing="2"
+                                                    Margin="8,0,0,0"
+                                                    VerticalAlignment="Center"
+                                                    IsVisible="{Binding HasUncommittedChanges}"
+                                                    ToolTip.Tip="{Binding UncommittedChangesTooltip}"
+                                                    Cursor="Hand">
+                                            <TextBlock Text="&#x2387;" FontSize="11"
+                                                       Foreground="#FAB387"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="#FAB387"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding UncommittedBadgeText}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Focus / Summary freshness indicators -->
+                                    <Grid Margin="0,4,0,0" ColumnDefinitions="*,*">
+                                        <!-- Focus -->
+                                        <Border Grid.Column="0" Padding="3,2" CornerRadius="3"
+                                                Margin="0,0,4,0" Background="#30F38BA8">
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <TextBlock Text="Focus" FontSize="9"
+                                                           Foreground="#A6ADC8"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding FocusAgeText}" FontSize="12"
+                                                           Foreground="White"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <!-- Summary -->
+                                        <Border Grid.Column="1" Padding="3,2" CornerRadius="3"
+                                                Background="#30F38BA8">
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <TextBlock Text="Summary" FontSize="9"
+                                                           Foreground="#A6ADC8"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding SummaryAgeText}" FontSize="12"
+                                                           Foreground="White"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Activity bar (last 30 days) -->
+                                    <Border Margin="0,5,0,0"
+                                            Cursor="Hand"
+                                            ToolTip.Tip="Click to open Timeline"
+                                            x:Name="ActivityBarBorder">
+                                        <ItemsControl ItemsSource="{Binding ActivityDays}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ActivityDay">
+                                                    <Rectangle Width="7" Height="7" Margin="0.5,0"
+                                                               RadiusX="1" RadiusY="1"
+                                                               Fill="{Binding IsActive, Converter={StaticResource BoolToOpacityConverter}}"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+
+                                    <!-- Workstreams section -->
+                                    <Border Margin="0,4,0,0"
+                                            IsVisible="{Binding HasWorkstreams}">
+                                        <StackPanel>
+                                            <!-- Header (click to expand/collapse) -->
+                                            <Button Background="Transparent" BorderThickness="0"
+                                                    Padding="0" HorizontalContentAlignment="Left"
+                                                    Cursor="Hand"
+                                                    x:Name="ToggleWorkstreamButton"
+                                                    Tag="{Binding}">
+                                                <StackPanel Orientation="Horizontal" Spacing="2">
+                                                    <TextBlock FontSize="10" Foreground="#A6ADC8"
+                                                               VerticalAlignment="Center"
+                                                               Text="{Binding IsWorkstreamExpanded, Converter={StaticResource BoolToStringConverter}, ConverterParameter='&#x25BA; Workstreams |&#x25BC; Workstreams '}"/>
+                                                    <TextBlock Text="{Binding ActiveWorkstreamCount, StringFormat='({0})'}"
+                                                               FontSize="10" Foreground="#A6ADC8"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+
+                                            <!-- Expanded list -->
+                                            <ItemsControl ItemsSource="{Binding Workstreams}"
+                                                          Margin="4,2,0,0"
+                                                          IsVisible="{Binding IsWorkstreamExpanded}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:WorkstreamCardItem">
+                                                        <Grid Margin="0,1" ColumnDefinitions="*,Auto,Auto,Auto">
+                                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4"
+                                                                        Opacity="{Binding IsClosed, Converter={StaticResource BoolToOpacityConverter}, ConverterParameter=0.4|1.0}">
+                                                                <Ellipse Width="5" Height="5"
+                                                                         VerticalAlignment="Center">
+                                                                    <Ellipse.Fill>
+                                                                        <SolidColorBrush Color="White"/>
+                                                                    </Ellipse.Fill>
+                                                                </Ellipse>
+                                                                <TextBlock Text="{Binding Label}" FontSize="11"
+                                                                           VerticalAlignment="Center"
+                                                                           Foreground="White"
+                                                                           MaxWidth="105"
+                                                                           TextTrimming="CharacterEllipsis"/>
+                                                                <Border Padding="3,1" CornerRadius="2"
+                                                                        VerticalAlignment="Center"
+                                                                        Background="#30F38BA8">
+                                                                    <TextBlock Text="{Binding FocusAgeText}"
+                                                                               FontSize="9"
+                                                                               Foreground="#A6ADC8"/>
+                                                                </Border>
+                                                                <TextBlock Text="{Binding DecisionLogCount, StringFormat='&#x1F4DD;{0}'}"
+                                                                           FontSize="10"
+                                                                           VerticalAlignment="Center"
+                                                                           Foreground="#A6ADC8"/>
+                                                            </StackPanel>
+
+                                                            <Button Grid.Column="1" Padding="6,2" Margin="4,0,2,0"
+                                                                    ToolTip.Tip="Open workstream work root"
+                                                                    FontSize="12" Content="&#x1F4C2;"
+                                                                    Tag="{Binding}"/>
+                                                            <Button Grid.Column="2" Padding="6,2"
+                                                                    ToolTip.Tip="Create today folder in workstream work"
+                                                                    FontSize="12" Content="+"
+                                                                    Tag="{Binding}"/>
+                                                            <Button Grid.Column="3" Padding="6,2" Margin="2,0,0,0"
+                                                                    ToolTip.Tip="Pin a recent work folder"
+                                                                    FontSize="12" Content="&#x1F4CC;"
+                                                                    Tag="{Binding}"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Action buttons row -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Spacing="4">
+                                        <Button Padding="8,3"
+                                                ToolTip.Tip="Open folder (Explorer)"
+                                                x:Name="OpenDirButton"
+                                                Tag="{Binding}">
+                                            <TextBlock Text="&#x1F4C1;" FontSize="14"/>
+                                        </Button>
+                                        <Button Padding="8,3"
+                                                ToolTip.Tip="Open terminal"
+                                                x:Name="OpenTermButton"
+                                                Tag="{Binding}">
+                                            <TextBlock Text="&gt;_" FontSize="12" FontFamily="Consolas,Monospace"/>
+                                        </Button>
+                                        <Button Padding="8,3"
+                                                ToolTip.Tip="Open in Editor"
+                                                x:Name="OpenEditorButton"
+                                                Tag="{Binding}">
+                                            <TextBlock Text="&#x270F;" FontSize="14"/>
+                                        </Button>
+                                        <Button Padding="8,3"
+                                                ToolTip.Tip="Pin a general work folder"
+                                                x:Name="PinFolderButton"
+                                                Tag="{Binding}">
+                                            <TextBlock Text="&#x1F4CC;" FontSize="14"/>
+                                        </Button>
+                                    </StackPanel>
+
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Loading overlay -->
+            <Grid IsVisible="{Binding IsLoading}"
+                  Background="#80000000"
+                  IsHitTestVisible="False">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                    <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
+                    <TextBlock Text="Loading projects..."
+                               Foreground="White"
+                               HorizontalAlignment="Center"
+                               FontSize="13"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- ===== Pinned Folders ===== -->
+        <Border Grid.Row="2"
+                Background="#1E1E2E"
+                BorderBrush="#313244"
+                BorderThickness="0,1,0,0"
+                Padding="8,6"
+                IsVisible="{Binding HasPinnedFolders}">
+            <StackPanel>
+                <!-- Header -->
+                <Grid Margin="0,0,0,4" ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="&#x1F4CC; Pinned Folders"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="#A6ADC8"
+                               VerticalAlignment="Center"/>
+                    <Button Grid.Column="1"
+                            Content="Clear"
+                            FontSize="10"
+                            Padding="6,1"
+                            Background="Transparent"
+                            BorderBrush="#6C7086"
+                            BorderThickness="1"
+                            Foreground="#A6ADC8"
+                            ToolTip.Tip="Remove all pinned folders"
+                            x:Name="ClearPinnedButton"/>
+                </Grid>
+                <!-- Chip list -->
+                <ItemsControl ItemsSource="{Binding PinnedFolders}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:PinnedFolder">
+                            <Border Margin="0,0,4,2"
+                                    Padding="6,3"
+                                    CornerRadius="4"
+                                    Background="#313244"
+                                    BorderBrush="#45475A"
+                                    BorderThickness="1"
+                                    Opacity="{Binding FolderExists, Converter={StaticResource BoolToOpacityConverter}, ConverterParameter=0.4|1.0}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <StackPanel VerticalAlignment="Center" Spacing="1">
+                                        <TextBlock Text="{Binding ProjectLabel}"
+                                                   FontSize="9"
+                                                   Foreground="#A6ADC8"
+                                                   MaxWidth="140"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding Folder}"
+                                                   FontSize="11"
+                                                   Foreground="White"
+                                                   MaxWidth="140"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <Button Padding="5,2"
+                                            ToolTip.Tip="Open folder in Explorer"
+                                            Tag="{Binding}"
+                                            x:Name="OpenPinnedFolderButton">
+                                        <TextBlock Text="&#x1F4C2;" FontSize="12"/>
+                                    </Button>
+                                    <Button Content="&#xD7;"
+                                            FontSize="10"
+                                            Width="20" Height="20"
+                                            Padding="0"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Foreground="#6C7086"
+                                            Tag="{Binding}"
+                                            ToolTip.Tip="Unpin this folder"
+                                            x:Name="UnpinFolderButton"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- ===== Today Queue ===== -->
+        <Border Grid.Row="3"
+                Background="#1E1E2E"
+                BorderBrush="#313244"
+                BorderThickness="0,1,0,0"
+                MinHeight="220" MaxHeight="220">
+            <Grid RowDefinitions="Auto,*">
+
+                <!-- Header -->
+                <Border Grid.Row="0" Background="#181825" Padding="8,4">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding TodayQueueStatus}"
+                                   FontSize="12"
+                                   Foreground="#A6ADC8"
+                                   VerticalAlignment="Center"/>
+
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding ProjectFilterItems}"
+                                  SelectedItem="{Binding SelectedProjectFilter}"
+                                  FontSize="11"
+                                  MinWidth="120" MaxWidth="200"
+                                  Margin="8,0,6,0"
+                                  VerticalAlignment="Center"/>
+
+                        <ComboBox Grid.Column="2"
+                                  ItemsSource="{Binding WorkstreamFilterItems}"
+                                  SelectedItem="{Binding SelectedWorkstreamFilter}"
+                                  FontSize="11"
+                                  MinWidth="130" MaxWidth="220"
+                                  Margin="0,0,6,0"
+                                  VerticalAlignment="Center"/>
+
+                        <Button Grid.Column="3"
+                                Command="{Binding ToggleShowAllCommand}"
+                                Padding="10,0" FontSize="11" Margin="0,0,6,0"
+                                VerticalAlignment="Center"
+                                Content="{Binding ShowAllTasks, Converter={StaticResource BoolToStringConverter}, ConverterParameter='Show All|Show Less'}"/>
+
+                        <!-- Unsnooze button -->
+                        <Button Grid.Column="4"
+                                Content="{Binding SnoozeCount, StringFormat='&#x21A9; {0} snoozed'}"
+                                Padding="10,0" FontSize="11" Margin="0,0,6,0"
+                                VerticalAlignment="Center"
+                                ToolTip.Tip="Unsnooze all tasks"
+                                IsVisible="{Binding HasSnoozed}"
+                                x:Name="UnsnoozeAllButton"/>
+
+                        <!-- Refresh Today Queue -->
+                        <Button Grid.Column="5" Content="&#x21BB;"
+                                Padding="10,0" FontSize="12"
+                                ToolTip.Tip="Refresh Today Queue"
+                                VerticalAlignment="Center"
+                                x:Name="TodayQueueRefreshButton"/>
+                    </Grid>
+                </Border>
+
+                <!-- Task list -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding TodayQueueTasks}" Padding="6,2,20,2">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="svc:TodayQueueTask">
+                                <Grid Margin="0,2"
+                                      ColumnDefinitions="72,*,Auto,Auto,Auto">
+
+                                    <!-- Priority label -->
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding DueLabel}"
+                                               FontSize="11"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Center"
+                                               Foreground="#A6ADC8"/>
+
+                                    <!-- Task title -->
+                                    <TextBlock Grid.Column="1"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"
+                                               FontSize="11"
+                                               Foreground="White"
+                                               ToolTip.Tip="{Binding DisplayTitle}"
+                                               Text="{Binding DisplayMainTitle}"/>
+
+                                    <!-- Open in Asana -->
+                                    <Button Grid.Column="2"
+                                            Content="&#x2197;"
+                                            FontSize="10"
+                                            Padding="4,1" Margin="4,0,0,0"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Foreground="#89B4FA"
+                                            Tag="{Binding}"
+                                            IsVisible="{Binding HasAsanaUrl}"
+                                            ToolTip.Tip="Open in Asana"
+                                            x:Name="OpenAsanaButton"/>
+
+                                    <!-- Snooze -->
+                                    <Button Grid.Column="3"
+                                            Content="z"
+                                            FontSize="11"
+                                            Width="26" Height="26"
+                                            Padding="0,0,0,1" Margin="4,0,0,0"
+                                            Background="Transparent"
+                                            BorderBrush="#6C7086"
+                                            BorderThickness="1"
+                                            Foreground="#A6ADC8"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            Tag="{Binding}"
+                                            ToolTip.Tip="Snooze until tomorrow"
+                                            x:Name="SnoozeButton"/>
+
+                                    <!-- Done -->
+                                    <Button Grid.Column="4"
+                                            Content="&#x2713;"
+                                            FontSize="10"
+                                            Width="26" Height="26"
+                                            Padding="0" Margin="4,0,0,0"
+                                            Background="Transparent"
+                                            BorderBrush="#A6E3A1"
+                                            BorderThickness="1"
+                                            Foreground="#A6E3A1"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            Tag="{Binding}"
+                                            IsVisible="{Binding CanComplete}"
+                                            ToolTip.Tip="Mark as done in Asana"
+                                            x:Name="DoneButton"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+    </Grid>
+</UserControl>

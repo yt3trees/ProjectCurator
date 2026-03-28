@@ -186,12 +186,12 @@ ProjectCurator.sln
 
 ### 2-5. DashboardPage (最大・最複雑: 970 XAML行, 4417 CS行)
 
-- [ ] `DashboardPage.axaml` - メインレイアウト変換
+- [x] `DashboardPage.axaml` - メインレイアウト変換
 - [ ] プログラマティックUI構築のAvalonia対応:
   - [ ] コンテキストメニュー (System.Windows.Controls.ContextMenu -> Avalonia.Controls.ContextMenu)
   - [ ] 動的MenuItem作成
   - [ ] ポップアップダイアログ群 (AI Briefing, フォルダ作成 etc.) をAXAMLベースに書き直し
-- [ ] `DashboardPage.axaml.cs` - コードビハインド移植
+- [x] `DashboardPage.axaml.cs` - コードビハインド移植 (基本実装)
 - [ ] 動作確認: プロジェクト一覧、Today Queue、ピン留めフォルダ、全ポップアップ
 
 ### 2-6. EditorPage (297 XAML行, 2923 CS行)
