@@ -7,24 +7,26 @@
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-A Windows desktop app for managing projects across multiple workspaces.
+A Windows desktop app for streamlining project management and context switching.
 
 ![Dashboard screenshot](_assets/Dashboard.png)
 
 ## Why This App Is Useful
 
-ProjectCurator reduces context switching in three areas:
+ProjectCurator reduces context switching and cognitive load for both you and your AI agents:
 
-- Project visibility: see project health and today’s task signals from one Dashboard
-- Context editing: quickly update `current_focus.md` and `decision_log` in a focused editor
-- Asana integration: sync tasks into Markdown so project status stays visible and searchable
+- Project visibility: see project health and today's task signals from one Dashboard
+- Context maintenance: quickly track "what I'm doing now" (`current_focus.md`) and "what was decided" (`decision_log`) in a focused editor
+- AI Agent readiness: the markdown files maintained here serve perfectly as ready-to-read context files for AI agents like Claude Code or Codex CLI
+- Optional Asana integration: sync tasks into Markdown so project status stays visible and searchable
 
-If you run many projects in parallel, ProjectCurator helps you spend less time searching and more time executing.
+Whether you run many projects in parallel or manage a single complex one, ProjectCurator helps both you and your AI jump straight into the flow state without losing time trying to remember where you left off.
 
 ## Who It Is For
 
-- People managing multiple active projects
-- Users who want Asana tasks mapped into project Markdown context
+- People managing multiple active projects, or one complex long-term project
+- Users wanting their local folders completely primed for AI agent collaboration
+- Users who want Asana tasks mapped into project Markdown context (Asana is completely optional; the app works great as a standalone context manager)
 
 ## Feature Map
 
@@ -68,12 +70,13 @@ flowchart TD
 ### 3. Configure required paths
 
 Open `Settings`, set these values, then save:
+*(Note: If you don't use Box/OneDrive or Obsidian, you can simply point these to any local folders on your PC.)*
 
 - `Local Projects Root` (parent folder for your local working projects)
   Example: `C:\Users\<your-user>\Documents\Projects`
 - `Cloud Sync Root` (parent folder synced by Box for shared project files)
   Example: `C:\Users\<your-user>\Box\Projects`
-- `Obsidian Vault Root` (parent folder for your Obsidian vault)
+- `Obsidian Vault Root` (parent folder for your Obsidian vault, or just a general notes folder)
   Example: `C:\Users\<your-user>\Box\ObsidianVault`
 
 Required config files are created automatically when you save.

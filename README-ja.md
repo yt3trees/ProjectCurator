@@ -5,23 +5,25 @@
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-複数のプロジェクトを横断管理する、Windows向けデスクトップアプリです。
+プロジェクトの横断管理や複雑なコンテキストの維持を支援する、Windows向けデスクトップアプリです。
 
 ![Dashboard screenshot](_assets/Dashboard.png)
 
 ## このアプリで何が便利になるか
 
-ProjectCurator は、次の「面倒な行き来」を減らすためのツールです。
+ProjectCurator は、人間とAI両方にとっての「面倒な行き来」を減らします。
 
 - プロジェクトの状態確認: フォルダを開き回らなくても、Dashboardで全体の鮮度とタスクを一望
-- コンテキスト編集: `current_focus.md` や `decision_log` を専用Editorで素早く更新
-- Asana連携: タスクをMarkdownへ同期して、プロジェクト状況を追いやすく管理
+- コンテキスト維持: 「今何に取り組んでいるか(`current_focus.md`)」「何をどう決めたか(`decision_log`)」といったプロジェクト全体の記憶を、専用Editorで手軽に更新
+- AIエージェント最適化: アプリで整理されたMarkdown群は、そのままClaude CodeなどのAIエージェントが即座に読み込める「完璧な指示書」として機能
+- (任意)Asana連携: タスクをMarkdownへ同期して、プロジェクト状況を追いやすく管理
 
-「複数案件を同時に進めると、どこを見るべきか迷う」を減らし、今やることに集中できます。
+「どこを見るべきか迷う」「再開のたびに文脈を思い出すのが大変」といった認知負荷を減らし、人間もAIも迷わず作業に入り込めるようになります。
 
 ## こんな人向け
-- 複数プロジェクトを並行して進めている
-- Asanaタスクをプロジェクト文脈(Markdown)で管理したい
+- 複数プロジェクトを並行して進めている、または複雑な単一プロジェクトを管理している
+- AIエージェント(Claude Code等)に渡すコンテキストを日頃から整理しておきたい
+- Asanaタスクをプロジェクト文脈(Markdown)で管理したい (※連携は任意です。タスクツールを使わなくてもコンテキストマネージャーとして単独で機能します)
 
 ## 機能マップ
 
@@ -65,12 +67,13 @@ flowchart TD
 ### 3. 最初に設定する場所
 
 `Settings` で以下を設定して保存します。
+※Box等の同期アプリやObsidianを使わない場合は、PC上の任意のローカルフォルダを指定するだけで動作します。
 
 - `Local Projects Root` (ローカル作業用の親フォルダ)
   例: `C:\Users\<あなたのユーザー名>\Documents\Projects`
 - `Cloud Sync Root` (クラウド同期される共有フォルダの親)
   例: `C:\Users\<あなたのユーザー名>\Box\Projects`
-- `Obsidian Vault Root` (Obsidian保管庫の親フォルダ)
+- `Obsidian Vault Root` (Obsidianの保管庫、またはただのメモ用フォルダの親)
   例: `C:\Users\<あなたのユーザー名>\Box\ObsidianVault`
 
 保存時に必要な設定ファイルは自動生成されます。
