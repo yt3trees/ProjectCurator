@@ -1,0 +1,1123 @@
+using System.Collections.Generic;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.IO;
+using Wpf.Ui.Controls;
+using MediaBrush = System.Windows.Media.Brush;
+using MediaBrushes = System.Windows.Media.Brushes;
+using Win32OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using Win32SaveFileDialog = Microsoft.Win32.SaveFileDialog;
+using ProjectCurator.Models;
+using ProjectCurator.Services;
+using ProjectCurator.ViewModels;
+using WpfUserControl = System.Windows.Controls.UserControl;
+
+namespace ProjectCurator.Views.Pages;
+
+public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewModel>
+{
+    private sealed record FrontmatterFieldDoc(string Field, string Type, string Required, string Description);
+
+    public AgentHubViewModel ViewModel { get; }
+    private readonly LlmClientService _llmClientService;
+
+    private bool _isInitialized;
+
+    public AgentHubPage(AgentHubViewModel viewModel, LlmClientService llmClientService)
+    {
+        ViewModel = viewModel;
+        _llmClientService = llmClientService;
+        DataContext = ViewModel;
+        InitializeComponent();
+    }
+
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_isInitialized) return;
+        _isInitialized = true;
+
+        ViewModel.LoadLibrary();
+        await ViewModel.LoadProjectsAsync();
+    }
+
+    // ─── Library list selection ───────────────────────────────────────────
+
+    private void OnAgentSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ViewModel.SelectedAgentDefinition != null)
+            RuleListBox.UnselectAll();
+    }
+
+    private void OnRuleSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ViewModel.SelectedRuleDefinition != null)
+            AgentListBox.UnselectAll();
+    }
+
+    // ─── Agent CRUD buttons ───────────────────────────────────────────────
+
+    private async void OnNewAgentClick(object sender, RoutedEventArgs e)
+    {
+        var result = await ShowItemDialogAsync("New Agent", "", "", "", "", "", "", "", true);
+        if (result == null) return;
+        ViewModel.SaveAgent(
+            null,
+            result.Name,
+            result.Description,
+            result.Content,
+            result.FrontmatterClaude,
+            result.FrontmatterCodex,
+            result.FrontmatterCopilot,
+            result.FrontmatterGemini);
+    }
+
+    private async void OnEditAgentClick(object sender, RoutedEventArgs e)
+    {
+        var def = ViewModel.SelectedAgentDefinition;
+        if (def == null) return;
+
+        var content = ViewModel.SelectedPreviewContent;
+        var result = await ShowItemDialogAsync(
+            "Edit Agent",
+            def.Name,
+            def.Description,
+            content,
+            def.FrontmatterClaude,
+            def.FrontmatterCodex,
+            def.FrontmatterCopilot,
+            def.FrontmatterGemini,
+            true);
+        if (result == null) return;
+        ViewModel.SaveAgent(
+            def.Id,
+            result.Name,
+            result.Description,
+            result.Content,
+            result.FrontmatterClaude,
+            result.FrontmatterCodex,
+            result.FrontmatterCopilot,
+            result.FrontmatterGemini);
+    }
+
+    private void OnEditSelectedClick(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedAgentDefinition != null)
+        {
+            OnEditAgentClick(sender, e);
+            return;
+        }
+
+        if (ViewModel.SelectedRuleDefinition != null)
+        {
+            OnEditRuleClick(sender, e);
+        }
+    }
+
+    private void OnDeleteAgentClick(object sender, RoutedEventArgs e)
+    {
+        var def = ViewModel.SelectedAgentDefinition;
+        if (def == null) return;
+
+        if (ShowConfirmDialog($"Delete agent '{def.Name}'?", "This cannot be undone."))
+            ViewModel.DeleteAgent(def.Id);
+    }
+
+    // ─── Rule CRUD buttons ────────────────────────────────────────────────
+
+    private async void OnNewRuleClick(object sender, RoutedEventArgs e)
+    {
+        var result = await ShowItemDialogAsync("New Context Rule", "", "", "", "", "", "", "", false);
+        if (result == null) return;
+        ViewModel.SaveRule(null, result.Name, result.Description, result.Content);
+    }
+
+    private void OnDeleteSelectedClick(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedAgentDefinition != null)
+        {
+            OnDeleteAgentClick(sender, e);
+            return;
+        }
+
+        if (ViewModel.SelectedRuleDefinition != null)
+        {
+            OnDeleteRuleClick(sender, e);
+        }
+    }
+
+    private async void OnEditRuleClick(object sender, RoutedEventArgs e)
+    {
+        var def = ViewModel.SelectedRuleDefinition;
+        if (def == null) return;
+
+        var content = ViewModel.SelectedPreviewContent;
+        var result = await ShowItemDialogAsync("Edit Context Rule", def.Name, def.Description, content, "", "", "", "", false);
+        if (result == null) return;
+        ViewModel.SaveRule(def.Id, result.Name, result.Description, result.Content);
+    }
+
+    private void OnDeleteRuleClick(object sender, RoutedEventArgs e)
+    {
+        var def = ViewModel.SelectedRuleDefinition;
+        if (def == null) return;
+
+        if (ShowConfirmDialog($"Delete rule '{def.Name}'?", "This cannot be undone."))
+            ViewModel.DeleteRule(def.Id);
+    }
+
+    // ─── Other buttons ────────────────────────────────────────────────────
+
+    private void OnImportAgentMarkdownClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Win32OpenFileDialog
+        {
+            Filter = "Markdown (*.md)|*.md|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            ViewModel.ImportAgentMarkdown(dialog.FileName);
+            ViewModel.StatusMessage = $"Imported agent from '{Path.GetFileName(dialog.FileName)}'";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"Import agent error: {ex.Message}";
+        }
+    }
+
+    private void OnImportRuleMarkdownClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Win32OpenFileDialog
+        {
+            Filter = "Markdown (*.md)|*.md|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            ViewModel.ImportRuleMarkdown(dialog.FileName);
+            ViewModel.StatusMessage = $"Imported rule from '{Path.GetFileName(dialog.FileName)}'";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"Import rule error: {ex.Message}";
+        }
+    }
+
+    private void OnExportLibraryZipClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Win32SaveFileDialog
+        {
+            Filter = "ZIP (*.zip)|*.zip",
+            FileName = $"agent_hub_library_{DateTime.Now:yyyyMMdd_HHmm}.zip",
+            AddExtension = true,
+            DefaultExt = ".zip"
+        };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            ViewModel.ExportLibraryZip(dialog.FileName);
+            ViewModel.StatusMessage = $"Exported library ZIP: {Path.GetFileName(dialog.FileName)}";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"Export error: {ex.Message}";
+        }
+    }
+
+    private void OnImportLibraryZipClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Win32OpenFileDialog
+        {
+            Filter = "ZIP (*.zip)|*.zip|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            ViewModel.ImportLibraryZip(dialog.FileName);
+            ViewModel.StatusMessage = $"Imported library ZIP: {Path.GetFileName(dialog.FileName)}";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"Import ZIP error: {ex.Message}";
+        }
+    }
+
+    private async void OnAiBuilderClick(object sender, RoutedEventArgs e)
+    {
+        var purpose = await ShowAiBuilderInputDialogAsync();
+        if (string.IsNullOrWhiteSpace(purpose)) return;
+
+        ViewModel.StatusMessage = "AI Builder: generating...";
+        try
+        {
+            var systemPrompt =
+                "Generate a sub-agent system prompt and trigger conditions.\n" +
+                "IMPORTANT: Do NOT include any folder paths, directory restrictions,\n" +
+                "or working directory references. Define only the role, skills,\n" +
+                "and best practices.\n" +
+                "Output ONLY the Markdown content for the agent definition, no preamble.";
+
+            var generated = await _llmClientService.ChatCompletionAsync(systemPrompt, purpose, CancellationToken.None);
+            var result = await ShowItemDialogAsync("AI Builder - Review & Save", "", "", generated, "", "", "", "", true);
+            if (result == null) { ViewModel.StatusMessage = "AI Builder cancelled"; return; }
+            ViewModel.SaveAgent(
+                null,
+                result.Name,
+                result.Description,
+                result.Content,
+                result.FrontmatterClaude,
+                result.FrontmatterCodex,
+                result.FrontmatterCopilot,
+                result.FrontmatterGemini);
+            ViewModel.StatusMessage = $"AI Builder: saved '{result.Name}'";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"AI Builder error: {ex.Message}";
+        }
+    }
+
+    // ─── Dialog helpers ───────────────────────────────────────────────────
+
+    private record ItemDialogResult(
+        string Name,
+        string Description,
+        string Content,
+        string FrontmatterClaude,
+        string FrontmatterCodex,
+        string FrontmatterCopilot,
+        string FrontmatterGemini);
+
+    private Task<ItemDialogResult?> ShowItemDialogAsync(
+        string title,
+        string name,
+        string description,
+        string content,
+        string frontmatterClaude,
+        string frontmatterCodex,
+        string frontmatterCopilot,
+        string frontmatterGemini,
+        bool isAgentDialog)
+    {
+        var tcs = new TaskCompletionSource<ItemDialogResult?>();
+
+        var appRes = Application.Current.Resources;
+        var surface = (MediaBrush)appRes["AppSurface0"];
+        var surface1 = (MediaBrush)appRes["AppSurface1"];
+        var surface2 = (MediaBrush)appRes["AppSurface2"];
+        var text = (MediaBrush)appRes["AppText"];
+        var subtext = (MediaBrush)appRes["AppSubtext0"];
+        var accentBrush = appRes.Contains("AppBlue") ? (MediaBrush)appRes["AppBlue"] : text;
+
+        // Title bar
+        var titleBar = BuildTitleBar(title, surface1, text, subtext, accentBrush, out var closeBtn);
+
+        // Name field
+        var nameLabel = new System.Windows.Controls.TextBlock { Text = "Name", Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 0, 0, 3) };
+        var nameBox = new System.Windows.Controls.TextBox
+        {
+            Text = name,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            Padding = new Thickness(6, 4, 6, 4),
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+
+        // Description field
+        var descLabel = new System.Windows.Controls.TextBlock { Text = "Description", Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 0, 0, 3) };
+        var descBox = new System.Windows.Controls.TextBox
+        {
+            Text = description,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            Padding = new Thickness(6, 4, 6, 4),
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+
+        var frontmatterHeaderPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 0, 0, 3),
+            Visibility = isAgentDialog ? Visibility.Visible : Visibility.Collapsed
+        };
+        var frontmatterLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Agent Config (Frontmatter/TOML, optional)",
+            Foreground = subtext,
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var frontmatterHelpButton = new System.Windows.Controls.Button
+        {
+            Width = 20,
+            Height = 20,
+            Margin = new Thickness(6, 0, 0, 0),
+            Padding = new Thickness(0),
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            ToolTip = "Show frontmatter field reference"
+        };
+        frontmatterHelpButton.Content = new System.Windows.Controls.TextBlock
+        {
+            Text = "?",
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            LineHeight = 12,
+            TextAlignment = TextAlignment.Center,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        frontmatterHelpButton.Click += (_, _) => ShowFrontmatterHelpDialog();
+        frontmatterHeaderPanel.Children.Add(frontmatterLabel);
+        frontmatterHeaderPanel.Children.Add(frontmatterHelpButton);
+        var frontmatterBox = new System.Windows.Controls.TextBox
+        {
+            Text = frontmatterClaude,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            Padding = new Thickness(6, 4, 6, 4),
+            Margin = new Thickness(0, 0, 0, 10),
+            Height = 96,
+            TextWrapping = TextWrapping.Wrap,
+            AcceptsReturn = true,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Visibility = isAgentDialog ? Visibility.Visible : Visibility.Collapsed
+        };
+        var frontmatterPlaceholderMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Claude"] = "tools: Read, Glob, Grep\nmodel: sonnet\npermissionMode: default\nmaxTurns: 30",
+            ["Codex"] = "model = \"gpt-5.4-mini\"\nmodel_reasoning_effort = \"medium\"\nsandbox_mode = \"read-only\"\nnickname_candidates = [\"Mapper\", \"Scout\"]",
+            ["Copilot"] = "tools:\n  - read_file\n  - find_text\nmodel: gpt-5.4-mini",
+            ["Gemini"] = "tools:\n  - \"*\"\nmodel: gemini-3-preview\ntemperature: 0.2"
+        };
+        var frontmatterPlaceholder = new System.Windows.Controls.TextBlock
+        {
+            Text = frontmatterPlaceholderMap["Claude"],
+            Foreground = subtext,
+            Opacity = 0.8,
+            Margin = new Thickness(10, 8, 10, 8),
+            TextWrapping = TextWrapping.Wrap,
+            IsHitTestVisible = false,
+            Visibility = string.IsNullOrWhiteSpace(frontmatterBox.Text) ? Visibility.Visible : Visibility.Collapsed
+        };
+        var frontmatterBoxHost = new Grid
+        {
+            Margin = new Thickness(0, 0, 0, 10),
+            Height = 96,
+            Visibility = isAgentDialog ? Visibility.Visible : Visibility.Collapsed
+        };
+        frontmatterBox.Margin = new Thickness(0);
+        frontmatterBoxHost.Children.Add(frontmatterBox);
+        frontmatterBoxHost.Children.Add(frontmatterPlaceholder);
+
+        var frontmatterCliLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Frontmatter target",
+            Foreground = subtext,
+            FontSize = 11,
+            Margin = new Thickness(0, 0, 0, 3),
+            Visibility = isAgentDialog ? Visibility.Visible : Visibility.Collapsed
+        };
+        var frontmatterCliCombo = new System.Windows.Controls.ComboBox
+        {
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            Padding = new Thickness(6, 4, 6, 4),
+            Margin = new Thickness(0, 0, 0, 8),
+            Visibility = isAgentDialog ? Visibility.Visible : Visibility.Collapsed
+        };
+        frontmatterCliCombo.Items.Add("Claude");
+        frontmatterCliCombo.Items.Add("Codex");
+        frontmatterCliCombo.Items.Add("Copilot");
+        frontmatterCliCombo.Items.Add("Gemini");
+        frontmatterCliCombo.SelectedIndex = 0;
+
+        var frontmatterMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Claude"] = frontmatterClaude ?? "",
+            ["Codex"] = frontmatterCodex ?? "",
+            ["Copilot"] = frontmatterCopilot ?? "",
+            ["Gemini"] = frontmatterGemini ?? ""
+        };
+        frontmatterBox.Text = frontmatterMap["Claude"];
+
+        void UpdateFrontmatterPlaceholder()
+        {
+            var key = (frontmatterCliCombo.SelectedItem as string) ?? "Claude";
+            if (!frontmatterPlaceholderMap.TryGetValue(key, out var placeholder))
+                placeholder = "";
+            frontmatterPlaceholder.Text = placeholder;
+            frontmatterPlaceholder.Visibility = string.IsNullOrWhiteSpace(frontmatterBox.Text)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        frontmatterCliCombo.SelectionChanged += (_, _) =>
+        {
+            var key = (frontmatterCliCombo.SelectedItem as string) ?? "Claude";
+            if (!frontmatterMap.TryGetValue(key, out var value))
+                value = "";
+            frontmatterBox.Text = value;
+            UpdateFrontmatterPlaceholder();
+        };
+        frontmatterBox.TextChanged += (_, _) =>
+        {
+            var key = (frontmatterCliCombo.SelectedItem as string) ?? "Claude";
+            frontmatterMap[key] = frontmatterBox.Text;
+            UpdateFrontmatterPlaceholder();
+        };
+        UpdateFrontmatterPlaceholder();
+
+        // Content area
+        var contentLabel = new System.Windows.Controls.TextBlock { Text = "Content (Markdown)", Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 0, 0, 3) };
+        var contentBox = new System.Windows.Controls.TextBox
+        {
+            Text = content,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            Padding = new Thickness(6, 4, 6, 4),
+            MinHeight = 200,
+            MaxHeight = 320,
+            TextWrapping = TextWrapping.Wrap,
+            AcceptsReturn = true,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+
+        var contentPanel = new StackPanel
+        {
+            Margin = new Thickness(16, 12, 16, 8)
+        };
+        contentPanel.Children.Add(nameLabel);
+        contentPanel.Children.Add(nameBox);
+        contentPanel.Children.Add(descLabel);
+        contentPanel.Children.Add(descBox);
+        contentPanel.Children.Add(frontmatterHeaderPanel);
+        contentPanel.Children.Add(frontmatterCliLabel);
+        contentPanel.Children.Add(frontmatterCliCombo);
+        contentPanel.Children.Add(frontmatterBoxHost);
+        contentPanel.Children.Add(contentLabel);
+        contentPanel.Children.Add(contentBox);
+
+        // Footer
+        var saveBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Save",
+            Appearance = ControlAppearance.Primary,
+            MinWidth = 90,
+            Height = 32,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        var cancelBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = ControlAppearance.Secondary,
+            MinWidth = 80,
+            Height = 32,
+            IsCancel = true
+        };
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 0, 16, 12)
+        };
+        footer.Children.Add(saveBtn);
+        footer.Children.Add(cancelBtn);
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(contentPanel, 1);
+        Grid.SetRow(footer, 2);
+        root.Children.Add(titleBar);
+        root.Children.Add(contentPanel);
+        root.Children.Add(footer);
+
+        var owner = Window.GetWindow(this);
+        var dialog = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.CanResize,
+            WindowStyle = WindowStyle.None,
+            Width = 560,
+            MinHeight = 400,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            SizeToContent = SizeToContent.Height,
+            Content = root
+        };
+
+        System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 0,
+                ResizeBorderThickness = new Thickness(4),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
+
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed)
+                dialog.DragMove();
+        };
+
+        ItemDialogResult? dialogResult = null;
+
+        saveBtn.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(nameBox.Text)) { nameBox.Focus(); return; }
+            dialogResult = new ItemDialogResult(
+                nameBox.Text.Trim(),
+                descBox.Text.Trim(),
+                contentBox.Text,
+                frontmatterMap.GetValueOrDefault("Claude", ""),
+                frontmatterMap.GetValueOrDefault("Codex", ""),
+                frontmatterMap.GetValueOrDefault("Copilot", ""),
+                frontmatterMap.GetValueOrDefault("Gemini", ""));
+            dialog.Close();
+        };
+        closeBtn.Click += (_, _) => dialog.Close();
+        cancelBtn.Click += (_, _) => dialog.Close();
+        dialog.Closed += (_, _) => tcs.TrySetResult(dialogResult);
+
+        dialog.ShowDialog();
+        return tcs.Task;
+    }
+
+    private bool ShowConfirmDialog(string message, string subMessage)
+    {
+        var appRes = Application.Current.Resources;
+        var surface = (MediaBrush)appRes["AppSurface0"];
+        var surface1 = (MediaBrush)appRes["AppSurface1"];
+        var surface2 = (MediaBrush)appRes["AppSurface2"];
+        var text = (MediaBrush)appRes["AppText"];
+        var subtext = (MediaBrush)appRes["AppSubtext0"];
+        var danger = appRes.Contains("AppRed") ? (MediaBrush)appRes["AppRed"] : MediaBrushes.IndianRed;
+        var accentBrush = danger;
+
+        var titleBar = BuildTitleBar("Confirm", surface1, text, subtext, accentBrush, out var closeBtn);
+
+        var msgText = new System.Windows.Controls.TextBlock
+        {
+            Text = message,
+            Foreground = text,
+            FontSize = 13,
+            Margin = new Thickness(16, 14, 16, 4),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var subText = new System.Windows.Controls.TextBlock
+        {
+            Text = subMessage,
+            Foreground = subtext,
+            FontSize = 11,
+            Margin = new Thickness(16, 0, 16, 14),
+            TextWrapping = TextWrapping.Wrap
+        };
+
+        var deleteBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Delete",
+            Appearance = ControlAppearance.Danger,
+            MinWidth = 80,
+            Height = 32,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        var cancelBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = ControlAppearance.Secondary,
+            MinWidth = 80,
+            Height = 32,
+            IsCancel = true
+        };
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 0, 16, 14)
+        };
+        footer.Children.Add(deleteBtn);
+        footer.Children.Add(cancelBtn);
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(msgText, 1);
+        Grid.SetRow(subText, 2);
+        Grid.SetRow(footer, 3);
+        root.Children.Add(titleBar);
+        root.Children.Add(msgText);
+        root.Children.Add(subText);
+        root.Children.Add(footer);
+
+        var owner = Window.GetWindow(this);
+        var dialog = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStyle = WindowStyle.None,
+            Width = 360,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            SizeToContent = SizeToContent.Height,
+            Content = root
+        };
+
+        System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 0,
+                ResizeBorderThickness = new Thickness(0),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
+
+        bool confirmed = false;
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) dialog.DragMove();
+        };
+        deleteBtn.Click += (_, _) => { confirmed = true; dialog.Close(); };
+        closeBtn.Click += (_, _) => dialog.Close();
+        cancelBtn.Click += (_, _) => dialog.Close();
+
+        dialog.ShowDialog();
+        return confirmed;
+    }
+
+    private Task<string?> ShowAiBuilderInputDialogAsync()
+    {
+        var tcs = new TaskCompletionSource<string?>();
+
+        var appRes = Application.Current.Resources;
+        var surface = (MediaBrush)appRes["AppSurface0"];
+        var surface1 = (MediaBrush)appRes["AppSurface1"];
+        var surface2 = (MediaBrush)appRes["AppSurface2"];
+        var text = (MediaBrush)appRes["AppText"];
+        var subtext = (MediaBrush)appRes["AppSubtext0"];
+        var accent = appRes.Contains("AppBlue") ? (MediaBrush)appRes["AppBlue"] : text;
+
+        var titleBar = BuildTitleBar("AI Builder", surface1, text, subtext, accent, out var closeBtn);
+
+        var label = new System.Windows.Controls.TextBlock
+        {
+            Text = "Describe the agent's purpose (e.g. 'A strict C# code reviewer focused on SOLID principles')",
+            Foreground = subtext,
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+        var inputBox = new System.Windows.Controls.TextBox
+        {
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            Padding = new Thickness(6, 4, 6, 4),
+            Height = 80,
+            TextWrapping = TextWrapping.Wrap,
+            AcceptsReturn = true,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+
+        var contentPanel = new StackPanel { Margin = new Thickness(16, 12, 16, 8) };
+        contentPanel.Children.Add(label);
+        contentPanel.Children.Add(inputBox);
+
+        var generateBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Generate",
+            Appearance = ControlAppearance.Primary,
+            MinWidth = 100,
+            Height = 32,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        var cancelBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = ControlAppearance.Secondary,
+            MinWidth = 80,
+            Height = 32,
+            IsCancel = true
+        };
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 0, 16, 12)
+        };
+        footer.Children.Add(generateBtn);
+        footer.Children.Add(cancelBtn);
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(contentPanel, 1);
+        Grid.SetRow(footer, 2);
+        root.Children.Add(titleBar);
+        root.Children.Add(contentPanel);
+        root.Children.Add(footer);
+
+        var owner = Window.GetWindow(this);
+        var dialog = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStyle = WindowStyle.None,
+            Width = 480,
+            Background = surface,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            SizeToContent = SizeToContent.Height,
+            Content = root
+        };
+
+        System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 0,
+                ResizeBorderThickness = new Thickness(0),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
+
+        string? result = null;
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) dialog.DragMove();
+        };
+        generateBtn.Click += (_, _) =>
+        {
+            if (!string.IsNullOrWhiteSpace(inputBox.Text)) { result = inputBox.Text.Trim(); dialog.Close(); }
+        };
+        closeBtn.Click += (_, _) => dialog.Close();
+        cancelBtn.Click += (_, _) => dialog.Close();
+        dialog.Closed += (_, _) => tcs.TrySetResult(result);
+
+        dialog.ShowDialog();
+        return tcs.Task;
+    }
+
+    private void ShowFrontmatterHelpDialog()
+    {
+        var appRes = Application.Current.Resources;
+        var surface = (MediaBrush)appRes["AppSurface0"];
+        var surface1 = (MediaBrush)appRes["AppSurface1"];
+        var surface2 = (MediaBrush)appRes["AppSurface2"];
+        var text = (MediaBrush)appRes["AppText"];
+        var subtext = (MediaBrush)appRes["AppSubtext0"];
+        var accent = appRes.Contains("AppBlue") ? (MediaBrush)appRes["AppBlue"] : text;
+
+        var claudeDocs = new List<FrontmatterFieldDoc>
+        {
+            new("name", "string", "Yes", "Unique identifier using lowercase letters and hyphens."),
+            new("description", "string", "Yes", "Description used by Claude to decide delegation."),
+            new("tools", "array/string", "No", "Tools the sub-agent can use. Inherits all tools if omitted."),
+            new("disallowedTools", "array/string", "No", "Tools to block. Removed from inherited or explicit tool list."),
+            new("model", "string", "No", "Model: sonnet, opus, haiku, full model ID, or inherit."),
+            new("permissionMode", "string", "No", "Permission mode: default, acceptEdits, dontAsk, bypassPermissions, or plan."),
+            new("maxTurns", "number", "No", "Maximum agent turns before the sub-agent stops."),
+            new("skills", "array", "No", "Skills injected into context; parent skills are not inherited."),
+            new("mcpServers", "array/object", "No", "Configured server names or inline server definitions."),
+            new("hooks", "object", "No", "Lifecycle hooks scoped to this sub-agent."),
+            new("memory", "string", "No", "Persistent memory scope: user, project, or local."),
+            new("background", "boolean", "No", "Run this sub-agent as a background task if true."),
+            new("effort", "string", "No", "Effort level: low, medium, high, max."),
+            new("isolation", "string", "No", "Set worktree to run in an isolated temporary git worktree."),
+            new("initialPrompt", "string", "No", "Auto-sent first turn when used as main session agent.")
+        };
+        var codexDocs = new List<FrontmatterFieldDoc>
+        {
+            new("name", "string", "Yes", "Agent name Codex uses when spawning or referring to this agent."),
+            new("description", "string", "Yes", "Human-facing guidance for when Codex should use this agent."),
+            new("developer_instructions", "string", "Yes", "Core instructions that define the agent behavior."),
+            new("nickname_candidates", "string[]", "No", "Optional pool of display nicknames for spawned agents."),
+            new("model", "string", "No", "Optional model override (e.g. gpt-5.4-mini)."),
+            new("model_reasoning_effort", "string", "No", "Reasoning effort override (low/medium/high/xhigh)."),
+            new("sandbox_mode", "string", "No", "Sandbox mode override (for example read-only).")
+        };
+        var geminiDocs = new List<FrontmatterFieldDoc>
+        {
+            new("name", "string", "Yes", "Unique identifier (slug) used as the tool name for the agent."),
+            new("description", "string", "Yes", "Short description used by the main agent to decide invocation."),
+            new("kind", "string", "No", "local (default) or remote."),
+            new("tools", "array", "No", "Allowed tool names. Supports wildcards (*, mcp_*, mcp_server_*)."),
+            new("model", "string", "No", "Specific model override (for example gemini-3-preview)."),
+            new("temperature", "number", "No", "Model temperature (0.0 - 2.0)."),
+            new("max_turns", "number", "No", "Maximum conversation turns for this agent."),
+            new("timeout_mins", "number", "No", "Execution timeout in minutes.")
+        };
+        var copilotDocs = new List<FrontmatterFieldDoc>
+        {
+            new("name", "string", "No", "Display name for the custom agent."),
+            new("description", "string", "Yes", "Description of purpose and capabilities."),
+            new("target", "string", "No", "Target environment (vscode or github-copilot)."),
+            new("tools", "list/string", "No", "Tool names. Comma-separated string or YAML array."),
+            new("model", "string", "No", "Model override; inherits default when unset."),
+            new("disable-model-invocation", "boolean", "No", "Disable automatic invocation by Copilot coding agent."),
+            new("user-invocable", "boolean", "No", "Whether users can manually select this agent."),
+            new("infer", "boolean", "No", "Retired; use disable-model-invocation and user-invocable."),
+            new("mcp-servers", "object", "No", "Additional MCP servers/tools (not used in VS Code agent mode)."),
+            new("metadata", "object", "No", "Arbitrary string key/value annotations.")
+        };
+
+        var titleBar = BuildTitleBar("Frontmatter Field Reference", surface1, text, subtext, accent, out var closeBtn);
+
+        var dataGrid = new System.Windows.Controls.DataGrid
+        {
+            AutoGenerateColumns = false,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            IsReadOnly = true,
+            HeadersVisibility = System.Windows.Controls.DataGridHeadersVisibility.Column,
+            ItemsSource = claudeDocs,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            GridLinesVisibility = System.Windows.Controls.DataGridGridLinesVisibility.Horizontal,
+            RowHeight = double.NaN,
+            RowHeaderWidth = 0,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Margin = new Thickness(16, 12, 16, 8)
+        };
+        dataGrid.Columns.Add(new System.Windows.Controls.DataGridTextColumn
+        {
+            Header = "Field",
+            Binding = new System.Windows.Data.Binding(nameof(FrontmatterFieldDoc.Field)),
+            Width = new System.Windows.Controls.DataGridLength(140)
+        });
+        dataGrid.Columns.Add(new System.Windows.Controls.DataGridTextColumn
+        {
+            Header = "Type",
+            Binding = new System.Windows.Data.Binding(nameof(FrontmatterFieldDoc.Type)),
+            Width = new System.Windows.Controls.DataGridLength(130)
+        });
+        dataGrid.Columns.Add(new System.Windows.Controls.DataGridTextColumn
+        {
+            Header = "Required",
+            Binding = new System.Windows.Data.Binding(nameof(FrontmatterFieldDoc.Required)),
+            Width = new System.Windows.Controls.DataGridLength(80)
+        });
+        var descColumn = new System.Windows.Controls.DataGridTextColumn
+        {
+            Header = "Description",
+            Binding = new System.Windows.Data.Binding(nameof(FrontmatterFieldDoc.Description)),
+            Width = new System.Windows.Controls.DataGridLength(1, System.Windows.Controls.DataGridLengthUnitType.Star)
+        };
+        dataGrid.Columns.Add(descColumn);
+        var wrapStyle = new Style(typeof(System.Windows.Controls.TextBlock));
+        wrapStyle.Setters.Add(new Setter(System.Windows.Controls.TextBlock.TextWrappingProperty, TextWrapping.Wrap));
+        wrapStyle.Setters.Add(new Setter(System.Windows.Controls.TextBlock.VerticalAlignmentProperty, VerticalAlignment.Top));
+        descColumn.ElementStyle = wrapStyle;
+
+        var dialogTitle = new System.Windows.Controls.TextBlock
+        {
+            Text = "Frontmatter Field Reference (Claude)",
+            Foreground = text,
+            FontSize = 12,
+            Margin = new Thickness(16, 10, 16, 0)
+        };
+
+        void SetDocs(List<FrontmatterFieldDoc> docs, string titleSuffix)
+        {
+            dataGrid.ItemsSource = docs;
+            dialogTitle.Text = $"Frontmatter Field Reference ({titleSuffix})";
+        }
+
+        var tabButtons = new WrapPanel
+        {
+            Margin = new Thickness(16, 8, 16, 0)
+        };
+        var claudeBtn = new Wpf.Ui.Controls.Button { Content = "Claude", Appearance = ControlAppearance.Secondary, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 6, 6) };
+        var codexBtn = new Wpf.Ui.Controls.Button { Content = "Codex", Appearance = ControlAppearance.Secondary, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 6, 6) };
+        var copilotBtn = new Wpf.Ui.Controls.Button { Content = "Copilot", Appearance = ControlAppearance.Secondary, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 6, 6) };
+        var geminiBtn = new Wpf.Ui.Controls.Button { Content = "Gemini", Appearance = ControlAppearance.Secondary, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 6, 6) };
+        tabButtons.Children.Add(claudeBtn);
+        tabButtons.Children.Add(codexBtn);
+        tabButtons.Children.Add(copilotBtn);
+        tabButtons.Children.Add(geminiBtn);
+
+        claudeBtn.Click += (_, _) => SetDocs(claudeDocs, "Claude");
+        codexBtn.Click += (_, _) => SetDocs(codexDocs, "Codex");
+        copilotBtn.Click += (_, _) => SetDocs(copilotDocs, "Copilot");
+        geminiBtn.Click += (_, _) => SetDocs(geminiDocs, "Gemini");
+
+        var closeButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Close",
+            Appearance = ControlAppearance.Secondary,
+            MinWidth = 90,
+            Height = 32
+        };
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 0, 16, 12)
+        };
+        footer.Children.Add(closeButton);
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(dialogTitle, 1);
+        Grid.SetRow(tabButtons, 2);
+        Grid.SetRow(dataGrid, 3);
+        Grid.SetRow(footer, 4);
+        root.Children.Add(titleBar);
+        root.Children.Add(dialogTitle);
+        root.Children.Add(tabButtons);
+        root.Children.Add(dataGrid);
+        root.Children.Add(footer);
+
+        var owner = Window.GetWindow(this);
+        var dialog = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.CanResize,
+            WindowStyle = WindowStyle.None,
+            Width = 980,
+            Height = 620,
+            MinWidth = 760,
+            MinHeight = 420,
+            Background = surface,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            Content = root
+        };
+
+        System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 0,
+                ResizeBorderThickness = new Thickness(4),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
+
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed)
+                dialog.DragMove();
+        };
+        closeBtn.Click += (_, _) => dialog.Close();
+        closeButton.Click += (_, _) => dialog.Close();
+
+        SetDocs(claudeDocs, "Claude");
+        dialog.ShowDialog();
+    }
+
+    private static Grid BuildTitleBar(
+        string title,
+        MediaBrush background,
+        MediaBrush textBrush,
+        MediaBrush subtextBrush,
+        MediaBrush accentBrush,
+        out System.Windows.Controls.Button closeBtnOut)
+    {
+        var titleBar = new Grid { Background = background, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var icon = new System.Windows.Controls.TextBlock
+        {
+            Text = "●",
+            Foreground = accentBrush,
+            FontSize = 11,
+            Margin = new Thickness(12, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(icon, 0);
+
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = title,
+            Foreground = textBrush,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+
+        var closeBtn = new System.Windows.Controls.Button
+        {
+            Content = "✕",
+            Width = 34,
+            Height = 26,
+            Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = MediaBrushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Foreground = subtextBrush,
+            FontSize = 13
+        };
+        Grid.SetColumn(closeBtn, 2);
+
+        titleBar.Children.Add(icon);
+        titleBar.Children.Add(titleText);
+        titleBar.Children.Add(closeBtn);
+
+        closeBtnOut = closeBtn;
+        return titleBar;
+    }
+}

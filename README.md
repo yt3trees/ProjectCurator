@@ -63,6 +63,7 @@ flowchart TD
 | Timeline | Review recent project activity in chronological order |
 | Git Repos | Recursively scan workspace roots for repositories |
 | Asana Sync | Sync Asana tasks to project/workstream Markdown outputs |
+| Agent Hub | Manage reusable sub-agent/context-rule library and deploy/undeploy per project, per CLI (Claude/Codex/Copilot/Gemini) |
 | Setup | Create/check/archive projects, tier conversion, workstream management |
 | Settings | Theme, hotkey, workspace paths, refresh behavior, LLM API configuration, Enable AI Features toggle |
 
@@ -476,6 +477,20 @@ flowchart TD
     E --> H["Proposes Obsidian note (if knowledge worth saving)"]
 ```
 
+### Agent Hub (Multi-CLI Deployment)
+
+The `Agent Hub` page is a control center for deploying sub-agent and context-rule definitions to each project with per-CLI toggles (`Cl` / `Cx` / `Cp` / `Gm`).
+
+- Master library files are stored under `%USERPROFILE%\Documents\Projects\_config\agent_hub\` (`agents/` and `rules/` as JSON + Markdown).
+- Agent deployment targets:
+  - Claude: `.claude/agents/<name>.md`
+  - Codex: `.codex/agents/<name>.toml`
+  - Copilot: `.github/agents/<name>.md`
+  - Gemini: `.gemini/agents/<name>.md`
+- Context rules are appended/removed with `<!-- [AgentHub:<id>] -->` markers in CLI-specific files (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, `GEMINI.md`) so existing content is preserved.
+- For `.claude` / `.codex` / `.gemini`, deployment is junction-aware and writes to the junction target when present. `.github` is always written to the local project path.
+- Includes status sync, target subfolder deployment, batch deploy to all projects, library ZIP import/export, and AI Builder (enabled only when AI Features is on).
+
 ### Skill Deployment
 
 ProjectCurator automatically deploys the `/project-curator` skill when creating or checking a project from the Setup page:
@@ -498,15 +513,19 @@ Overview of all projects with health indicators, update freshness, and Today Que
 <summary>Dashboard details</summary>
 
 ![](_assets/Dashboard-Card.png)
+
 This is the standard project card view with health signals, repository status, and quick actions.
 
 <img src="_assets/ai-feature/WhatsNext.png" width="60%" alt="What's Next dialog" />
+
 When AI Features is enabled, the What's Next button (💡) in the top bar shows 3-5 prioritized actions across all projects, with an `Open` button for direct navigation and `Copy` for plain-text export.
 
 <img src="_assets/ai-feature/ContextBriefing.png" width="60%" alt="Context Briefing dialog" />
+
 When AI Features is enabled, each project card also shows a Briefing button (💡) that generates a project-specific context-switch summary (`Where you left off` / `Suggested next steps` / `Key context`) with `Copy`, `Open in Editor`, and `View Debug`.
 
 <img src="_assets/ai-feature/TodaysPlan.png" width="60%" alt="Today's Plan dialog" />
+
 Today's Plan dialog (AI) provides a time-blocked day plan (for example, Morning / Afternoon), with `Open`, `Copy`, `Save`, and `View Debug` actions.
 
 - Use the top bar to refresh the view (`↻`), set auto refresh (`Off / 10 / 15 / 30 / 60 min`), and show hidden projects.
@@ -540,14 +559,17 @@ Tree-based file browser for AI context files (`current_focus.md`, `decision_log`
 - Status bar at the bottom shows the current project and file name
 
 <img src="_assets/ai-feature/UpdateFocusFromAsana.png" width="60%" alt="Update Focus from Asana dialog" />
+
 Update Focus from Asana (AI) reads `asana-tasks.md`, sends context to the configured LLM, and shows a diff-based proposal dialog; it supports workstream filtering, natural-language refinement, and `View Debug`, and saves a backup to `focus_history/`.
 
 <img src="_assets/ai-feature/AI-DecisionLog_1.png" width="60%" alt="AI Decision Log dialog step 1" />
 <img src="_assets/ai-feature/AI-DecisionLog_2.png" width="60%" alt="AI Decision Log dialog step 2" />
+
 AI Decision Log (Dec Log in AI mode) detects implicit decisions from recent `focus_history`, accepts decision metadata (Status/Trigger/attachments), generates a structured draft (Options / Why / Risk / Revisit Trigger), supports refinement and debug view, and saves to `decision_log/YYYY-MM-DD_{topic}.md`.
 
 <img src="_assets/ai-feature/ImportMeetingNotes_1.png" width="60%" alt="Import Meeting Notes dialog step 1" />
 <img src="_assets/ai-feature/ImportMeetingNotes_2.png" width="60%" alt="Import Meeting Notes dialog step 2" />
+
 Import Meeting Notes (AI) analyzes raw notes in a single pass and previews Decisions / Focus / Tensions / Asana Tasks tabs; you can choose what to apply, inspect prompt/response via `View Debug`, and `current_focus.md` is backed up before overwrite.
 
 </details>
@@ -637,6 +659,29 @@ Reference (you usually do not edit these directly):
 
 </details>
 
+### Agent Hub
+
+Manage reusable agent/rule definitions and deploy them per project and per CLI from one page.
+
+![](_assets/AgentHub.png)
+
+<details>
+<summary>Agent Hub details</summary>
+
+- Left panel: master library (`Agents` / `Context Rules`) with preview and create/edit/delete actions
+- Right panel: per-project deployment matrix with per-CLI toggles (`Cl`, `Cx`, `Cp`, `Gm`)
+- Supports target subfolder selection, status sync, batch deploy, and import/export actions
+
+<img src="_assets/AgentHub-EditAgent.png" width="60%" alt="Agent Hub Edit Agent dialog" />
+
+Edit Agent dialog lets you update name, description, and content for each reusable sub-agent definition.
+
+<img src="_assets/AgentHub-EditContextRule.png" width="60%" alt="Agent Hub Edit Context Rule dialog" />
+
+Edit Context Rule dialog provides the same workflow for reusable context rules.
+
+</details>
+
 ### Setup - New Project
 
 Create new projects, check existing structures, archive, and convert tiers from a single page.
@@ -695,7 +740,7 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 | Shortcut | Action |
 |---|---|
 | `Ctrl+K` | Open Command Palette |
-| `Ctrl+1` - `Ctrl+7` | Navigate pages |
+| `Ctrl+1` - `Ctrl+8` | Navigate pages |
 | `Ctrl+S` | Save in Editor |
 | `Ctrl+F` | Search in Editor |
 | `Ctrl+Shift+P` | Toggle app visibility (default) |
@@ -711,7 +756,11 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 ├── hidden_projects.json
 ├── asana_global.json
 ├── pinned_folders.json
-└── curator_state.json      ← auto-generated; updated on every Dashboard refresh
+├── agent_hub_state.json    ← auto-generated deployment state for Agent Hub
+├── curator_state.json      ← auto-generated; updated on every Dashboard refresh
+└── agent_hub\
+    ├── agents\             ← master agent definitions (JSON + Markdown)
+    └── rules\              ← master context rule definitions (JSON + Markdown)
 ```
 
 `settings.json` and `asana_global.json` are gitignored.

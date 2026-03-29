@@ -280,10 +280,14 @@ public partial class MainWindow : FluentWindow
                     e.Handled = true;
                     break;
                 case WpfKey.D6:
-                    RootNavigation.Navigate(typeof(SetupPage));
+                    RootNavigation.Navigate(typeof(AgentHubPage));
                     e.Handled = true;
                     break;
                 case WpfKey.D7:
+                    RootNavigation.Navigate(typeof(SetupPage));
+                    e.Handled = true;
+                    break;
+                case WpfKey.D8:
                     RootNavigation.Navigate(typeof(SettingsPage));
                     e.Handled = true;
                     break;

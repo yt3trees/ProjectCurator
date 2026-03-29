@@ -84,6 +84,8 @@ public partial class App : WpfApplication
         services.AddSingleton<CaptureService>();
         services.AddSingleton<MeetingNotesService>();
         services.AddSingleton<StateSnapshotService>();
+        services.AddSingleton<AgentHubService>();
+        services.AddSingleton<AgentDeploymentService>();
 
         // ViewModels
         services.AddSingleton<MainWindowViewModel>();
@@ -95,6 +97,7 @@ public partial class App : WpfApplication
         services.AddSingleton<SetupViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<CommandPaletteViewModel>();
+        services.AddSingleton<AgentHubViewModel>();
 
         // Pages
         services.AddSingleton<DashboardPage>();
@@ -104,6 +107,7 @@ public partial class App : WpfApplication
         services.AddSingleton<AsanaSyncPage>();
         services.AddSingleton<SetupPage>();
         services.AddSingleton<SettingsPage>();
+        services.AddSingleton<AgentHubPage>();
 
         // wpf-ui: IPageService for DI-based page resolution
         services.AddSingleton<IPageService, AppPageService>();

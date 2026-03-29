@@ -51,6 +51,9 @@
                 <ui:NavigationViewItem Content="Asana Sync"
                     Icon="{ui:SymbolIcon Symbol=ArrowSync24}"
                     TargetPageType="{x:Type pages:AsanaSyncPage}" />
+                <ui:NavigationViewItem Content="Agent Hub"
+                    Icon="{ui:SymbolIcon Symbol=BotSparkle24}"
+                    TargetPageType="{x:Type pages:AgentHubPage}" />
             </ui:NavigationView.MenuItems>
 
             <ui:NavigationView.FooterMenuItems>

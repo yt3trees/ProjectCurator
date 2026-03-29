@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ProjectCurator.Helpers;
 using ProjectCurator.Models;
 
@@ -13,6 +14,13 @@ public class ConfigService
     {
         WriteIndented = true,
         PropertyNameCaseInsensitive = true,
+    };
+
+    private static readonly JsonSerializerOptions JsonOptionsWithEnum = new()
+    {
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
     };
 
     public string WorkspaceRoot { get; }
@@ -159,6 +167,33 @@ public class ConfigService
         EnsureConfigDir();
         var path = Path.Combine(ConfigDir, "window_state.json");
         var json = JsonSerializer.Serialize(placement, JsonOptions);
+        File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    // ---------- AgentHubState ----------
+
+    public AgentHubState LoadAgentHubState()
+    {
+        var path = Path.Combine(ConfigDir, "agent_hub_state.json");
+        if (!File.Exists(path))
+            return new AgentHubState();
+        try
+        {
+            var content = File.ReadAllText(path, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            return JsonSerializer.Deserialize<AgentHubState>(content, JsonOptionsWithEnum) ?? new AgentHubState();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ConfigService] LoadAgentHubState error: {ex}");
+            return new AgentHubState();
+        }
+    }
+
+    public void SaveAgentHubState(AgentHubState state)
+    {
+        EnsureConfigDir();
+        var path = Path.Combine(ConfigDir, "agent_hub_state.json");
+        var json = JsonSerializer.Serialize(state, JsonOptionsWithEnum);
         File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
