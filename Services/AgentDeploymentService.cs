@@ -584,15 +584,23 @@ public class AgentDeploymentService
 
     private static string ReplaceMarkedSection(string content, string id, string newSection)
     {
-        var pattern = $@"\n\n{Regex.Escape($"<!-- [AgentHub:{id}] -->")}[\s\S]*?{Regex.Escape($"<!-- [/AgentHub:{id}] -->")}";
+        var openMarker = Regex.Escape($"<!-- [AgentHub:{id}] -->");
+        var closeMarker = Regex.Escape($"<!-- [/AgentHub:{id}] -->");
+        // Use (\r?\n)+ to handle CRLF and any number of preceding newlines (not just \n\n)
+        var pattern = $@"(\r?\n)+[ \t]*{openMarker}[\s\S]*?{closeMarker}[ \t]*";
         var result = Regex.Replace(content, pattern, "\n\n" + newSection);
         return result.TrimEnd() + "\n";
     }
 
     private static string RemoveMarkedSection(string content, string id)
     {
-        var pattern = $@"\n\n{Regex.Escape($"<!-- [AgentHub:{id}] -->")}[\s\S]*?{Regex.Escape($"<!-- [/AgentHub:{id}] -->")}(\n?)";
-        var result = Regex.Replace(content, pattern, "");
+        var openMarker = Regex.Escape($"<!-- [AgentHub:{id}] -->");
+        var closeMarker = Regex.Escape($"<!-- [/AgentHub:{id}] -->");
+        // Use (\r?\n)+ to handle CRLF and any number of preceding newlines (not just \n\n).
+        // Replace the matched block (including its preceding newlines) with a single \n
+        // so that text before and after the section remains separated by a line break.
+        var pattern = $@"(\r?\n)+[ \t]*{openMarker}[\s\S]*?{closeMarker}[ \t]*(\r?\n)?";
+        var result = Regex.Replace(content, pattern, "\n");
         return result.TrimEnd() + "\n";
     }
 }
