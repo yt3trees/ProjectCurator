@@ -482,7 +482,7 @@ flowchart TD
 
 The `Agent Hub` page is a control center for deploying sub-agent and context-rule definitions to each project with per-CLI toggles (`Cl` / `Cx` / `Cp` / `Gm`).
 
-- Master library files are stored under `%USERPROFILE%\Documents\Projects\_config\agent_hub\` (`agents/` and `rules/` as JSON + Markdown).
+- Master library files are stored under `{Cloud Sync Root}\_config\agent_hub\` (`agents/` and `rules/` as JSON + Markdown).
 - Agent deployment targets:
   - Claude: `.claude/agents/<name>.md`
   - Codex: `.codex/agents/<name>.toml`
@@ -758,10 +758,11 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 ├── asana_global.json
 ├── pinned_folders.json
 ├── agent_hub_state.json    ← auto-generated deployment state for Agent Hub
-├── curator_state.json      ← auto-generated; updated on every Dashboard refresh
-└── agent_hub\
-    ├── agents\             ← master agent definitions (JSON + Markdown)
-    └── rules\              ← master context rule definitions (JSON + Markdown)
+└── curator_state.json      ← auto-generated; updated on every Dashboard refresh
+
+{Cloud Sync Root}\_config\agent_hub\
+├── agents\                 ← master agent definitions (JSON + Markdown)
+└── rules\                  ← master context rule definitions (JSON + Markdown)
 ```
 
 `settings.json` and `asana_global.json` are gitignored.

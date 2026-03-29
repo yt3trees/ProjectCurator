@@ -479,7 +479,7 @@ flowchart TD
 
 `Agent Hub` ページは、サブエージェント定義とコンテキストルール定義をプロジェクトごと・CLIごと(`Cl` / `Cx` / `Cp` / `Gm`)に切り替えて配備するためのコントロールセンターです。
 
-- マスターライブラリは `%USERPROFILE%\Documents\Projects\_config\agent_hub\` 配下 (`agents/` と `rules/`) に JSON + Markdown で保存されます。
+- マスターライブラリは `{Cloud Sync Root}\_config\agent_hub\` 配下 (`agents/` と `rules/`) に JSON + Markdown で保存されます。
 - Agent の配備先:
   - Claude: `.claude/agents/<name>.md`
   - Codex: `.codex/agents/<name>.toml`
@@ -755,10 +755,11 @@ Convert Tier タブ:
 ├── asana_global.json
 ├── pinned_folders.json
 ├── agent_hub_state.json    ← Agent Hub の配備状態 (自動生成)
-├── curator_state.json      ← 自動生成; Dashboard 更新のたびに書き出される
-└── agent_hub\
-    ├── agents\             ← マスターAgent定義 (JSON + Markdown)
-    └── rules\              ← マスターContext Rule定義 (JSON + Markdown)
+└── curator_state.json      ← 自動生成; Dashboard 更新のたびに書き出される
+
+{Cloud Sync Root}\_config\agent_hub\
+├── agents\                 ← マスターAgent定義 (JSON + Markdown)
+└── rules\                  ← マスターContext Rule定義 (JSON + Markdown)
 ```
 
 `settings.json` / `asana_global.json` は `.gitignore` 対象です。

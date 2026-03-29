@@ -19,7 +19,7 @@ public class AgentHubService
 
     private readonly ConfigService _configService;
 
-    public string AgentHubDir => Path.Combine(_configService.ConfigDir, "agent_hub");
+    public string AgentHubDir => Path.Combine(ResolveAgentHubConfigDir(), "agent_hub");
     public string AgentsDir => Path.Combine(AgentHubDir, "agents");
     public string RulesDir => Path.Combine(AgentHubDir, "rules");
 
@@ -290,5 +290,17 @@ public class AgentHubService
         {
             Debug.WriteLine($"[AgentHubService] Temp directory cleanup failed: {dirPath} - {ex.Message}");
         }
+    }
+
+    private string ResolveAgentHubConfigDir()
+    {
+        var settings = _configService.LoadSettings();
+        if (!string.IsNullOrWhiteSpace(settings.CloudSyncRoot))
+        {
+            var cloudRoot = Environment.ExpandEnvironmentVariables(settings.CloudSyncRoot).Trim();
+            return Path.Combine(cloudRoot, "_config");
+        }
+
+        return _configService.ConfigDir;
     }
 }
