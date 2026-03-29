@@ -322,9 +322,10 @@
                                         <ColumnDefinition Width="34"/>
                                         <ColumnDefinition Width="34"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="ON" FontSize="10" FontWeight="SemiBold"
+                                    <TextBlock Grid.Column="0" Text="All" FontSize="10" FontWeight="SemiBold"
                                                Foreground="{DynamicResource AppSubtext0}"
-                                               HorizontalAlignment="Center" Padding="0,4"/>
+                                               HorizontalAlignment="Center" Padding="0,4"
+                                               ToolTip="Toggle all CLI targets"/>
                                     <TextBlock Grid.Column="1" Text="Name" FontSize="10" FontWeight="SemiBold"
                                                Foreground="{DynamicResource AppSubtext0}" Padding="4,4"/>
                                     <TextBlock Grid.Column="2" Text="Cl" FontSize="10" FontWeight="SemiBold"
@@ -360,22 +361,12 @@
                                                         <ColumnDefinition Width="34"/>
                                                         <ColumnDefinition Width="34"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0"
-                                                               Text="{Binding IsDeployedLabel}"
-                                                               FontSize="11" FontWeight="SemiBold"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Foreground" Value="{DynamicResource AppSubtext0}"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsDeployed}" Value="True">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource AppGreen}"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
+                                                    <CheckBox Grid.Column="0"
+                                                              IsChecked="{Binding IsAllDeployed}"
+                                                              IsThreeState="True"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                              MinWidth="16" MinHeight="16" Margin="0,2,0,0" Padding="0"
+                                                              ToolTip="Toggle all CLI targets"/>
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding Name}"
                                                                FontSize="12"
@@ -435,9 +426,10 @@
                                         <ColumnDefinition Width="34"/>
                                         <ColumnDefinition Width="34"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="ON" FontSize="10" FontWeight="SemiBold"
+                                    <TextBlock Grid.Column="0" Text="All" FontSize="10" FontWeight="SemiBold"
                                                Foreground="{DynamicResource AppSubtext0}"
-                                               HorizontalAlignment="Center" Padding="0,4"/>
+                                               HorizontalAlignment="Center" Padding="0,4"
+                                               ToolTip="Toggle all CLI targets"/>
                                     <TextBlock Grid.Column="1" Text="Name" FontSize="10" FontWeight="SemiBold"
                                                Foreground="{DynamicResource AppSubtext0}" Padding="4,4"/>
                                     <TextBlock Grid.Column="2" Text="Cl" FontSize="10" FontWeight="SemiBold"
@@ -469,22 +461,12 @@
                                                         <ColumnDefinition Width="34"/>
                                                         <ColumnDefinition Width="34"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0"
-                                                               Text="{Binding IsDeployedLabel}"
-                                                               FontSize="11" FontWeight="SemiBold"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Foreground" Value="{DynamicResource AppSubtext0}"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsDeployed}" Value="True">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource AppGreen}"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
+                                                    <CheckBox Grid.Column="0"
+                                                              IsChecked="{Binding IsAllDeployed}"
+                                                              IsThreeState="True"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                              MinWidth="16" MinHeight="16" Margin="0,2,0,0" Padding="0"
+                                                              ToolTip="Toggle all CLI targets"/>
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding Name}"
                                                                FontSize="12"

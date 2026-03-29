@@ -488,6 +488,9 @@ flowchart TD
 - Context Rule は `<!-- [AgentHub:<id>] -->` マーカーで囲って CLI 別ファイル (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, `GEMINI.md`) に追記/削除されるため、既存記述を壊しません。
 - `.claude` / `.codex` / `.gemini` はジャンクションを検出してリンク先へ書き込みます。`.github` は常にプロジェクトのローカルパスへ直接書き込みます。
 - 状態同期、サブフォルダ単位の配備、全プロジェクト一括配備、ライブラリZIPのImport/Export、AI Builder(AI機能有効時のみ)に対応しています。
+- AI Builder では Agent または Context Rule のどちらを生成するかをラジオボタンで選択できます。Ctrl+Enter で Generate を実行でき、名前と説明はAIが自動補完します。
+- 配備マトリクスの各行に `All` チェックボックスが追加され、全CLIをまとめて ON/OFF できます。
+- ライブラリのインポートは ZIP のみに対応しています。保存される `.md` ファイルには YAML frontmatter が含まれるため、配備せずにそのまま利用できます。
 
 ### スキルの配置
 
@@ -666,17 +669,19 @@ Agent/Rule の定義を一元管理し、プロジェクト単位・CLI単位で
 <details>
 <summary>Agent Hub の詳細</summary>
 
-- 左ペイン: マスターライブラリ (`Agents` / `Context Rules`) の一覧、プレビュー、作成/編集/削除
-- 右ペイン: プロジェクト単位の配備マトリクス。CLIごと (`Cl`, `Cx`, `Cp`, `Gm`) にON/OFF可能
-- ターゲットサブフォルダ指定、状態同期、一括配備、Import/Export に対応
+- 左ペイン: マスターライブラリ (`Agents` / `Context Rules`) の一覧、プレビュー、作成/編集/削除。アイテムをダブルクリックすると Edit ダイアログが開きます
+- 右ペイン: プロジェクト単位の配備マトリクス。CLIごと (`Cl`, `Cx`, `Cp`, `Gm`) にON/OFF可能。各行に `All` チェックボックスがあり全CLIをまとめて切り替えられます
+- ライブラリのインポートは ZIP のみ対応(Markdownのみのインポートは非サポート)。エクスポートも ZIP 形式
+- ターゲットサブフォルダ指定、状態同期、一括配備に対応
+- AI Builder (AI機能が有効の場合のみ) で Agent または Context Rule を自由記述のプロンプトから生成。ラジオボタンで種別を選択し、`Generate` または Ctrl+Enter で実行。名前と説明はAIが自動補完します
 
 <img src="_assets/AgentHub-EditAgent.png" width="60%" alt="Agent Hub Agent編集ダイアログ" />
 
-Edit Agent ダイアログで、再利用するサブエージェント定義の名前・説明・本文を編集できます。
+Edit Agent ダイアログで、再利用するサブエージェント定義の名前・説明・本文を編集できます。Ctrl+Enter で保存。
 
 <img src="_assets/AgentHub-EditContextRule.png" width="60%" alt="Agent Hub Context Rule編集ダイアログ" />
 
-Edit Context Rule ダイアログで、再利用するルール定義を同様の手順で編集できます。
+Edit Context Rule ダイアログで、再利用するルール定義を同様の手順で編集できます。Ctrl+Enter で保存。
 
 </details>
 

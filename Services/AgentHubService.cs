@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using ProjectCurator.Models;
 
 namespace ProjectCurator.Services;
@@ -56,6 +57,29 @@ public class AgentHubService
         if (string.IsNullOrEmpty(def.ContentFile)) return "";
         var path = Path.Combine(AgentsDir, def.ContentFile);
         return File.Exists(path) ? File.ReadAllText(path, new UTF8Encoding(false)) : "";
+    }
+
+    // Returns body-only and extracted extra frontmatter for the Edit dialog.
+    public (string Body, string ExtraFrontmatter) GetAgentContentForEdit(AgentDefinition def)
+    {
+        var raw = GetAgentContent(def);
+        var trimmed = raw.TrimStart();
+        if (!trimmed.StartsWith("---\n", StringComparison.Ordinal) &&
+            !trimmed.StartsWith("---\r\n", StringComparison.Ordinal))
+            return (raw, def.FrontmatterClaude);
+
+        var match = Regex.Match(trimmed, @"\A---\r?\n([\s\S]*?)\r?\n---\r?\n?", RegexOptions.CultureInvariant);
+        if (!match.Success)
+            return (raw, def.FrontmatterClaude);
+
+        var fmBlock = match.Groups[1].Value;
+        var body = trimmed[match.Length..];
+        var extraLines = fmBlock.Replace("\r\n", "\n")
+            .Split('\n')
+            .Where(l => !string.IsNullOrWhiteSpace(l) &&
+                        !Regex.IsMatch(l, @"^(name|description)\s*:", RegexOptions.IgnoreCase));
+        var extra = string.Join("\n", extraLines);
+        return (body.TrimStart('\r', '\n'), !string.IsNullOrWhiteSpace(extra) ? extra : def.FrontmatterClaude);
     }
 
     public void SaveAgentDefinition(AgentDefinition def, string content)

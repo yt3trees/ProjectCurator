@@ -491,6 +491,9 @@ The `Agent Hub` page is a control center for deploying sub-agent and context-rul
 - Context rules are appended/removed with `<!-- [AgentHub:<id>] -->` markers in CLI-specific files (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, `GEMINI.md`) so existing content is preserved.
 - For `.claude` / `.codex` / `.gemini`, deployment is junction-aware and writes to the junction target when present. `.github` is always written to the local project path.
 - Includes status sync, target subfolder deployment, batch deploy to all projects, library ZIP import/export, and AI Builder (enabled only when AI Features is on).
+- AI Builder generates either an Agent or a Context Rule definition from a free-text prompt; Ctrl+Enter triggers Generate, and Name/Description are auto-filled by the AI.
+- Each row in the deployment matrix has an `All` checkbox to toggle all CLI targets at once.
+- Library import is ZIP-only; saved `.md` files include YAML frontmatter so they are directly usable without deploying.
 
 ### Skill Deployment
 
@@ -669,17 +672,19 @@ Manage reusable agent/rule definitions and deploy them per project and per CLI f
 <details>
 <summary>Agent Hub details</summary>
 
-- Left panel: master library (`Agents` / `Context Rules`) with preview and create/edit/delete actions
-- Right panel: per-project deployment matrix with per-CLI toggles (`Cl`, `Cx`, `Cp`, `Gm`)
-- Supports target subfolder selection, status sync, batch deploy, and import/export actions
+- Left panel: master library (`Agents` / `Context Rules`) with preview and create/edit/delete actions; double-click an item to open the Edit dialog directly
+- Right panel: per-project deployment matrix with per-CLI toggles (`Cl`, `Cx`, `Cp`, `Gm`); each row has an `All` checkbox to toggle all CLI targets at once
+- Library import is ZIP-only (Markdown-only import is not supported); export also produces a ZIP
+- Supports target subfolder selection, status sync, and batch deploy
+- AI Builder (AI Features must be enabled) generates an Agent or Context Rule from a free-text prompt; select the type with the radio buttons, press `Generate` or Ctrl+Enter, and Name/Description are auto-filled by the AI
 
 <img src="_assets/AgentHub-EditAgent.png" width="60%" alt="Agent Hub Edit Agent dialog" />
 
-Edit Agent dialog lets you update name, description, and content for each reusable sub-agent definition.
+Edit Agent dialog lets you update name, description, and content for each reusable sub-agent definition. Ctrl+Enter saves.
 
 <img src="_assets/AgentHub-EditContextRule.png" width="60%" alt="Agent Hub Edit Context Rule dialog" />
 
-Edit Context Rule dialog provides the same workflow for reusable context rules.
+Edit Context Rule dialog provides the same workflow for reusable context rules. Ctrl+Enter saves.
 
 </details>
 

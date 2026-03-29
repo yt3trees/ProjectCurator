@@ -77,13 +77,13 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         var def = ViewModel.SelectedAgentDefinition;
         if (def == null) return;
 
-        var content = ViewModel.SelectedPreviewContent;
+        var (body, fmExtra) = ViewModel.GetAgentContentForEdit(def);
         var result = await ShowItemDialogAsync(
             "Edit Agent",
             def.Name,
             def.Description,
-            content,
-            def.FrontmatterClaude,
+            body,
+            fmExtra,
             def.FrontmatterCodex,
             def.FrontmatterCopilot,
             def.FrontmatterGemini,
@@ -231,17 +231,18 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
 
         try
         {
-            var result = await ShowItemDialogAsync("AI Builder - Review & Save", ai.Value.Name, ai.Value.Description, ai.Value.Content, "", "", "", "", true);
+            var dialogTitle = ai.Value.IsAgent ? "AI Builder - Review & Save (Agent)" : "AI Builder - Review & Save (Rule)";
+            var result = await ShowItemDialogAsync(dialogTitle, ai.Value.Name, ai.Value.Description, ai.Value.Content, "", "", "", "", ai.Value.IsAgent);
             if (result == null) { ViewModel.StatusMessage = "AI Builder cancelled"; return; }
-            ViewModel.SaveAgent(
-                null,
-                result.Name,
-                result.Description,
-                result.Content,
-                result.FrontmatterClaude,
-                result.FrontmatterCodex,
-                result.FrontmatterCopilot,
-                result.FrontmatterGemini);
+            if (ai.Value.IsAgent)
+            {
+                ViewModel.SaveAgent(null, result.Name, result.Description, result.Content,
+                    result.FrontmatterClaude, result.FrontmatterCodex, result.FrontmatterCopilot, result.FrontmatterGemini);
+            }
+            else
+            {
+                ViewModel.SaveRule(null, result.Name, result.Description, result.Content);
+            }
             ViewModel.StatusMessage = $"AI Builder: saved '{result.Name}'";
         }
         catch (Exception ex)
@@ -578,6 +579,11 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
                 frontmatterMap.GetValueOrDefault("Gemini", ""));
             dialog.Close();
         };
+        dialog.PreviewKeyDown += (_, ev) =>
+        {
+            if (ev.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                saveBtn.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        };
         closeBtn.Click += (_, _) => dialog.Close();
         cancelBtn.Click += (_, _) => dialog.Close();
         dialog.Closed += (_, _) => tcs.TrySetResult(dialogResult);
@@ -695,9 +701,9 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         return confirmed;
     }
 
-    private Task<(string Name, string Description, string Content)?> ShowAiBuilderInputDialogAsync()
+    private Task<(string Name, string Description, string Content, bool IsAgent)?> ShowAiBuilderInputDialogAsync()
     {
-        var tcs = new TaskCompletionSource<(string Name, string Description, string Content)?>();
+        var tcs = new TaskCompletionSource<(string Name, string Description, string Content, bool IsAgent)?>();
 
         var appRes = Application.Current.Resources;
         var surface = (MediaBrush)appRes["AppSurface0"];
@@ -709,9 +715,31 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
 
         var titleBar = BuildTitleBar("AI Builder", surface1, text, subtext, accent, out var closeBtn);
 
+        var agentRadio = new System.Windows.Controls.RadioButton
+        {
+            Content = "Agent",
+            IsChecked = true,
+            Foreground = text,
+            FontSize = 12,
+            Margin = new Thickness(0, 0, 20, 0)
+        };
+        var ruleRadio = new System.Windows.Controls.RadioButton
+        {
+            Content = "Context Rule",
+            Foreground = text,
+            FontSize = 12
+        };
+        var typePanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+        typePanel.Children.Add(agentRadio);
+        typePanel.Children.Add(ruleRadio);
+
         var label = new System.Windows.Controls.TextBlock
         {
-            Text = "Describe the agent's purpose (e.g. 'A strict C# code reviewer focused on SOLID principles')",
+            Text = "Describe the purpose (e.g. 'A strict C# code reviewer focused on SOLID principles')",
             Foreground = subtext,
             FontSize = 11,
             TextWrapping = TextWrapping.Wrap,
@@ -732,6 +760,7 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         };
 
         var contentPanel = new StackPanel { Margin = new Thickness(16, 12, 16, 8) };
+        contentPanel.Children.Add(typePanel);
         contentPanel.Children.Add(label);
         contentPanel.Children.Add(inputBox);
 
@@ -833,7 +862,7 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
                 UseAeroCaptionButtons = false
             });
 
-        (string Name, string Description, string Content)? result = null;
+        (string Name, string Description, string Content, bool IsAgent)? result = null;
         titleBar.MouseLeftButtonDown += (_, ev) =>
         {
             if (ev.LeftButton == MouseButtonState.Pressed) dialog.DragMove();
@@ -847,7 +876,10 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         {
             if (string.IsNullOrWhiteSpace(inputBox.Text)) return;
 
+            var isAgent = agentRadio.IsChecked == true;
             inputBox.IsEnabled = false;
+            agentRadio.IsEnabled = false;
+            ruleRadio.IsEnabled = false;
             generateBtn.IsEnabled = false;
             cancelBtn.IsEnabled = false;
             errorText.Visibility = Visibility.Collapsed;
@@ -855,14 +887,20 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
 
             try
             {
-                var systemPrompt =
-                    "Generate a sub-agent definition based on the user's description.\n" +
-                    "IMPORTANT: Do NOT include any folder paths, directory restrictions,\n" +
-                    "or working directory references. Define only the role, skills, and best practices.\n\n" +
-                    "Respond with a single JSON object (no markdown fences) with exactly these fields:\n" +
-                    "- \"name\": concise slug in lowercase-with-hyphens (e.g. \"strict-csharp-reviewer\")\n" +
-                    "- \"description\": one sentence describing when to use this agent\n" +
-                    "- \"content\": the full Markdown agent definition (role, trigger conditions, skills, best practices)";
+                var systemPrompt = isAgent
+                    ? "Generate a sub-agent definition based on the user's description.\n" +
+                      "IMPORTANT: Do NOT include any folder paths, directory restrictions,\n" +
+                      "or working directory references. Define only the role, skills, and best practices.\n\n" +
+                      "Respond with a single JSON object (no markdown fences) with exactly these fields:\n" +
+                      "- \"name\": concise slug in lowercase-with-hyphens (e.g. \"strict-csharp-reviewer\")\n" +
+                      "- \"description\": one sentence describing when to use this agent\n" +
+                      "- \"content\": the full Markdown agent definition (role, trigger conditions, skills, best practices)"
+                    : "Generate a context rule definition (coding conventions, guidelines, or instructions for AI coding assistants).\n" +
+                      "IMPORTANT: Do NOT include any folder paths or directory restrictions.\n\n" +
+                      "Respond with a single JSON object (no markdown fences) with exactly these fields:\n" +
+                      "- \"name\": concise slug in lowercase-with-hyphens (e.g. \"typescript-strict-conventions\")\n" +
+                      "- \"description\": one sentence describing what this rule enforces\n" +
+                      "- \"content\": the full Markdown rule content (conventions, rationale, examples)";
                 var raw = await _llmClientService.ChatCompletionAsync(systemPrompt, inputBox.Text.Trim(), CancellationToken.None);
 
                 var json = raw.Trim();
@@ -878,7 +916,8 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
                 result = (
                     root.GetProperty("name").GetString() ?? "",
                     root.GetProperty("description").GetString() ?? "",
-                    root.GetProperty("content").GetString() ?? ""
+                    root.GetProperty("content").GetString() ?? "",
+                    isAgent
                 );
                 dialog.Close();
             }
@@ -888,6 +927,8 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
                 errorText.Visibility = Visibility.Visible;
                 loadingPanel.Visibility = Visibility.Collapsed;
                 inputBox.IsEnabled = true;
+                agentRadio.IsEnabled = true;
+                ruleRadio.IsEnabled = true;
                 generateBtn.IsEnabled = true;
                 cancelBtn.IsEnabled = true;
             }

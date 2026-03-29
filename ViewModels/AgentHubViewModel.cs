@@ -28,6 +28,22 @@ public partial class DeployAgentItemViewModel : ObservableObject
     public bool IsDeployed => IsClaudeDeployed || IsCodexDeployed || IsCopilotDeployed || IsGeminiDeployed;
     public string IsDeployedLabel => IsDeployed ? "ON" : "--";
 
+    public bool? IsAllDeployed
+    {
+        get => IsClaudeDeployed && IsCodexDeployed && IsCopilotDeployed && IsGeminiDeployed ? true
+             : !IsClaudeDeployed && !IsCodexDeployed && !IsCopilotDeployed && !IsGeminiDeployed ? false
+             : (bool?)null;
+        set
+        {
+            var deploy = value == true;
+            IsClaudeDeployed = deploy;
+            IsCodexDeployed = deploy;
+            IsCopilotDeployed = deploy;
+            IsGeminiDeployed = deploy;
+            OnPropertyChanged();
+        }
+    }
+
     public DeployAgentItemViewModel(AgentDefinition definition)
     {
         Definition = definition;
@@ -46,6 +62,7 @@ public partial class DeployAgentItemViewModel : ObservableObject
         _suppressCallback = false;
         OnPropertyChanged(nameof(IsDeployed));
         OnPropertyChanged(nameof(IsDeployedLabel));
+        OnPropertyChanged(nameof(IsAllDeployed));
     }
 
     partial void OnIsClaudeDeployedChanged(bool value)
@@ -53,6 +70,7 @@ public partial class DeployAgentItemViewModel : ObservableObject
         if (!_suppressCallback) OnCliToggled?.Invoke(this, CliTarget.Claude, value);
         OnPropertyChanged(nameof(IsDeployed));
         OnPropertyChanged(nameof(IsDeployedLabel));
+        OnPropertyChanged(nameof(IsAllDeployed));
     }
 
     partial void OnIsCodexDeployedChanged(bool value)
@@ -60,6 +78,7 @@ public partial class DeployAgentItemViewModel : ObservableObject
         if (!_suppressCallback) OnCliToggled?.Invoke(this, CliTarget.Codex, value);
         OnPropertyChanged(nameof(IsDeployed));
         OnPropertyChanged(nameof(IsDeployedLabel));
+        OnPropertyChanged(nameof(IsAllDeployed));
     }
 
     partial void OnIsCopilotDeployedChanged(bool value)
@@ -67,6 +86,7 @@ public partial class DeployAgentItemViewModel : ObservableObject
         if (!_suppressCallback) OnCliToggled?.Invoke(this, CliTarget.Copilot, value);
         OnPropertyChanged(nameof(IsDeployed));
         OnPropertyChanged(nameof(IsDeployedLabel));
+        OnPropertyChanged(nameof(IsAllDeployed));
     }
 
     partial void OnIsGeminiDeployedChanged(bool value)
@@ -74,6 +94,7 @@ public partial class DeployAgentItemViewModel : ObservableObject
         if (!_suppressCallback) OnCliToggled?.Invoke(this, CliTarget.Gemini, value);
         OnPropertyChanged(nameof(IsDeployed));
         OnPropertyChanged(nameof(IsDeployedLabel));
+        OnPropertyChanged(nameof(IsAllDeployed));
     }
 }
 
@@ -94,6 +115,22 @@ public partial class DeployRuleItemViewModel : ObservableObject
     public bool IsDeployed => IsClaudeDeployed || IsCodexDeployed || IsCopilotDeployed || IsGeminiDeployed;
     public string IsDeployedLabel => IsDeployed ? "ON" : "--";
 
+    public bool? IsAllDeployed
+    {
+        get => IsClaudeDeployed && IsCodexDeployed && IsCopilotDeployed && IsGeminiDeployed ? true
+             : !IsClaudeDeployed && !IsCodexDeployed && !IsCopilotDeployed && !IsGeminiDeployed ? false
+             : (bool?)null;
+        set
+        {
+            var deploy = value == true;
+            IsClaudeDeployed = deploy;
+            IsCodexDeployed = deploy;
+            IsCopilotDeployed = deploy;
+            IsGeminiDeployed = deploy;
+            OnPropertyChanged();
+        }
+    }
+
     public DeployRuleItemViewModel(ContextRuleDefinition definition)
     {
         Definition = definition;
@@ -112,6 +149,7 @@ public partial class DeployRuleItemViewModel : ObservableObject
         _suppressCallback = false;
         OnPropertyChanged(nameof(IsDeployed));
         OnPropertyChanged(nameof(IsDeployedLabel));
+        OnPropertyChanged(nameof(IsAllDeployed));
     }
 
     partial void OnIsClaudeDeployedChanged(bool value)
@@ -119,6 +157,7 @@ public partial class DeployRuleItemViewModel : ObservableObject
         if (!_suppressCallback) OnCliToggled?.Invoke(this, CliTarget.Claude, value);
         OnPropertyChanged(nameof(IsDeployed));
         OnPropertyChanged(nameof(IsDeployedLabel));
+        OnPropertyChanged(nameof(IsAllDeployed));
     }
 
     partial void OnIsCodexDeployedChanged(bool value)
@@ -126,6 +165,7 @@ public partial class DeployRuleItemViewModel : ObservableObject
         if (!_suppressCallback) OnCliToggled?.Invoke(this, CliTarget.Codex, value);
         OnPropertyChanged(nameof(IsDeployed));
         OnPropertyChanged(nameof(IsDeployedLabel));
+        OnPropertyChanged(nameof(IsAllDeployed));
     }
 
     partial void OnIsCopilotDeployedChanged(bool value)
@@ -133,6 +173,7 @@ public partial class DeployRuleItemViewModel : ObservableObject
         if (!_suppressCallback) OnCliToggled?.Invoke(this, CliTarget.Copilot, value);
         OnPropertyChanged(nameof(IsDeployed));
         OnPropertyChanged(nameof(IsDeployedLabel));
+        OnPropertyChanged(nameof(IsAllDeployed));
     }
 
     partial void OnIsGeminiDeployedChanged(bool value)
@@ -140,6 +181,7 @@ public partial class DeployRuleItemViewModel : ObservableObject
         if (!_suppressCallback) OnCliToggled?.Invoke(this, CliTarget.Gemini, value);
         OnPropertyChanged(nameof(IsDeployed));
         OnPropertyChanged(nameof(IsDeployedLabel));
+        OnPropertyChanged(nameof(IsAllDeployed));
     }
 }
 
@@ -519,6 +561,9 @@ public partial class AgentHubViewModel : ObservableObject
     }
 
     // ── Agent CRUD ────────────────────────────────────────────────────────
+
+    public (string Body, string ExtraFrontmatter) GetAgentContentForEdit(AgentDefinition def)
+        => _agentHubService.GetAgentContentForEdit(def);
 
     public void SaveAgent(
         string? existingId,
