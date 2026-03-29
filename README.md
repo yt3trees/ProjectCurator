@@ -47,6 +47,7 @@ flowchart TD
     U -->|"Manage folders"| SU["🧰 Setup"]
     U -->|"Review activity"| TL["🕒 Timeline"]
     U -->|"Scan repositories"| GR["🌿 Git Repos"]
+    U -->|"Manage sub-agents/rules"| AH["🧩 Agent Hub"]
     U -->|"Configure paths / hotkey / theme"| ST["⚙️ Settings"]
 
     GR -->|"Show uncommitted changes"| DB

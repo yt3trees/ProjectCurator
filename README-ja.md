@@ -44,6 +44,7 @@ flowchart TD
     U -->|"フォルダ管理"| SU["🧰 Setup"]
     U -->|"変更履歴を見る"| TL["🕒 Timeline"]
     U -->|"リポジトリを探索"| GR["🌿 Git Repos"]
+    U -->|"SubAgent/Ruleを管理"| AH["🧩 Agent Hub"]
     U -->|"パス・ホットキー・テーマ設定"| ST["⚙️ Settings"]
 
     GR -->|"未コミット変更を表示"| DB
