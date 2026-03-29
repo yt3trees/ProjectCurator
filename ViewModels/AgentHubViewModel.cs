@@ -518,20 +518,6 @@ public partial class AgentHubViewModel : ObservableObject
         LoadDeploymentState();
     }
 
-    public void ImportAgentMarkdown(string sourceMarkdownPath)
-    {
-        _agentHubService.ImportAgentFromMarkdown(sourceMarkdownPath);
-        LoadLibrary();
-        LoadDeploymentState();
-    }
-
-    public void ImportRuleMarkdown(string sourceMarkdownPath)
-    {
-        _agentHubService.ImportRuleFromMarkdown(sourceMarkdownPath);
-        LoadLibrary();
-        LoadDeploymentState();
-    }
-
     // ── Agent CRUD ────────────────────────────────────────────────────────
 
     public void SaveAgent(

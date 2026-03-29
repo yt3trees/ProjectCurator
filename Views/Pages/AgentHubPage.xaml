@@ -107,6 +107,7 @@
                                  ItemsSource="{Binding AgentDefinitions}"
                                  SelectedItem="{Binding SelectedAgentDefinition}"
                                  SelectionChanged="OnAgentSelectionChanged"
+                                 MouseDoubleClick="OnAgentListDoubleClick"
                                  ItemContainerStyle="{StaticResource AgentHubListItemStyle}"
                                  Background="Transparent"
                                  BorderThickness="0"
@@ -148,6 +149,7 @@
                                  ItemsSource="{Binding RuleDefinitions}"
                                  SelectedItem="{Binding SelectedRuleDefinition}"
                                  SelectionChanged="OnRuleSelectionChanged"
+                                 MouseDoubleClick="OnRuleListDoubleClick"
                                  ItemContainerStyle="{StaticResource AgentHubListItemStyle}"
                                  Background="Transparent"
                                  BorderThickness="0"
@@ -526,18 +528,7 @@
                                Appearance="Secondary">
                         <ui:SymbolIcon Symbol="ArrowSync20" FontSize="18" Filled="False"/>
                     </ui:Button>
-                    <ui:Button Padding="6,4" Margin="0,0,6,0"
-                               ToolTip="Import agent markdown"
-                               Click="OnImportAgentMarkdownClick"
-                               Appearance="Secondary">
-                        <ui:SymbolIcon Symbol="BotAdd20" FontSize="18" Filled="False"/>
-                    </ui:Button>
-                    <ui:Button Padding="6,4" Margin="0,0,6,0"
-                               ToolTip="Import rule markdown"
-                               Click="OnImportRuleMarkdownClick"
-                               Appearance="Secondary">
-                        <ui:SymbolIcon Symbol="DocumentAdd20" FontSize="18" Filled="False"/>
-                    </ui:Button>
+
                     <ui:Button Padding="6,4" Margin="0,0,6,0"
                                ToolTip="Import library ZIP"
                                Click="OnImportLibraryZipClick"

@@ -76,7 +76,7 @@ public class AgentHubService
         var mdPath = Path.Combine(AgentsDir, def.ContentFile);
 
         File.WriteAllText(jsonPath, JsonSerializer.Serialize(def, JsonOptions), new UTF8Encoding(false));
-        File.WriteAllText(mdPath, content, new UTF8Encoding(false));
+        File.WriteAllText(mdPath, EmbedFrontmatter(def, content), new UTF8Encoding(false));
     }
 
     public void DeleteAgentDefinition(string agentId)
@@ -197,31 +197,26 @@ public class AgentHubService
         }
     }
 
-    public AgentDefinition ImportAgentFromMarkdown(string sourceMarkdownPath)
+
+    private static string EmbedFrontmatter(AgentDefinition def, string content)
     {
-        var name = Path.GetFileNameWithoutExtension(sourceMarkdownPath);
-        var content = File.ReadAllText(sourceMarkdownPath, new UTF8Encoding(false));
-        var def = new AgentDefinition
-        {
-            Name = name,
-            Description = $"Imported from {Path.GetFileName(sourceMarkdownPath)}"
-        };
-        SaveAgentDefinition(def, content);
-        return def;
+        var trimmed = content.TrimStart();
+        if (trimmed.StartsWith("---\n", StringComparison.Ordinal) ||
+            trimmed.StartsWith("---\r\n", StringComparison.Ordinal))
+            return content; // already has frontmatter
+
+        var name = (string.IsNullOrWhiteSpace(def.Id) ? def.Name : def.Id)
+            .Replace("\\", "\\\\").Replace("\"", "\\\"");
+        var description = def.Description.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        var extraLines = (def.FrontmatterClaude ?? "")
+            .Replace("\r\n", "\n").Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => !string.IsNullOrWhiteSpace(l) && l != "---")
+            .ToList();
+        var extraBlock = extraLines.Count > 0 ? "\n" + string.Join("\n", extraLines) : "";
+        return $"---\nname: \"{name}\"\ndescription: \"{description}\"{extraBlock}\n---\n\n{trimmed}";
     }
 
-    public ContextRuleDefinition ImportRuleFromMarkdown(string sourceMarkdownPath)
-    {
-        var name = Path.GetFileNameWithoutExtension(sourceMarkdownPath);
-        var content = File.ReadAllText(sourceMarkdownPath, new UTF8Encoding(false));
-        var def = new ContextRuleDefinition
-        {
-            Name = name,
-            Description = $"Imported from {Path.GetFileName(sourceMarkdownPath)}"
-        };
-        SaveRuleDefinition(def, content);
-        return def;
-    }
 
     // ─── Helpers ──────────────────────────────────────────────────────────
 

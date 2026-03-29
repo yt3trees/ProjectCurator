@@ -100,6 +100,20 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
             result.FrontmatterGemini);
     }
 
+    private void OnAgentListDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject src &&
+            ItemsControl.ContainerFromElement(AgentListBox, src) is ListBoxItem)
+            OnEditAgentClick(sender, e);
+    }
+
+    private void OnRuleListDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject src &&
+            ItemsControl.ContainerFromElement(RuleListBox, src) is ListBoxItem)
+            OnEditRuleClick(sender, e);
+    }
+
     private void OnEditSelectedClick(object sender, RoutedEventArgs e)
     {
         if (ViewModel.SelectedAgentDefinition != null)
@@ -168,45 +182,6 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
 
     // ─── Other buttons ────────────────────────────────────────────────────
 
-    private void OnImportAgentMarkdownClick(object sender, RoutedEventArgs e)
-    {
-        var dialog = new Win32OpenFileDialog
-        {
-            Filter = "Markdown (*.md)|*.md|All files (*.*)|*.*",
-            CheckFileExists = true,
-            Multiselect = false
-        };
-        if (dialog.ShowDialog() != true) return;
-        try
-        {
-            ViewModel.ImportAgentMarkdown(dialog.FileName);
-            ViewModel.StatusMessage = $"Imported agent from '{Path.GetFileName(dialog.FileName)}'";
-        }
-        catch (Exception ex)
-        {
-            ViewModel.StatusMessage = $"Import agent error: {ex.Message}";
-        }
-    }
-
-    private void OnImportRuleMarkdownClick(object sender, RoutedEventArgs e)
-    {
-        var dialog = new Win32OpenFileDialog
-        {
-            Filter = "Markdown (*.md)|*.md|All files (*.*)|*.*",
-            CheckFileExists = true,
-            Multiselect = false
-        };
-        if (dialog.ShowDialog() != true) return;
-        try
-        {
-            ViewModel.ImportRuleMarkdown(dialog.FileName);
-            ViewModel.StatusMessage = $"Imported rule from '{Path.GetFileName(dialog.FileName)}'";
-        }
-        catch (Exception ex)
-        {
-            ViewModel.StatusMessage = $"Import rule error: {ex.Message}";
-        }
-    }
 
     private void OnExportLibraryZipClick(object sender, RoutedEventArgs e)
     {
@@ -251,21 +226,12 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
 
     private async void OnAiBuilderClick(object sender, RoutedEventArgs e)
     {
-        var purpose = await ShowAiBuilderInputDialogAsync();
-        if (string.IsNullOrWhiteSpace(purpose)) return;
+        var ai = await ShowAiBuilderInputDialogAsync();
+        if (ai == null) return;
 
-        ViewModel.StatusMessage = "AI Builder: generating...";
         try
         {
-            var systemPrompt =
-                "Generate a sub-agent system prompt and trigger conditions.\n" +
-                "IMPORTANT: Do NOT include any folder paths, directory restrictions,\n" +
-                "or working directory references. Define only the role, skills,\n" +
-                "and best practices.\n" +
-                "Output ONLY the Markdown content for the agent definition, no preamble.";
-
-            var generated = await _llmClientService.ChatCompletionAsync(systemPrompt, purpose, CancellationToken.None);
-            var result = await ShowItemDialogAsync("AI Builder - Review & Save", "", "", generated, "", "", "", "", true);
+            var result = await ShowItemDialogAsync("AI Builder - Review & Save", ai.Value.Name, ai.Value.Description, ai.Value.Content, "", "", "", "", true);
             if (result == null) { ViewModel.StatusMessage = "AI Builder cancelled"; return; }
             ViewModel.SaveAgent(
                 null,
@@ -729,9 +695,9 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         return confirmed;
     }
 
-    private Task<string?> ShowAiBuilderInputDialogAsync()
+    private Task<(string Name, string Description, string Content)?> ShowAiBuilderInputDialogAsync()
     {
-        var tcs = new TaskCompletionSource<string?>();
+        var tcs = new TaskCompletionSource<(string Name, string Description, string Content)?>();
 
         var appRes = Application.Current.Resources;
         var surface = (MediaBrush)appRes["AppSurface0"];
@@ -769,6 +735,36 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         contentPanel.Children.Add(label);
         contentPanel.Children.Add(inputBox);
 
+        var loadingPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(16, 0, 16, 8),
+            Visibility = Visibility.Collapsed
+        };
+        loadingPanel.Children.Add(new Wpf.Ui.Controls.ProgressRing
+        {
+            IsIndeterminate = true,
+            Width = 16,
+            Height = 16,
+            Margin = new Thickness(0, 0, 8, 0)
+        });
+        loadingPanel.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = "Generating...",
+            Foreground = subtext,
+            FontSize = 11,
+            VerticalAlignment = System.Windows.VerticalAlignment.Center
+        });
+
+        var errorText = new System.Windows.Controls.TextBlock
+        {
+            Foreground = MediaBrushes.IndianRed,
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(16, 0, 16, 8),
+            Visibility = Visibility.Collapsed
+        };
+
         var generateBtn = new Wpf.Ui.Controls.Button
         {
             Content = "Generate",
@@ -798,11 +794,17 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetRow(titleBar, 0);
         Grid.SetRow(contentPanel, 1);
-        Grid.SetRow(footer, 2);
+        Grid.SetRow(loadingPanel, 2);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(footer, 4);
         root.Children.Add(titleBar);
         root.Children.Add(contentPanel);
+        root.Children.Add(loadingPanel);
+        root.Children.Add(errorText);
         root.Children.Add(footer);
 
         var owner = Window.GetWindow(this);
@@ -831,14 +833,64 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
                 UseAeroCaptionButtons = false
             });
 
-        string? result = null;
+        (string Name, string Description, string Content)? result = null;
         titleBar.MouseLeftButtonDown += (_, ev) =>
         {
             if (ev.LeftButton == MouseButtonState.Pressed) dialog.DragMove();
         };
-        generateBtn.Click += (_, _) =>
+        inputBox.KeyDown += (_, ev) =>
         {
-            if (!string.IsNullOrWhiteSpace(inputBox.Text)) { result = inputBox.Text.Trim(); dialog.Close(); }
+            if (ev.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                generateBtn.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        };
+        generateBtn.Click += async (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(inputBox.Text)) return;
+
+            inputBox.IsEnabled = false;
+            generateBtn.IsEnabled = false;
+            cancelBtn.IsEnabled = false;
+            errorText.Visibility = Visibility.Collapsed;
+            loadingPanel.Visibility = Visibility.Visible;
+
+            try
+            {
+                var systemPrompt =
+                    "Generate a sub-agent definition based on the user's description.\n" +
+                    "IMPORTANT: Do NOT include any folder paths, directory restrictions,\n" +
+                    "or working directory references. Define only the role, skills, and best practices.\n\n" +
+                    "Respond with a single JSON object (no markdown fences) with exactly these fields:\n" +
+                    "- \"name\": concise slug in lowercase-with-hyphens (e.g. \"strict-csharp-reviewer\")\n" +
+                    "- \"description\": one sentence describing when to use this agent\n" +
+                    "- \"content\": the full Markdown agent definition (role, trigger conditions, skills, best practices)";
+                var raw = await _llmClientService.ChatCompletionAsync(systemPrompt, inputBox.Text.Trim(), CancellationToken.None);
+
+                var json = raw.Trim();
+                if (json.StartsWith("```"))
+                {
+                    var firstNewline = json.IndexOf('\n');
+                    var lastFence = json.LastIndexOf("```");
+                    if (firstNewline >= 0 && lastFence > firstNewline)
+                        json = json[(firstNewline + 1)..lastFence].Trim();
+                }
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                result = (
+                    root.GetProperty("name").GetString() ?? "",
+                    root.GetProperty("description").GetString() ?? "",
+                    root.GetProperty("content").GetString() ?? ""
+                );
+                dialog.Close();
+            }
+            catch (Exception ex)
+            {
+                errorText.Text = ex.Message;
+                errorText.Visibility = Visibility.Visible;
+                loadingPanel.Visibility = Visibility.Collapsed;
+                inputBox.IsEnabled = true;
+                generateBtn.IsEnabled = true;
+                cancelBtn.IsEnabled = true;
+            }
         };
         closeBtn.Click += (_, _) => dialog.Close();
         cancelBtn.Click += (_, _) => dialog.Close();
