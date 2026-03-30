@@ -150,7 +150,7 @@ public class ContextCompressionLayerService
         logs.Add($"[DEBUG] boxProjectRoot={boxProjectRoot}");
         if (skillFolders.Length > 0)
         {
-            foreach (var cli in new[] { ".claude", ".codex", ".gemini" })
+            foreach (var cli in new[] { ".claude", ".codex", ".gemini", ".github" })
             {
                 var dstSkillsDir = Path.Combine(boxProjectRoot, cli, "skills");
 
@@ -200,12 +200,13 @@ public class ContextCompressionLayerService
                     }
                 }
             }
+
             return;
         }
 
         logs.Add("[INFO] Skills folder on disk was not found or empty. Using embedded skill assets.");
         logs.Add($"[DEBUG] boxProjectRoot={boxProjectRoot}");
-        foreach (var cli in new[] { ".claude", ".codex", ".gemini" })
+        foreach (var cli in new[] { ".claude", ".codex", ".gemini", ".github" })
         {
             var dstSkillsDir = Path.Combine(boxProjectRoot, cli, "skills");
 
@@ -258,7 +259,7 @@ public class ContextCompressionLayerService
 
     private static void SetupCliSkillsJunctions(string localProjectRoot, string boxProjectRoot, bool force, List<string> logs)
     {
-        foreach (var cli in new[] { ".claude", ".codex", ".gemini" })
+        foreach (var cli in new[] { ".claude", ".codex", ".gemini", ".github" })
         {
             var localPath = Path.Combine(localProjectRoot, cli);
             var boxPath = Path.Combine(boxProjectRoot, cli);

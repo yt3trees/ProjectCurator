@@ -261,6 +261,7 @@ Local Projects Root/
     ├── .claude/            ← junction → Cloud Sync Root/MyProject/.claude/
     ├── .codex/             ← junction → Cloud Sync Root/MyProject/.codex/
     ├── .gemini/            ← junction → Cloud Sync Root/MyProject/.gemini/
+    ├── .github/            ← junction → Cloud Sync Root/MyProject/.github/
     ├── AGENTS.md                      # AI agent instructions (copied from Cloud)
     └── CLAUDE.md                      # Points to @AGENTS.md
 
@@ -273,6 +274,7 @@ Cloud Sync Root/
     ├── .claude/skills/project-curator/  # AI skill definitions
     ├── .codex/skills/project-curator/
     ├── .gemini/skills/project-curator/
+    ├── .github/skills/project-curator/
     ├── .git/forCodex                  # Marker for Codex CLI discovery
     ├── AGENTS.md                      # AI agent instructions (source of truth)
     ├── CLAUDE.md                      # Points to @AGENTS.md
@@ -489,7 +491,7 @@ The `Agent Hub` page is a control center for deploying sub-agent and context-rul
   - Copilot: `.github/agents/<name>.md`
   - Gemini: `.gemini/agents/<name>.md`
 - Context rules are appended/removed with `<!-- [AgentHub:<id>] -->` markers in CLI-specific files (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, `GEMINI.md`) so existing content is preserved.
-- For `.claude` / `.codex` / `.gemini`, deployment is junction-aware and writes to the junction target when present. `.github` is always written to the local project path.
+- For `.claude` / `.codex` / `.gemini` / `.github`, deployment is junction-aware and writes to the junction target when present.
 - Includes status sync, target subfolder deployment, batch deploy to all projects, library ZIP import/export, and AI Builder (enabled only when AI Features is on).
 - AI Builder generates either an Agent or a Context Rule definition from a free-text prompt; Ctrl+Enter triggers Generate, and Name/Description are auto-filled by the AI.
 - Each row in the deployment matrix has an `All` checkbox to toggle all CLI targets at once.
@@ -502,6 +504,7 @@ ProjectCurator automatically deploys the `/project-curator` skill when creating 
 - `.claude/skills/project-curator/` for Claude Code
 - `.codex/skills/project-curator/` for Codex CLI
 - `.gemini/skills/project-curator/` for Gemini CLI
+- `.github/skills/project-curator/` for GitHub Copilot
 
 Skills are sourced from the app's embedded assets and kept in sync with the shared folder via junctions. Use the `Overwrite existing skills` option in Setup to force re-deploy.
 
@@ -704,7 +707,7 @@ New Project tab:
 - Category: `project (time-bound)` or `domain`
 - ExternalSharePath (optional): custom path per files for shared data
 - Also run AI Context Setup: when checked, junctions for `_ai-context/context/` and `_ai-context/obsidian_notes/` are created automatically
-- Overwrite existing skills (-Force): re-deploys `.claude/skills/` and `.codex/skills/` even if they already exist
+- Overwrite existing skills (-Force): re-deploys `.claude/skills/`, `.codex/skills/`, `.gemini/skills/`, and `.github/skills/` even if they already exist
 - Setup Project button creates the folder structure, junctions, and skill files
 - Output area shows the log of operations performed
 
