@@ -152,7 +152,7 @@ public class AsanaSyncService
                 if (task.NumSubtasks > 0)
                     task.SubtasksData = await FetchSubtasksAsync(task.Gid, token, Log, ct);
 
-                var anken = GetCustomFieldValue(task, "案件");
+                var anken = GetCustomFieldValue(task, "Project");
                 var matched = false;
 
                 if (!string.IsNullOrWhiteSpace(anken))
@@ -895,7 +895,7 @@ public class AsanaSyncService
         var check = task.Completed ? "x" : " ";
         var due = string.IsNullOrWhiteSpace(task.DueOn) ? "" : $" (Due: {task.DueOn})";
         var roleTag = string.IsNullOrWhiteSpace(role) ? "" : $"[{role}] ";
-        var anken = GetCustomFieldValue(task, "案件");
+        var anken = GetCustomFieldValue(task, "Project");
         var ankenTag = string.IsNullOrWhiteSpace(anken) ? "" : $"[{anken}] ";
         var priority = !task.Completed ? GetCustomFieldValue(task, "優先度") : null;
         var priorityTag = string.IsNullOrWhiteSpace(priority) ? "" : $" [{priority}]";

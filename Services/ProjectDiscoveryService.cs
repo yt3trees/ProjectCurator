@@ -222,10 +222,10 @@ public class ProjectDiscoveryService
 
             EnsureAiContextCoreFiles(obsidianAiContext, projectName, tier, result.Logs);
 
-            CreateJunctionInternal(Path.Combine(docRoot, "shared"), boxShared);
+            EnsureJunctionWithLog(Path.Combine(docRoot, "shared"), boxShared, "shared", result.Logs);
             SetupExternalSharedPaths(docRoot, boxShared, externalSharedPaths, result.Logs);
-            CreateJunctionInternal(Path.Combine(docRoot, "_ai-context", "obsidian_notes"), obsidianProject);
-            CreateJunctionInternal(Path.Combine(docRoot, "_ai-context", "context"), Path.Combine(obsidianProject, "ai-context"));
+            EnsureJunctionWithLog(Path.Combine(docRoot, "_ai-context", "obsidian_notes"), obsidianProject, "_ai-context/obsidian_notes", result.Logs);
+            EnsureJunctionWithLog(Path.Combine(docRoot, "_ai-context", "context"), Path.Combine(obsidianProject, "ai-context"), "_ai-context/context", result.Logs);
 
             // AGENTS.md / CLAUDE.md
             CreateAiInstructionFiles(projectName, docRoot, boxShared, result.Logs);
@@ -320,13 +320,11 @@ public class ProjectDiscoveryService
             }
             else if (Directory.Exists(expandedPath))
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c mklink /j \"{linkPath}\" \"{expandedPath}\"",
-                    CreateNoWindow = true, UseShellExecute = false
-                })?.WaitForExit();
-                logs.Add($"  Created: external_shared/{folderName}/ -> {expandedPath}");
+                var created = TryCreateJunction(linkPath, expandedPath);
+                if (created.Success)
+                    logs.Add($"  Created: external_shared/{folderName}/ -> {expandedPath}");
+                else
+                    logs.Add($"  [WARN] Failed to create external_shared/{folderName}/ ({created.Reason})");
             }
             else
             {
@@ -481,12 +479,76 @@ public class ProjectDiscoveryService
     private void CreateJunctionInternal(string linkPath, string targetPath)
     {
         if (!Directory.Exists(targetPath) || Directory.Exists(linkPath)) return;
-        Process.Start(new ProcessStartInfo
+        _ = TryCreateJunction(linkPath, targetPath);
+    }
+
+    private static void EnsureJunctionWithLog(string linkPath, string targetPath, string label, List<string> logs)
+    {
+        if (!Directory.Exists(targetPath))
         {
-            FileName = "cmd.exe",
-            Arguments = $"/c mklink /j \"{linkPath}\" \"{targetPath}\"",
-            CreateNoWindow = true, UseShellExecute = false
-        })?.WaitForExit();
+            logs.Add($"  [WARN] {label} junction target is missing: {targetPath}");
+            return;
+        }
+
+        if (Directory.Exists(linkPath))
+        {
+            var existing = new DirectoryInfo(linkPath);
+            if ((existing.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                logs.Add($"  [SKIP] {label} junction already exists.");
+            }
+            else
+            {
+                logs.Add($"  [WARN] {label} exists but is not a junction: {linkPath}");
+            }
+            return;
+        }
+
+        var creation = TryCreateJunction(linkPath, targetPath);
+        if (creation.Success)
+        {
+            logs.Add($"  Created junction: {label} -> {targetPath}");
+            return;
+        }
+
+        var reason = string.IsNullOrWhiteSpace(creation.Reason) ? "unknown error" : creation.Reason;
+        logs.Add($"  [ERROR] Failed to create junction: {label} -> {targetPath} ({reason})");
+    }
+
+    private static (bool Success, string Reason) TryCreateJunction(string linkPath, string targetPath)
+    {
+        static string EscapeSingleQuotes(string value) => value.Replace("'", "''");
+
+        var psCommand = $"New-Item -ItemType Junction -Path '{EscapeSingleQuotes(linkPath)}' -Target '{EscapeSingleQuotes(targetPath)}' -Force | Out-Null";
+        var encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(psCommand));
+
+        var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = $"-NonInteractive -NoProfile -EncodedCommand {encoded}",
+            CreateNoWindow = true,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        });
+
+        if (process == null)
+        {
+            return (false, "failed to start PowerShell process");
+        }
+
+        process.WaitForExit();
+        var stdout = process.StandardOutput.ReadToEnd().Trim();
+        var stderr = process.StandardError.ReadToEnd().Trim();
+        var created = Directory.Exists(linkPath) && (new DirectoryInfo(linkPath).Attributes & FileAttributes.ReparsePoint) != 0;
+
+        if (process.ExitCode == 0 && created)
+        {
+            return (true, "");
+        }
+
+        var reason = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
+        return (false, reason);
     }
 
     private void MoveFolderInternal(string src, string dst, List<string> logs)
