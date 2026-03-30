@@ -375,8 +375,16 @@ public class AgentDeploymentService
             lines.Add(line);
         }
 
-        lines.Add($"developer_instructions = \"\"\"\n{content.Trim()}\n\"\"\"");
+        var body = StripYamlFrontmatter(content);
+        lines.Add($"developer_instructions = \"\"\"\n{body.Trim()}\n\"\"\"");
         return string.Join("\n", lines) + "\n";
+    }
+
+    private static string StripYamlFrontmatter(string content)
+    {
+        var trimmed = content.TrimStart();
+        var match = Regex.Match(trimmed, @"\A---\r?\n[\s\S]*?\r?\n---\r?\n?", RegexOptions.CultureInvariant);
+        return match.Success ? trimmed[match.Length..] : content;
     }
 
     private static string EscapeYamlScalar(string value)
