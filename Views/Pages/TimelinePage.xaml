@@ -90,6 +90,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Grid.Column="0"
@@ -150,6 +151,38 @@
                           SelectedItem="{Binding SelectedGraphScope}"
                           Background="{DynamicResource AppSurface1}"
                           Foreground="{DynamicResource AppText}"/>
+
+                <ui:Button Grid.Column="7"
+                           Margin="8,0,0,0" Height="34" Padding="8,0"
+                           ToolTip="Toggle hidden projects"
+                           Click="OnToggleShowHidden">
+                    <ui:Button.Style>
+                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                            <Setter Property="Appearance" Value="Secondary"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowHidden}" Value="True">
+                                    <Setter Property="Appearance" Value="Primary"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ui:Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Width="14" Height="14" VerticalAlignment="Center">
+                            <ui:SymbolIcon.Style>
+                                <Style TargetType="ui:SymbolIcon">
+                                    <Setter Property="Symbol" Value="EyeOff24"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowHidden}" Value="True">
+                                            <Setter Property="Symbol" Value="Eye24"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:SymbolIcon.Style>
+                        </ui:SymbolIcon>
+                        <TextBlock Text="{Binding HiddenCount}"
+                                   Margin="4,0,0,0" VerticalAlignment="Center" FontSize="12"/>
+                    </StackPanel>
+                </ui:Button>
             </Grid>
         </Border>
 

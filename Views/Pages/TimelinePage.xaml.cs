@@ -93,6 +93,9 @@ public partial class TimelinePage : WpfUserControl, INavigableView<TimelineViewM
             ViewModel.OpenHeatmapCell(cell);
     }
 
+    private void OnToggleShowHidden(object sender, RoutedEventArgs e)
+        => ViewModel.ShowHidden = !ViewModel.ShowHidden;
+
     private void OnHeatmapBodyPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (sender is not ScrollViewer scrollViewer)

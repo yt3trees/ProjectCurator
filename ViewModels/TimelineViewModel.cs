@@ -60,9 +60,17 @@ public class TimelineHeatmapRowItem
 public partial class TimelineViewModel : ObservableObject
 {
     private readonly ProjectDiscoveryService _discoveryService;
+    private readonly ConfigService _configService;
+    private List<ProjectInfo> _allProjects = [];
+    private List<string> _hiddenKeys = [];
 
     [ObservableProperty]
     private ObservableCollection<ProjectInfo> projects = [];
+
+    [ObservableProperty]
+    private bool showHidden = false;
+
+    public int HiddenCount => _allProjects.Count(p => _hiddenKeys.Contains(p.HiddenKey));
 
     [ObservableProperty]
     private ProjectInfo? selectedProject;
@@ -99,9 +107,10 @@ public partial class TimelineViewModel : ObservableObject
     /// <summary>Dashboard からジャンプ時のターゲットキー (InitAsync後にSelectedProjectへ反映)</summary>
     public string? NavigateToProjectKey { get; set; }
 
-    public TimelineViewModel(ProjectDiscoveryService discoveryService)
+    public TimelineViewModel(ProjectDiscoveryService discoveryService, ConfigService configService)
     {
         _discoveryService = discoveryService;
+        _configService = configService;
     }
 
     /// <summary>ページ表示時に呼ぶ。プロジェクトリストを読み込む。</summary>
@@ -111,9 +120,10 @@ public partial class TimelineViewModel : ObservableObject
         try
         {
             var infos = await Task.Run(() => _discoveryService.GetProjectInfoList());
-            Projects.Clear();
-            foreach (var p in infos)
-                Projects.Add(p);
+            _hiddenKeys = _configService.LoadHiddenProjects();
+            _allProjects = infos;
+            ApplyProjectFilter();
+            OnPropertyChanged(nameof(HiddenCount));
         }
         catch (Exception ex)
         {
@@ -125,6 +135,23 @@ public partial class TimelineViewModel : ObservableObject
         }
 
         await LoadHeatmapAsync();
+    }
+
+    partial void OnShowHiddenChanged(bool value)
+    {
+        ApplyProjectFilter();
+        _ = LoadHeatmapAsync();
+    }
+
+    private void ApplyProjectFilter()
+    {
+        var current = SelectedProject?.HiddenKey;
+        var src = ShowHidden ? _allProjects : _allProjects.Where(p => !_hiddenKeys.Contains(p.HiddenKey));
+        Projects.Clear();
+        foreach (var p in src) Projects.Add(p);
+        // 選択中プロジェクトがフィルタで消えた場合は選択解除
+        if (current != null && !Projects.Any(p => p.HiddenKey == current))
+            SelectedProject = null;
     }
 
     partial void OnSelectedProjectChanged(ProjectInfo? value)
@@ -424,7 +451,6 @@ public partial class TimelineViewModel : ObservableObject
 
         var rows = scopeProjects
             .Where(p => projectsWithEntries.Contains(p.HiddenKey))
-            .OrderBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
             .Select(project =>
             {
                 var row = new TimelineHeatmapRowItem

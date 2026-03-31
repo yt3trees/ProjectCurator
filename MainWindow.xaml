@@ -19,8 +19,8 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- タイトルバー (移動・最小化・最大化・閉じる) -->
-        <ui:TitleBar x:Name="RootTitleBar" Title="ProjectCurator" Grid.Row="0" />
+        <!-- タイトルバー (移動・最大化・閉じる) -->
+        <ui:TitleBar x:Name="RootTitleBar" Title="ProjectCurator" ShowMinimize="False" Grid.Row="0" />
 
         <ui:NavigationView x:Name="RootNavigation"
             Grid.Row="1"

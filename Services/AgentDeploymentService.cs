@@ -159,12 +159,97 @@ public class AgentDeploymentService
         return true;
     }
 
+    // ─── Skill Deploy/Undeploy ────────────────────────────────────────────
+
+    public void DeploySkill(ProjectInfo project, string targetSubPath, SkillDefinition def, CliTarget cli)
+    {
+        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
+        var targetSkillDir = ResolveSkillWriteDir(project.Path, normalizedSubPath, cli, def.Id);
+        try
+        {
+            CopyDirectory(def.ContentDirectory, targetSkillDir);
+            Debug.WriteLine($"[SkillDeploy] '{def.Name}' → {targetSkillDir}");
+            UpdateSkillState(project.Name, normalizedSubPath, def.Id, cli, deployed: true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SkillDeploy] Failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    public void UndeploySkill(ProjectInfo project, string targetSubPath, SkillDefinition def, CliTarget cli)
+    {
+        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
+        var targetSkillDir = ResolveSkillWriteDir(project.Path, normalizedSubPath, cli, def.Id);
+        try
+        {
+            if (Directory.Exists(targetSkillDir))
+            {
+                Directory.Delete(targetSkillDir, recursive: true);
+                Debug.WriteLine($"[SkillUndeploy] '{def.Name}' ← {targetSkillDir}");
+            }
+            UpdateSkillState(project.Name, normalizedSubPath, def.Id, cli, deployed: false);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SkillUndeploy] Failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    public bool IsSkillDeployed(ProjectInfo project, string targetSubPath, SkillDefinition def, CliTarget cli)
+    {
+        var skillDir = ResolveSkillWriteDir(project.Path, NormalizeTargetSubPath(targetSubPath), cli, def.Id);
+        return Directory.Exists(skillDir) && File.Exists(Path.Combine(skillDir, "SKILL.md"));
+    }
+
+    public string ResolveSkillWriteDir(string projectPath, string targetSubPath, CliTarget cli, string skillName)
+    {
+        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
+        var targetDir = string.IsNullOrEmpty(normalizedSubPath)
+            ? projectPath
+            : Path.Combine(projectPath, normalizedSubPath);
+
+        string skillsBaseDir;
+        if (cli == CliTarget.Copilot)
+        {
+            skillsBaseDir = Path.Combine(targetDir, ".github", "skills");
+        }
+        else
+        {
+            var cliDirName = cli switch
+            {
+                CliTarget.Claude => ".claude",
+                CliTarget.Codex => ".codex",
+                CliTarget.Gemini => ".gemini",
+                _ => ".claude"
+            };
+            var localCliDir = Path.Combine(targetDir, cliDirName);
+            var resolved = ResolveJunctionTarget(localCliDir);
+            skillsBaseDir = Path.Combine(resolved ?? localCliDir, "skills");
+        }
+
+        return Path.Combine(skillsBaseDir, skillName);
+    }
+
+    private static void CopyDirectory(string sourceDir, string targetDir)
+    {
+        if (!Directory.Exists(sourceDir)) return;
+        Directory.CreateDirectory(targetDir);
+        foreach (var file in Directory.GetFiles(sourceDir))
+            File.Copy(file, Path.Combine(targetDir, Path.GetFileName(file)), overwrite: true);
+        foreach (var subDir in Directory.GetDirectories(sourceDir))
+            CopyDirectory(subDir, Path.Combine(targetDir, Path.GetFileName(subDir)));
+    }
+
     // ─── State Sync ───────────────────────────────────────────────────────
 
     public void SyncDeploymentState(
         List<AgentDefinition> agentDefs,
         List<ContextRuleDefinition> ruleDefs,
-        List<ProjectInfo> projects)
+        List<ProjectInfo> projects,
+        List<SkillDefinition>? skillDefs = null)
     {
         var state = _configService.LoadAgentHubState();
         bool changed = false;
@@ -219,10 +304,43 @@ public class AgentDeploymentService
                 changed = true;
         }
 
+        var validSkills = new List<SkillDeployment>();
+        if (skillDefs != null)
+        {
+            foreach (var dep in state.SkillDeployments)
+            {
+                var project = projects.FirstOrDefault(p => p.Name == dep.ProjectName);
+                var skillDef = skillDefs.FirstOrDefault(s => s.Id == dep.SkillId);
+                if (project == null || skillDef == null) { changed = true; continue; }
+
+                var validClis = dep.CliTargets
+                    .Where(cli => IsSkillDeployed(project, dep.TargetSubPath, skillDef, cli))
+                    .ToList();
+
+                if (validClis.Count != dep.CliTargets.Count) changed = true;
+                if (validClis.Count > 0)
+                    validSkills.Add(new SkillDeployment
+                    {
+                        ProjectName = dep.ProjectName,
+                        TargetSubPath = dep.TargetSubPath,
+                        SkillId = dep.SkillId,
+                        CliTargets = validClis,
+                        DeployedAt = dep.DeployedAt
+                    });
+                else
+                    changed = true;
+            }
+        }
+        else
+        {
+            validSkills.AddRange(state.SkillDeployments);
+        }
+
         if (changed)
         {
             state.AgentDeployments = validAgents;
             state.RuleDeployments = validRules;
+            state.SkillDeployments = validSkills;
             _configService.SaveAgentHubState(state);
         }
     }
@@ -583,6 +701,40 @@ public class AgentDeploymentService
                 existing.CliTargets.Remove(cli);
                 if (existing.CliTargets.Count == 0)
                     state.RuleDeployments.Remove(existing);
+            }
+        }
+        _configService.SaveAgentHubState(state);
+    }
+
+    private void UpdateSkillState(string projectName, string targetSubPath, string skillId, CliTarget cli, bool deployed)
+    {
+        var state = _configService.LoadAgentHubState();
+        var existing = state.SkillDeployments
+            .FirstOrDefault(d => d.ProjectName == projectName
+                              && d.TargetSubPath == targetSubPath
+                              && d.SkillId == skillId);
+
+        if (deployed)
+        {
+            if (existing == null)
+                state.SkillDeployments.Add(new SkillDeployment
+                {
+                    ProjectName = projectName,
+                    TargetSubPath = targetSubPath,
+                    SkillId = skillId,
+                    CliTargets = [cli],
+                    DeployedAt = DateTimeOffset.Now
+                });
+            else if (!existing.CliTargets.Contains(cli))
+                existing.CliTargets.Add(cli);
+        }
+        else
+        {
+            if (existing != null)
+            {
+                existing.CliTargets.Remove(cli);
+                if (existing.CliTargets.Count == 0)
+                    state.SkillDeployments.Remove(existing);
             }
         }
         _configService.SaveAgentHubState(state);

@@ -54,8 +54,29 @@ public class RuleDeployment
     public DateTimeOffset DeployedAt { get; set; } = DateTimeOffset.Now;
 }
 
+public class SkillDefinition
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public bool IsBuiltIn { get; set; } = false;
+    public string ContentDirectory { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.Now;
+}
+
+public class SkillDeployment
+{
+    public string ProjectName { get; set; } = "";
+    public string TargetSubPath { get; set; } = "";
+    public string SkillId { get; set; } = "";
+    public List<CliTarget> CliTargets { get; set; } = [];
+    public DateTimeOffset DeployedAt { get; set; } = DateTimeOffset.Now;
+}
+
 public class AgentHubState
 {
     public List<AgentDeployment> AgentDeployments { get; set; } = [];
     public List<RuleDeployment> RuleDeployments { get; set; } = [];
+    public List<SkillDeployment> SkillDeployments { get; set; } = [];
 }

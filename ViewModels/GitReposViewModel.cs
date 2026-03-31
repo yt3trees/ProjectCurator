@@ -74,8 +74,10 @@ public partial class GitReposViewModel : ObservableObject
     public async Task InitAsync()
     {
         var infos = await Task.Run(() => _discoveryService.GetProjectInfoList());
+        var hiddenKeys = _configService.LoadHiddenProjects();
         Projects.Clear();
-        foreach (var p in infos) Projects.Add(p);
+        foreach (var p in infos.Where(p => !hiddenKeys.Contains(p.HiddenKey)))
+            Projects.Add(p);
     }
 
     // --- コマンド ---

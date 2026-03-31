@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.IO;
+using System.Text.RegularExpressions;
 using Wpf.Ui.Controls;
 using MediaBrush = System.Windows.Media.Brush;
 using MediaBrushes = System.Windows.Media.Brushes;
@@ -23,6 +25,8 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
     private readonly LlmClientService _llmClientService;
 
     private bool _isInitialized;
+    private System.Windows.Media.Brush? _tabActiveBrush;
+    private System.Windows.Media.Brush? _tabInactiveBrush;
 
     public AgentHubPage(AgentHubViewModel viewModel, LlmClientService llmClientService)
     {
@@ -37,8 +41,51 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         if (_isInitialized) return;
         _isInitialized = true;
 
-        ViewModel.LoadLibrary();
-        await ViewModel.LoadProjectsAsync();
+        var appRes = Application.Current.Resources;
+        _tabActiveBrush = appRes.Contains("AppSurface2") ? (System.Windows.Media.Brush)appRes["AppSurface2"] : System.Windows.Media.Brushes.Gray;
+        _tabInactiveBrush = System.Windows.Media.Brushes.Transparent;
+        UpdateTabButtonStyles();
+
+        await ViewModel.InitializeAsync();
+    }
+
+    // ─── Tab switching ────────────────────────────────────────────────────
+
+    private void OnAgentsTabClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.SelectedLibraryTab = ProjectCurator.ViewModels.LibraryTab.Agents;
+        UpdateTabButtonStyles();
+    }
+
+    private void OnRulesTabClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.SelectedLibraryTab = ProjectCurator.ViewModels.LibraryTab.Rules;
+        UpdateTabButtonStyles();
+    }
+
+    private void OnSkillsTabClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.SelectedLibraryTab = ProjectCurator.ViewModels.LibraryTab.Skills;
+        UpdateTabButtonStyles();
+    }
+
+    private void UpdateTabButtonStyles()
+    {
+        if (_tabActiveBrush == null) return;
+        var active = _tabActiveBrush;
+        var inactive = _tabInactiveBrush ?? System.Windows.Media.Brushes.Transparent;
+
+        AgentsTabButton.Background = ViewModel.IsAgentsTabSelected ? active : inactive;
+        RulesTabButton.Background = ViewModel.IsRulesTabSelected ? active : inactive;
+        SkillsTabButton.Background = ViewModel.IsSkillsTabSelected ? active : inactive;
+
+        var appRes = Application.Current.Resources;
+        var textBrush = appRes.Contains("AppText") ? (System.Windows.Media.Brush)appRes["AppText"] : System.Windows.Media.Brushes.White;
+        var subtextBrush = appRes.Contains("AppSubtext0") ? (System.Windows.Media.Brush)appRes["AppSubtext0"] : System.Windows.Media.Brushes.Gray;
+
+        AgentsTabButton.Foreground = ViewModel.IsAgentsTabSelected ? textBrush : subtextBrush;
+        RulesTabButton.Foreground = ViewModel.IsRulesTabSelected ? textBrush : subtextBrush;
+        SkillsTabButton.Foreground = ViewModel.IsSkillsTabSelected ? textBrush : subtextBrush;
     }
 
     // ─── Library list selection ───────────────────────────────────────────
@@ -46,13 +93,55 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
     private void OnAgentSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ViewModel.SelectedAgentDefinition != null)
+        {
             RuleListBox.UnselectAll();
+            SkillListBox.UnselectAll();
+        }
     }
 
     private void OnRuleSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ViewModel.SelectedRuleDefinition != null)
+        {
             AgentListBox.UnselectAll();
+            SkillListBox.UnselectAll();
+        }
+    }
+
+    // ─── Library list selection ───────────────────────────────────────────
+
+    private void OnSkillSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ViewModel.SelectedSkillDefinition != null)
+        {
+            AgentListBox.UnselectAll();
+            RuleListBox.UnselectAll();
+        }
+    }
+
+    private void OnSkillListDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject src &&
+            ItemsControl.ContainerFromElement(SkillListBox, src) is ListBoxItem)
+            OnEditSkillClick(sender, e);
+    }
+
+    // ─── + New unified button ─────────────────────────────────────────────
+
+    private void OnNewItemClick(object sender, RoutedEventArgs e)
+    {
+        switch (ViewModel.SelectedLibraryTab)
+        {
+            case ProjectCurator.ViewModels.LibraryTab.Agents:
+                OnNewAgentClick(sender, e);
+                break;
+            case ProjectCurator.ViewModels.LibraryTab.Rules:
+                OnNewRuleClick(sender, e);
+                break;
+            case ProjectCurator.ViewModels.LibraryTab.Skills:
+                OnNewSkillClick(sender, e);
+                break;
+        }
     }
 
     // ─── Agent CRUD buttons ───────────────────────────────────────────────
@@ -125,6 +214,12 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         if (ViewModel.SelectedRuleDefinition != null)
         {
             OnEditRuleClick(sender, e);
+            return;
+        }
+
+        if (ViewModel.SelectedSkillDefinition != null)
+        {
+            OnEditSkillClick(sender, e);
         }
     }
 
@@ -157,6 +252,12 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         if (ViewModel.SelectedRuleDefinition != null)
         {
             OnDeleteRuleClick(sender, e);
+            return;
+        }
+
+        if (ViewModel.SelectedSkillDefinition != null)
+        {
+            OnDeleteSkillClick(sender, e);
         }
     }
 
@@ -178,6 +279,372 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
 
         if (ShowConfirmDialog($"Delete rule '{def.Name}'?", "This cannot be undone."))
             ViewModel.DeleteRule(def.Id);
+    }
+
+    // ─── Skill CRUD buttons ───────────────────────────────────────────────
+
+    private async void OnNewSkillClick(object sender, RoutedEventArgs e)
+    {
+        var result = await ShowSkillDialogAsync("New Skill", "", "", "");
+        if (result == null) return;
+        ViewModel.SaveSkill(null, result.Value.Name, result.Value.Description, result.Value.Content);
+    }
+
+    private async void OnEditSkillClick(object sender, RoutedEventArgs e)
+    {
+        var def = ViewModel.SelectedSkillDefinition;
+        if (def == null) return;
+
+        var isReadOnly = def.IsBuiltIn;
+        var content = ViewModel.GetSkillContentForEdit(def);
+        var result = await ShowSkillDialogAsync(
+            isReadOnly ? "View Built-in Skill" : "Edit Skill",
+            def.Name,
+            def.Description,
+            content,
+            def.ContentDirectory,
+            isReadOnly);
+        if (result == null) return;
+        if (isReadOnly) return;
+        ViewModel.SaveSkill(def.Id, result.Value.Name, result.Value.Description, result.Value.Content);
+    }
+
+    private void OnDeleteSkillClick(object sender, RoutedEventArgs e)
+    {
+        var def = ViewModel.SelectedSkillDefinition;
+        if (def == null || def.IsBuiltIn) return;
+
+        if (ShowConfirmDialog($"Delete skill '{def.Name}'?", "This cannot be undone."))
+            ViewModel.DeleteSkill(def.Id);
+    }
+
+    // ─── Skill dialog ─────────────────────────────────────────────────────
+
+    private sealed record ParsedSkillMarkdown(
+        string Name,
+        string Description,
+        List<string> ParameterLines,
+        string Body);
+
+    private record struct SkillDialogResult(string Name, string Description, string Content);
+
+    private Task<SkillDialogResult?> ShowSkillDialogAsync(
+        string title,
+        string name,
+        string description,
+        string content,
+        string? skillFolderPath = null,
+        bool isReadOnly = false)
+    {
+        var tcs = new TaskCompletionSource<SkillDialogResult?>();
+        var parsed = ParseSkillMarkdown(content);
+        var effectiveName = string.IsNullOrWhiteSpace(parsed.Name) ? name : parsed.Name;
+        var effectiveDescription = string.IsNullOrWhiteSpace(parsed.Description) ? description : parsed.Description;
+        var effectiveParameters = string.Join(Environment.NewLine, parsed.ParameterLines);
+
+        var appRes = Application.Current.Resources;
+        var surface = (MediaBrush)appRes["AppSurface0"];
+        var surface1 = (MediaBrush)appRes["AppSurface1"];
+        var surface2 = (MediaBrush)appRes["AppSurface2"];
+        var text = (MediaBrush)appRes["AppText"];
+        var subtext = (MediaBrush)appRes["AppSubtext0"];
+        var accent = appRes.Contains("AppBlue") ? (MediaBrush)appRes["AppBlue"] : text;
+
+        var titleBar = BuildTitleBar(title, surface1, text, subtext, accent, out var closeBtn);
+
+        var nameLabel = new System.Windows.Controls.TextBlock { Text = "Name", Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 0, 0, 3) };
+        var nameBox = new System.Windows.Controls.TextBox
+        {
+            Text = effectiveName,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            Padding = new Thickness(6, 4, 6, 4),
+            Margin = new Thickness(0, 0, 0, 10),
+            IsReadOnly = isReadOnly
+        };
+
+        var descLabel = new System.Windows.Controls.TextBlock { Text = "Description", Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 0, 0, 3) };
+        var descBox = new System.Windows.Controls.TextBox
+        {
+            Text = effectiveDescription,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            Padding = new Thickness(6, 4, 6, 4),
+            Margin = new Thickness(0, 0, 0, 10),
+            IsReadOnly = isReadOnly
+        };
+
+        var parametersLabel = new System.Windows.Controls.TextBlock { Text = "Other Parameters", Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 0, 0, 3) };
+        var parametersBox = new System.Windows.Controls.TextBox
+        {
+            Text = effectiveParameters,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            Padding = new Thickness(6, 4, 6, 4),
+            Margin = new Thickness(0, 0, 0, 10),
+            TextWrapping = TextWrapping.NoWrap,
+            AcceptsReturn = true,
+            Height = 44,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            IsReadOnly = isReadOnly
+        };
+
+        var contentLabel = new System.Windows.Controls.TextBlock { Text = "SKILL.md content (body only)", Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 0, 0, 3) };
+        var contentBox = new System.Windows.Controls.TextBox
+        {
+            Text = parsed.Body.TrimStart('\r', '\n'),
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            FontSize = 12,
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            Padding = new Thickness(6, 4, 6, 4),
+            MinHeight = 200,
+            MaxHeight = 320,
+            TextWrapping = TextWrapping.Wrap,
+            AcceptsReturn = true,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            IsReadOnly = isReadOnly
+        };
+
+        var contentPanel = new StackPanel { Margin = new Thickness(16, 12, 16, 8) };
+        contentPanel.Children.Add(nameLabel);
+        contentPanel.Children.Add(nameBox);
+        contentPanel.Children.Add(descLabel);
+        contentPanel.Children.Add(descBox);
+        contentPanel.Children.Add(parametersLabel);
+        contentPanel.Children.Add(parametersBox);
+        contentPanel.Children.Add(contentLabel);
+        contentPanel.Children.Add(contentBox);
+
+        var openFolderBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Open Folder",
+            Appearance = ControlAppearance.Secondary,
+            Height = 28,
+            Padding = new Thickness(10, 4, 10, 4),
+            FontSize = 11,
+            Margin = new Thickness(16, 0, 0, 10),
+            IsEnabled = !string.IsNullOrEmpty(skillFolderPath) && Directory.Exists(skillFolderPath),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left
+        };
+        openFolderBtn.Click += (_, _) =>
+        {
+            if (!string.IsNullOrEmpty(skillFolderPath) && Directory.Exists(skillFolderPath))
+                Process.Start("explorer.exe", skillFolderPath);
+        };
+
+        var saveBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Save",
+            Appearance = ControlAppearance.Primary,
+            MinWidth = 90,
+            Height = 32,
+            Margin = new Thickness(0, 0, 8, 0),
+            Visibility = isReadOnly ? Visibility.Collapsed : Visibility.Visible
+        };
+        var cancelBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = isReadOnly ? "Close" : "Cancel",
+            Appearance = ControlAppearance.Secondary,
+            MinWidth = 80,
+            Height = 32,
+            IsCancel = true
+        };
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 0, 16, 12)
+        };
+        footer.Children.Add(saveBtn);
+        footer.Children.Add(cancelBtn);
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(contentPanel, 1);
+        Grid.SetRow(openFolderBtn, 2);
+        Grid.SetRow(footer, 3);
+        root.Children.Add(titleBar);
+        root.Children.Add(contentPanel);
+        root.Children.Add(openFolderBtn);
+        root.Children.Add(footer);
+
+        var owner = Window.GetWindow(this);
+        var dialog = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.CanResize,
+            WindowStyle = WindowStyle.None,
+            Width = 560,
+            MinHeight = 400,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            SizeToContent = SizeToContent.Height,
+            Content = root
+        };
+
+        System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
+            new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 0,
+                ResizeBorderThickness = new Thickness(4),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            });
+
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) dialog.DragMove();
+        };
+
+        SkillDialogResult? dialogResult = null;
+
+        saveBtn.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(nameBox.Text)) { nameBox.Focus(); return; }
+            var skillMarkdown = BuildSkillMarkdown(
+                nameBox.Text.Trim(),
+                descBox.Text.Trim(),
+                parametersBox.Text,
+                contentBox.Text,
+                parsed.ParameterLines);
+            dialogResult = new SkillDialogResult(nameBox.Text.Trim(), descBox.Text.Trim(), skillMarkdown);
+            dialog.Close();
+        };
+        if (!isReadOnly)
+        {
+            dialog.PreviewKeyDown += (_, ev) =>
+            {
+                if (ev.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                    saveBtn.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            };
+        }
+        closeBtn.Click += (_, _) => dialog.Close();
+        cancelBtn.Click += (_, _) => dialog.Close();
+        dialog.Closed += (_, _) => tcs.TrySetResult(dialogResult);
+
+        dialog.ShowDialog();
+        return tcs.Task;
+    }
+
+    private static ParsedSkillMarkdown ParseSkillMarkdown(string rawContent)
+    {
+        if (string.IsNullOrEmpty(rawContent))
+            return new ParsedSkillMarkdown("", "", [], "");
+
+        var match = Regex.Match(
+            rawContent,
+            @"\A---\r?\n(?<fm>[\s\S]*?)\r?\n---\r?\n?",
+            RegexOptions.CultureInvariant);
+
+        if (!match.Success)
+            return new ParsedSkillMarkdown("", "", [], rawContent);
+
+        var frontmatter = match.Groups["fm"].Value;
+        var body = rawContent[match.Length..];
+        var name = "";
+        var description = "";
+        var parameters = new List<string>();
+
+        foreach (var line in frontmatter.Replace("\r\n", "\n").Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
+                continue;
+
+            var idx = trimmed.IndexOf(':');
+            if (idx <= 0)
+            {
+                parameters.Add(trimmed);
+                continue;
+            }
+
+            var key = trimmed[..idx].Trim();
+            var value = trimmed[(idx + 1)..].Trim();
+            value = UnquoteYaml(value);
+
+            if (key.Equals("name", StringComparison.OrdinalIgnoreCase))
+                name = value;
+            else if (key.Equals("description", StringComparison.OrdinalIgnoreCase))
+                description = value;
+            else
+                parameters.Add(trimmed);
+        }
+
+        return new ParsedSkillMarkdown(name, description, parameters, body);
+    }
+
+    private static string BuildSkillMarkdown(
+        string name,
+        string description,
+        string parameterText,
+        string body,
+        List<string> _)
+    {
+        var lines = new List<string>
+        {
+            $"name: {QuoteYaml(name)}",
+            $"description: {QuoteYaml(description)}"
+        };
+
+        foreach (var rawLine in parameterText.Replace("\r\n", "\n").Split('\n'))
+        {
+            var trimmed = rawLine.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed == "---")
+                continue;
+
+            var idx = trimmed.IndexOf(':');
+            if (idx > 0)
+            {
+                var key = trimmed[..idx].Trim();
+                if (key.Equals("name", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("description", StringComparison.OrdinalIgnoreCase))
+                    continue;
+            }
+
+            lines.Add(trimmed);
+        }
+
+        var normalizedBody = body.TrimStart('\r', '\n');
+        return $"---\n{string.Join("\n", lines)}\n---\n\n{normalizedBody}";
+    }
+
+    private static string UnquoteYaml(string value)
+    {
+        if (value.Length >= 2 &&
+            ((value.StartsWith('"') && value.EndsWith('"')) ||
+             (value.StartsWith('\'') && value.EndsWith('\''))))
+        {
+            return value[1..^1];
+        }
+        return value;
+    }
+
+    private static string QuoteYaml(string value)
+    {
+        var escaped = value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        return $"\"{escaped}\"";
     }
 
     // ─── Other buttons ────────────────────────────────────────────────────

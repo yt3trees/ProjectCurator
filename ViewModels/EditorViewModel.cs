@@ -165,10 +165,11 @@ public partial class EditorViewModel : ObservableObject
         try
         {
             var list = await _discoveryService.GetProjectInfoListAsync();
+            var hiddenKeys = _configService.LoadHiddenProjects();
             var currentSelectionKey = SelectedProject?.HiddenKey;
 
             Projects.Clear();
-            foreach (var p in list)
+            foreach (var p in list.Where(p => !hiddenKeys.Contains(p.HiddenKey)))
                 Projects.Add(p);
 
             // 選択状態を復元
@@ -244,9 +245,10 @@ public partial class EditorViewModel : ObservableObject
             var currentFile = CurrentFile;
 
             var list = await _discoveryService.GetProjectInfoListAsync(force: true);
+            var hiddenKeys = _configService.LoadHiddenProjects();
 
             Projects.Clear();
-            foreach (var p in list)
+            foreach (var p in list.Where(p => !hiddenKeys.Contains(p.HiddenKey)))
                 Projects.Add(p);
 
             var nextSelected = selectedKey != null

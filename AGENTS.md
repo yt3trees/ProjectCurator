@@ -116,6 +116,10 @@ When adding modal dialogs, follow the patterns in `DashboardPage.xaml.cs` (canon
 ### WPF Control Best Practices
 
 - ComboBox: do not set an explicit `Height`. Use `Padding` instead (e.g., `Padding = new Thickness(6, 4, 4, 4)`) and let the control auto-size. A fixed height causes the text to be clipped at the bottom.
+- `ItemsControl`/`ListBox`: do not set both `DisplayMemberPath` and `ItemTemplate` at the same time. WPF throws `InvalidOperationException` (`DisplayMemberPath and ItemTemplate cannot both be set`). Use only one:
+  - simple text row: `DisplayMemberPath`
+  - custom row layout (trimming/wrap/icon/multi-column): `ItemTemplate`
+- `ListBox` in themed dialogs: avoid default OS selection visuals. Define `ItemContainerStyle` (or override selection brushes) so selected/hover states use app theme brushes (`AppSurface*`, `AppText`) for consistent dark-mode appearance.
 - Frameless resizable windows: when using `WindowStyle = WindowStyle.None` with `ResizeMode = ResizeMode.CanResize`, the DWM adds a white resize border. Apply `WindowChrome` immediately after window creation to remove it while keeping resize functionality:
 
 ```csharp

@@ -304,9 +304,67 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             Foreground = text,
             BorderBrush = surface2,
             BorderThickness = new Thickness(1),
-            FontSize = 12,
-            DisplayMemberPath = nameof(CaptureLogEntry.DisplayLabel)
+            FontSize = 12
         };
+        entryList.ItemTemplate = new DataTemplate(typeof(CaptureLogEntry))
+        {
+            VisualTree = new FrameworkElementFactory(typeof(System.Windows.Controls.TextBlock))
+        };
+        if (entryList.ItemTemplate.VisualTree is FrameworkElementFactory entryTextFactory)
+        {
+            entryTextFactory.SetBinding(System.Windows.Controls.TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(CaptureLogEntry.DisplayLabel)));
+            entryTextFactory.SetValue(System.Windows.Controls.TextBlock.TextWrappingProperty, TextWrapping.NoWrap);
+            entryTextFactory.SetValue(System.Windows.Controls.TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+            entryTextFactory.SetValue(System.Windows.Controls.TextBlock.FontSizeProperty, 12.0);
+        }
+        entryList.ItemContainerStyle = new Style(typeof(System.Windows.Controls.ListBoxItem))
+        {
+            Setters =
+            {
+                new Setter(System.Windows.Controls.Control.HorizontalContentAlignmentProperty, System.Windows.HorizontalAlignment.Stretch),
+                new Setter(System.Windows.Controls.Control.PaddingProperty, new Thickness(0)),
+                new Setter(System.Windows.Controls.Control.BackgroundProperty, System.Windows.Media.Brushes.Transparent),
+                new Setter(System.Windows.Controls.Control.TemplateProperty, new ControlTemplate(typeof(System.Windows.Controls.ListBoxItem))
+                {
+                    VisualTree = new FrameworkElementFactory(typeof(Border), "Bd")
+                })
+            }
+        };
+        if (entryList.ItemContainerStyle.Setters
+            .OfType<Setter>()
+            .FirstOrDefault(s => s.Property == System.Windows.Controls.Control.TemplateProperty)?.Value is ControlTemplate entryItemTemplate &&
+            entryItemTemplate.VisualTree is FrameworkElementFactory itemBorderFactory)
+        {
+            itemBorderFactory.SetValue(Border.BackgroundProperty, System.Windows.Media.Brushes.Transparent);
+            itemBorderFactory.SetValue(Border.BorderBrushProperty, System.Windows.Media.Brushes.Transparent);
+            itemBorderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+            itemBorderFactory.SetValue(Border.MarginProperty, new Thickness(2, 1, 2, 1));
+            itemBorderFactory.SetValue(Border.PaddingProperty, new Thickness(8, 4, 8, 4));
+            itemBorderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(2));
+
+            var presenterFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenterFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
+            presenterFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            itemBorderFactory.AppendChild(presenterFactory);
+
+            entryItemTemplate.Triggers.Add(new Trigger
+            {
+                Property = System.Windows.Controls.ListBoxItem.IsSelectedProperty,
+                Value = true,
+                Setters =
+                {
+                    new Setter(Border.BackgroundProperty, surface1, "Bd"),
+                    new Setter(Border.BorderBrushProperty, surface2, "Bd")
+                }
+            });
+
+            var hoverTrigger = new MultiTrigger();
+            hoverTrigger.Conditions.Add(new Condition(System.Windows.Controls.ListBoxItem.IsMouseOverProperty, true));
+            hoverTrigger.Conditions.Add(new Condition(System.Windows.Controls.ListBoxItem.IsSelectedProperty, false));
+            hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, surface, "Bd"));
+            hoverTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, surface2, "Bd"));
+            entryItemTemplate.Triggers.Add(hoverTrigger);
+        }
         foreach (var entry in entries) entryList.Items.Add(entry);
 
         // フルコンテンツ表示
@@ -3787,7 +3845,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         {
             foreach (var block in allBlocks)
             {
-                var sectionBg = block.Period == "afternoon" ? surface1 : surface;
+                var sectionBg = surface;
 
                 var sectionHeader = new Border
                 {
