@@ -41,6 +41,8 @@ public partial class ProjectCardViewModel : ObservableObject
     public string Category => Info.Category;
     public int? FocusAge => Info.FocusAge;
     public int? SummaryAge => Info.SummaryAge;
+    public string? FocusFile => Info.FocusFile;
+    public string? SummaryFile => Info.SummaryFile;
     public string JunctionShared => Info.JunctionShared;
     public string JunctionObsidian => Info.JunctionObsidian;
     public string JunctionContext => Info.JunctionContext;

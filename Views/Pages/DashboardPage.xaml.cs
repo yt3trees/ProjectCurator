@@ -169,10 +169,20 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         return null;
     }
 
-    private void OnOpenEditorClick(object sender, RoutedEventArgs e)
+    private void OnOpenFocusClick(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { Tag: ProjectCardViewModel card })
-            ViewModel.OpenInEditor(card);
+        if (sender is not FrameworkElement { Tag: ProjectCardViewModel card }) return;
+        if (string.IsNullOrWhiteSpace(card.FocusFile) || !File.Exists(card.FocusFile)) return;
+        if (Window.GetWindow(this) is MainWindow mw)
+            mw.NavigateToEditorAndOpenFile(card.Info, card.FocusFile);
+    }
+
+    private void OnOpenSummaryClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: ProjectCardViewModel card }) return;
+        if (string.IsNullOrWhiteSpace(card.SummaryFile) || !File.Exists(card.SummaryFile)) return;
+        if (Window.GetWindow(this) is MainWindow mw)
+            mw.NavigateToEditorAndOpenFile(card.Info, card.SummaryFile);
     }
 
     private void OnActivityBarClick(object sender, MouseButtonEventArgs e)

@@ -613,7 +613,7 @@ public class AsanaSyncService
         if (inProgress.Count > 0)
         {
             foreach (var task in inProgress)
-                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos);
+                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos, userGid);
         }
         else
         {
@@ -626,7 +626,7 @@ public class AsanaSyncService
         if (completed.Count > 0)
         {
             foreach (var task in completed)
-                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos);
+                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos, userGid);
         }
         else
         {
@@ -661,7 +661,7 @@ public class AsanaSyncService
         if (inProgress.Count > 0)
         {
             foreach (var task in inProgress)
-                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos);
+                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos, userGid);
         }
         else
         {
@@ -674,7 +674,7 @@ public class AsanaSyncService
         if (completed.Count > 0)
         {
             foreach (var task in completed)
-                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos);
+                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos, userGid);
         }
         else
         {
@@ -809,7 +809,7 @@ public class AsanaSyncService
             if (inProgress.Count > 0)
             {
                 foreach (var task in inProgress)
-                    WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos);
+                    WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos, userGid);
             }
             else
             {
@@ -830,7 +830,7 @@ public class AsanaSyncService
             if (inProgress.Count > 0)
             {
                 foreach (var task in inProgress)
-                    WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos);
+                    WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos, userGid);
             }
             else
             {
@@ -863,7 +863,7 @@ public class AsanaSyncService
         if (inProgress.Count > 0)
         {
             foreach (var task in inProgress)
-                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos);
+                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos, userGid);
         }
         else
         {
@@ -876,7 +876,7 @@ public class AsanaSyncService
         if (completed.Count > 0)
         {
             foreach (var task in completed)
-                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos);
+                WriteTaskLine(w, task, ClassifyTaskRole(task, userGid), memos, userGid);
         }
         else
         {
@@ -889,7 +889,8 @@ public class AsanaSyncService
         StreamWriter w,
         AsanaTask task,
         string role,
-        Dictionary<string, string> existingMemos)
+        Dictionary<string, string> existingMemos,
+        string userGid = "")
     {
         var gid = task.Gid;
         var check = task.Completed ? "x" : " ";
@@ -925,7 +926,9 @@ public class AsanaSyncService
             {
                 var subCheck = sub.Completed ? "x" : " ";
                 var subDue = string.IsNullOrWhiteSpace(sub.DueOn) ? "" : $" (Due: {sub.DueOn})";
-                w.WriteLine($"    - [{subCheck}] {sub.Name}{subDue} [[Asana](https://app.asana.com/0/0/{sub.Gid})]");
+                var subRole = string.IsNullOrWhiteSpace(userGid) ? "" : ClassifyTaskRole(sub, userGid);
+                var subRoleTag = string.IsNullOrWhiteSpace(subRole) ? "" : $"[{subRole}] ";
+                w.WriteLine($"    - [{subCheck}] {subRoleTag}{sub.Name}{subDue} [[Asana](https://app.asana.com/0/0/{sub.Gid})]");
             }
         }
 

@@ -48,6 +48,10 @@ public partial class EditorViewModel : ObservableObject
     private readonly MeetingNotesService _meetingNotesService;
     private readonly TrayService _trayService;
     private string? _pendingFileToOpen;
+    // NavigateToProjectAndOpenFile で指定されたファイル。LoadProjectsAsync が消費するまで保持する。
+    // _pendingFileToOpen は OnSelectedProjectChanged でクリアされるが、その後 LoadProjectsAsync が
+    // 再度 OnSelectedProjectChanged を発火させる際には既に null になっているため、このフィールドで補完する。
+    private string? _externalNavigationFile;
     private bool _suppressAutoFileOpenOnProjectChange;
     private CancellationTokenSource? _focusUpdateCts;
     private CancellationTokenSource? _decisionLogCts;
@@ -161,6 +165,13 @@ public partial class EditorViewModel : ObservableObject
     // =====================================================================
     public async Task LoadProjectsAsync()
     {
+        // NavigateToProjectAndOpenFile で指定されたファイルを非同期 yield 前にキャプチャして消費する。
+        // _pendingFileToOpen は OnSelectedProjectChanged で既にクリアされているが、
+        // そこで起動した OpenFileAndSelectNodeAsync がまだ完了していない場合に CurrentFile が
+        // 更新されておらず、SelectedProject の再セット時にデフォルト (FocusFile) が開かれてしまうのを防ぐ。
+        var externalFile = _externalNavigationFile;
+        _externalNavigationFile = null;
+
         IsLoading = true;
         try
         {
@@ -178,7 +189,22 @@ public partial class EditorViewModel : ObservableObject
                 var match = Projects.FirstOrDefault(p => p.HiddenKey == currentSelectionKey);
                 if (match != null)
                 {
+                    _suppressAutoFileOpenOnProjectChange = true;
                     SelectedProject = match;
+                    _suppressAutoFileOpenOnProjectChange = false;
+
+                    // 外部指定ファイルまたは現在開いているファイルをプロジェクト配下なら復元する
+                    var fileToRestore = externalFile ?? CurrentFile;
+                    if (!string.IsNullOrEmpty(fileToRestore)
+                        && File.Exists(fileToRestore)
+                        && IsPathUnderDirectory(fileToRestore, match.Path))
+                    {
+                        _ = OpenFileAndSelectNodeAsync(fileToRestore);
+                    }
+                    else if (!string.IsNullOrEmpty(match.FocusFile) && File.Exists(match.FocusFile))
+                    {
+                        _ = OpenFileAndSelectNodeAsync(match.FocusFile);
+                    }
                 }
             }
         }
@@ -293,6 +319,7 @@ public partial class EditorViewModel : ObservableObject
     public void NavigateToProjectAndOpenFile(ProjectInfo project, string filePath)
     {
         _pendingFileToOpen = filePath;
+        _externalNavigationFile = filePath;
 
         bool projectWillChange = !string.Equals(
             SelectedProject?.HiddenKey,
@@ -305,6 +332,7 @@ public partial class EditorViewModel : ObservableObject
         if (!projectWillChange)
         {
             _pendingFileToOpen = null;
+            _externalNavigationFile = null;
             _ = OpenFileAndSelectNodeAsync(filePath);
         }
     }
