@@ -44,8 +44,8 @@ public class FocusUpdateService
         // Step 2: ファイル存在チェック
         if (!File.Exists(focusPath))
             throw new FileNotFoundException(
-                $"current_focus.md が見つかりませんでした: {focusPath}\n" +
-                "先に Context Compression Layer のセットアップを行ってください。");
+                $"current_focus.md not found: {focusPath}\n" +
+                "Please set up the Context Compression Layer first.");
 
         // Step 3: バックアップ
         var (backupPath, backupStatus) = await CreateBackupAsync(focusPath);
@@ -421,9 +421,9 @@ public class FocusUpdateService
         if (workMode == WorkMode.SharedWork && !string.IsNullOrEmpty(wsId))
             sb.AppendLine($"Workstream: {wsId}");
 
-        sb.AppendLine($"進行中タスク: {asanaTasks.InProgress.Count} 件");
-        sb.AppendLine($"完了タスク: {asanaTasks.Completed.Count} 件");
-        sb.AppendLine($"未着手タスク: {asanaTasks.NotStarted.Count} 件");
+        sb.AppendLine($"In-progress tasks: {asanaTasks.InProgress.Count}");
+        sb.AppendLine($"Completed tasks: {asanaTasks.Completed.Count}");
+        sb.AppendLine($"Not started tasks: {asanaTasks.NotStarted.Count}");
 
         return sb.ToString().Trim();
     }
