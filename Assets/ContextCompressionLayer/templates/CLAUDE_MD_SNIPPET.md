@@ -34,9 +34,8 @@ Invoke `/project-curator` at the start of a session to activate these behaviors.
 
 ### Work Folder Rule
 
-When working with AI agents, if the current directory is the project root
-(`Local Projects Root/<project>`) or directly under `shared/`, create and use a
-work folder before editing files.
+If the current directory is `Local Projects Root/<project>` or directly under
+`shared/`, create a dated work folder and work there.
 
 - General: `shared/_work/yyyy/yyyyMM/yyyyMMdd_{work-summary}`
 - Workstream: `shared/_work/<workstreamId>/yyyyMM/yyyyMMdd_{work-summary}`
