@@ -31,6 +31,15 @@ If any context file is oversized, suggest archiving to `focus_history/`.
 Decision logging, session-end focus updates, Obsidian knowledge integration,
 and Asana focus sync are handled by the `/project-curator` skill.
 Invoke `/project-curator` at the start of a session to activate these behaviors.
+
+### Work Folder Rule
+
+When working with AI agents, if the current directory is the project root
+(`Local Projects Root/<project>`) or directly under `shared/`, create and use a
+work folder before editing files.
+
+- General: `shared/_work/yyyy/yyyyMM/yyyyMMdd_{work-summary}`
+- Workstream: `shared/_work/<workstreamId>/yyyyMM/yyyyMMdd_{work-summary}`
 ```
 
 ---
