@@ -9,6 +9,7 @@ using ProjectCurator.Services;
 using ProjectCurator.ViewModels;
 using ProjectCurator.Views;
 using ProjectCurator.Views.Pages;
+using System.Windows.Input;
 using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
 using WpfModifierKeys = System.Windows.Input.ModifierKeys;
 using WpfKey = System.Windows.Input.Key;
@@ -32,6 +33,12 @@ public partial class MainWindow : FluentWindow
 
     // ウィンドウが画面上に表示されているかのフラグ (Hide() を使わない方式)
     private bool _isShownOnScreen = false;
+    // 非表示にした時点のウィンドウ最大化状態
+    private bool _wasMaximized = false;
+    // DWMWA_CLOAK が設定中かどうか (StateChanged との競合を防ぐ)
+    private bool _isCloaked = false;
+    // OnFlashBlockerCollapseAndUncloak が待機すべき残りフレーム数
+    private int _pendingUncloakFrames = 0;
 
     public MainWindow(
         IServiceProvider serviceProvider,
@@ -58,6 +65,10 @@ public partial class MainWindow : FluentWindow
         Loaded += OnLoaded;
         Closing += OnClosing;
         KeyDown += OnKeyDown;
+        // 最大化ボタン (wpf-ui TitleBar) を横取りして CloakAndMaximize 経由にする
+        CommandBindings.Add(new CommandBinding(
+            SystemCommands.MaximizeWindowCommand,
+            (_, _) => { if (!_isCloaked) CloakAndMaximize(); }));
     }
 
     // ── Win32: DWM 補助設定 ───────────────────────────────────────────────
@@ -70,9 +81,14 @@ public partial class MainWindow : FluentWindow
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
 
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmFlush();
+
     private const int GCLP_HBRBACKGROUND = -10;
     private const int WM_ERASEBKGND = 0x0014;
     private const int DWMWA_TRANSITIONS_FORCEDISABLED = 3;
+    private const int DWMWA_BORDER_COLOR = 34;  // Windows 11 22000+
+    private const int DWMWA_CLOAK = 13;
 
     protected override void OnSourceInitialized(EventArgs e)
     {
@@ -88,7 +104,17 @@ public partial class MainWindow : FluentWindow
             SetClassLong32(_hwnd, GCLP_HBRBACKGROUND, 0);
         var disabled = 1;
         DwmSetWindowAttribute(_hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, ref disabled, sizeof(int));
+        // ウィンドウ枠をアプリ背景色 (#0D1117) に統一する (Windows 11+)
+        // 最大化時のアクセントカラーちらつきを目立たなくする
+        // COLORREF 形式: 0x00BBGGRR = B=0x17, G=0x11, R=0x0D
+        var borderColor = 0x0017110D;
+        DwmSetWindowAttribute(_hwnd, DWMWA_BORDER_COLOR, ref borderColor, sizeof(int));
     }
+
+    private const int WM_SYSCOMMAND  = 0x0112;
+    private const int SC_MAXIMIZE    = 0xF030;
+    private const int WM_SIZE        = 0x0005;
+    private const int SIZE_MAXIMIZED = 2;
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
@@ -97,7 +123,43 @@ public partial class MainWindow : FluentWindow
             handled = true;
             return new IntPtr(1);
         }
+
+        // キーボード・システムメニュー経由の最大化を横取りする。
+        // handled=true でデフォルト処理をブロックし、CloakAndMaximize で自分で最大化する。
+        if (msg == WM_SYSCOMMAND && ((int)wParam & 0xFFF0) == SC_MAXIMIZE && !_isCloaked)
+        {
+            handled = true;
+            CloakAndMaximize();
+        }
+        // フォールバック: 上記で捕捉できなかったパス (Aero Snap 等)
+        else if (msg == WM_SIZE && (int)wParam == SIZE_MAXIMIZED && !_isCloaked)
+        {
+            _isCloaked = true;
+            var cloak = 1;
+            DwmSetWindowAttribute(_hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
+            _pendingUncloakFrames = 2;
+            System.Windows.Media.CompositionTarget.Rendering -= OnFlashBlockerCollapseAndUncloak;
+            System.Windows.Media.CompositionTarget.Rendering += OnFlashBlockerCollapseAndUncloak;
+        }
+
         return IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// DWM クロークを確実に設定してから最大化する。
+    /// DwmFlush() で「クローク済み」が DWM に届いてからリサイズすることで
+    /// 最大化トランジション中の 1 フレームちらつきを防ぐ。
+    /// </summary>
+    private void CloakAndMaximize()
+    {
+        _isCloaked = true;
+        var cloak = 1;
+        DwmSetWindowAttribute(_hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
+        DwmFlush(); // リサイズ前に DWM がクロークを処理するまで同期待機
+        WindowState = WindowState.Maximized;
+        _pendingUncloakFrames = 2;
+        System.Windows.Media.CompositionTarget.Rendering -= OnFlashBlockerCollapseAndUncloak;
+        System.Windows.Media.CompositionTarget.Rendering += OnFlashBlockerCollapseAndUncloak;
     }
 
     // ── フラッシュ防止: 画面外移動方式 ───────────────────────────────────
@@ -113,12 +175,16 @@ public partial class MainWindow : FluentWindow
     private const double OffScreenY = -32000;
 
     /// <summary>
-    /// 1フレーム待って FlashBlocker を描画してからウィンドウを画面外に移動する。
+    /// DWMWA_CLOAK でウィンドウを DWM レベルで不可視にし、状態・位置を変更してから画面外に置く。
+    /// DWM サーフェスは維持されるため、次回表示時に再初期化フラッシュが起きない。
     /// </summary>
     private void MoveOffScreen()
     {
-        // 画面外に移動する前にウィンドウ位置・サイズを保存する
-        if (_isShownOnScreen)
+        // 最大化状態を記憶しておき、次回表示時に復元する
+        _wasMaximized = WindowState == WindowState.Maximized;
+
+        // 最大化状態では Left/Top が最大化位置 (通常 0,0) になるため保存しない
+        if (_isShownOnScreen && WindowState == WindowState.Normal)
         {
             _configService.SaveWindowPlacement(new Models.WindowPlacement
             {
@@ -129,57 +195,84 @@ public partial class MainWindow : FluentWindow
             });
         }
 
-        FlashBlocker.Visibility = Visibility.Visible;
-        System.Windows.Media.CompositionTarget.Rendering -= OnFlashBlockerRenderedThenMoveOff;
-        System.Windows.Media.CompositionTarget.Rendering += OnFlashBlockerRenderedThenMoveOff;
-    }
+        // クローク: DWM レベルで不可視にする (DWM サーフェスは維持)
+        _isCloaked = true;
+        var cloak = 1;
+        DwmSetWindowAttribute(_hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
 
-    private void OnFlashBlockerRenderedThenMoveOff(object? sender, EventArgs e)
-    {
-        System.Windows.Media.CompositionTarget.Rendering -= OnFlashBlockerRenderedThenMoveOff;
         _isShownOnScreen = false;
+        if (WindowState != WindowState.Normal)
+            WindowState = WindowState.Normal;
         Left = OffScreenX;
         Top = OffScreenY;
+
+        // アンクローク: ウィンドウは画面外なので視覚的影響なし
+        _isCloaked = false;
+        var uncloak = 0;
+        DwmSetWindowAttribute(_hwnd, DWMWA_CLOAK, ref uncloak, sizeof(int));
     }
 
     /// <summary>
-    /// ウィンドウを画面中央へ移動し、次フレームで FlashBlocker を非表示にする。
+    /// ウィンドウを画面に表示する。DWMWA_CLOAK で遷移中のちらつきを防ぐ。
     /// </summary>
     private void MoveOnScreen()
     {
-        var workArea = SystemParameters.WorkArea;
-        var saved = _configService.LoadWindowPlacement();
+        // クローク: 位置・状態変更の途中経過がユーザーに見えないようにする
+        _isCloaked = true;
+        var cloak = 1;
+        DwmSetWindowAttribute(_hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
 
-        // サイズは再起動後も固定値に戻す (XAML の Width/Height をそのまま使う)
-        // ウィンドウが作業領域より大きい場合はサイズを縮小する (MinWidth/MinHeight は守る)
-        if (Width > workArea.Width)
-            Width = Math.Max(MinWidth, workArea.Width);
-        if (Height > workArea.Height)
-            Height = Math.Max(MinHeight, workArea.Height);
+        _isShownOnScreen = true;
 
-        if (saved != null)
+        if (_wasMaximized)
         {
-            // 保存された位置が作業領域内に収まるよう調整する
-            Left = Math.Max(workArea.Left, Math.Min(saved.Left, workArea.Right - Width));
-            Top = Math.Max(workArea.Top, Math.Min(saved.Top, workArea.Bottom - Height));
+            WindowState = WindowState.Maximized;
+            // 最大化時は DWM が新しいサイズでの描画を完了するまで 2 フレーム待つ
+            _pendingUncloakFrames = 2;
         }
         else
         {
-            Left = workArea.Left + (workArea.Width - Width) / 2;
-            Top = workArea.Top + (workArea.Height - Height) / 2;
+            var workArea = SystemParameters.WorkArea;
+            var saved = _configService.LoadWindowPlacement();
+
+            // サイズは再起動後も固定値に戻す (XAML の Width/Height をそのまま使う)
+            // ウィンドウが作業領域より大きい場合はサイズを縮小する (MinWidth/MinHeight は守る)
+            if (Width > workArea.Width)
+                Width = Math.Max(MinWidth, workArea.Width);
+            if (Height > workArea.Height)
+                Height = Math.Max(MinHeight, workArea.Height);
+
+            if (saved != null)
+            {
+                // 保存された位置が作業領域内に収まるよう調整する
+                Left = Math.Max(workArea.Left, Math.Min(saved.Left, workArea.Right - Width));
+                Top = Math.Max(workArea.Top, Math.Min(saved.Top, workArea.Bottom - Height));
+            }
+            else
+            {
+                Left = workArea.Left + (workArea.Width - Width) / 2;
+                Top = workArea.Top + (workArea.Height - Height) / 2;
+            }
+            WindowState = WindowState.Normal;
+            _pendingUncloakFrames = 1;
         }
-        _isShownOnScreen = true;
-        WindowState = WindowState.Normal;
+
         Activate();
         Focus();
-        System.Windows.Media.CompositionTarget.Rendering -= OnFlashBlockerCollapse;
-        System.Windows.Media.CompositionTarget.Rendering += OnFlashBlockerCollapse;
+
+        // WPF レイアウト完了後にアンクロークする
+        System.Windows.Media.CompositionTarget.Rendering -= OnFlashBlockerCollapseAndUncloak;
+        System.Windows.Media.CompositionTarget.Rendering += OnFlashBlockerCollapseAndUncloak;
     }
 
-    private void OnFlashBlockerCollapse(object? sender, EventArgs e)
+    private void OnFlashBlockerCollapseAndUncloak(object? sender, EventArgs e)
     {
-        System.Windows.Media.CompositionTarget.Rendering -= OnFlashBlockerCollapse;
+        if (--_pendingUncloakFrames > 0) return;
+        System.Windows.Media.CompositionTarget.Rendering -= OnFlashBlockerCollapseAndUncloak;
         FlashBlocker.Visibility = Visibility.Collapsed;
+        _isCloaked = false;
+        var uncloak = 0;
+        DwmSetWindowAttribute(_hwnd, DWMWA_CLOAK, ref uncloak, sizeof(int));
     }
 
     // ──────────────────────────────────────────────────────────────────────
