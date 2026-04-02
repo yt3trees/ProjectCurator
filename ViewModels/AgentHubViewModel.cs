@@ -323,6 +323,9 @@ public partial class AgentHubViewModel : ObservableObject
     [ObservableProperty] private ProjectInfo? selectedProject;
     [ObservableProperty] private string targetSubPath = "";
     [ObservableProperty] private ObservableCollection<string> targetSubPathCandidates = [];
+    [ObservableProperty] private ObservableCollection<GlobalDeploymentProfile> globalProfiles = [];
+    [ObservableProperty] private GlobalDeploymentProfile? selectedGlobalProfile;
+    [ObservableProperty] private DeploymentScopeType selectedScopeType = DeploymentScopeType.Project;
 
     [ObservableProperty] private ObservableCollection<DeployAgentItemViewModel> agentDeployItems = [];
     [ObservableProperty] private ObservableCollection<DeployRuleItemViewModel> ruleDeployItems = [];
@@ -331,6 +334,10 @@ public partial class AgentHubViewModel : ObservableObject
     [ObservableProperty] private bool isAiEnabled;
     [ObservableProperty] private bool isRefreshing;
     [ObservableProperty] private string statusMessage = "";
+    [ObservableProperty] private string scopeStatusLabel = "";
+
+    public bool IsProjectScopeSelected => SelectedScopeType == DeploymentScopeType.Project;
+    public bool IsGlobalScopeSelected => SelectedScopeType == DeploymentScopeType.Global;
 
     public AgentHubViewModel(
         AgentHubService agentHubService,
@@ -420,14 +427,37 @@ public partial class AgentHubViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSkillsTabSelected));
     }
 
+    partial void OnSelectedScopeTypeChanged(DeploymentScopeType value)
+    {
+        OnPropertyChanged(nameof(IsProjectScopeSelected));
+        OnPropertyChanged(nameof(IsGlobalScopeSelected));
+        ScopeStatusLabel = BuildScopeStatusLabel();
+        StatusMessage = ScopeStatusLabel;
+        QueueDeploymentRefresh(includeTargetCandidates: true);
+    }
+
+    partial void OnSelectedGlobalProfileChanged(GlobalDeploymentProfile? value)
+    {
+        ScopeStatusLabel = BuildScopeStatusLabel();
+        StatusMessage = ScopeStatusLabel;
+        if (SelectedScopeType == DeploymentScopeType.Global)
+            QueueDeploymentRefresh(includeTargetCandidates: false);
+    }
+
     partial void OnSelectedProjectChanged(ProjectInfo? value)
     {
-        QueueDeploymentRefresh(includeTargetCandidates: true);
+        if (SelectedScopeType == DeploymentScopeType.Project)
+        {
+            ScopeStatusLabel = BuildScopeStatusLabel();
+            StatusMessage = ScopeStatusLabel;
+            QueueDeploymentRefresh(includeTargetCandidates: true);
+        }
     }
 
     partial void OnTargetSubPathChanged(string value)
     {
-        QueueDeploymentRefresh(includeTargetCandidates: false);
+        if (SelectedScopeType == DeploymentScopeType.Project)
+            QueueDeploymentRefresh(includeTargetCandidates: false);
     }
 
     // ── Library Loading ───────────────────────────────────────────────────
@@ -439,8 +469,10 @@ public partial class AgentHubViewModel : ObservableObject
         try
         {
             await LoadLibraryAsync();
+            LoadGlobalProfiles();
             await LoadProjectsAsync();
-            StatusMessage = "";
+            ScopeStatusLabel = BuildScopeStatusLabel();
+            StatusMessage = ScopeStatusLabel;
         }
         catch (Exception ex)
         {
@@ -486,6 +518,21 @@ public partial class AgentHubViewModel : ObservableObject
             SkillDefinitions.Add(def);
     }
 
+    public void LoadGlobalProfiles()
+    {
+        var fixedProfile = BuildFixedGlobalProfile();
+        GlobalProfiles = new ObservableCollection<GlobalDeploymentProfile>([fixedProfile]);
+        SelectedGlobalProfile = fixedProfile;
+    }
+
+    public void SaveGlobalProfiles(IEnumerable<GlobalDeploymentProfile> profiles)
+    {
+        // Single fixed-profile mode: ignore external profile edits.
+        LoadGlobalProfiles();
+        ScopeStatusLabel = BuildScopeStatusLabel();
+        QueueDeploymentRefresh(includeTargetCandidates: false);
+    }
+
     public async Task LoadProjectsAsync()
     {
         try
@@ -504,12 +551,14 @@ public partial class AgentHubViewModel : ObservableObject
                 SelectedProject = null;
                 TargetSubPathCandidates = new ObservableCollection<string>([""]);
                 ClearDeploymentItems();
+                ScopeStatusLabel = BuildScopeStatusLabel();
                 return;
             }
 
             SelectedProject =
                 Projects.FirstOrDefault(p => p.HiddenKey == currentHiddenKey)
                 ?? Projects[0];
+            ScopeStatusLabel = BuildScopeStatusLabel();
         }
         catch (Exception ex)
         {
@@ -519,24 +568,28 @@ public partial class AgentHubViewModel : ObservableObject
 
     public void LoadTargetSubPathCandidates()
     {
-        TargetSubPathCandidates = new ObservableCollection<string>(
-            BuildTargetSubPathCandidates(SelectedProject));
+        if (SelectedScopeType == DeploymentScopeType.Global)
+        {
+            TargetSubPathCandidates = new ObservableCollection<string>([""]);
+            return;
+        }
+
+        TargetSubPathCandidates = new ObservableCollection<string>(BuildTargetSubPathCandidates(SelectedProject));
     }
 
     // ── Deployment State ──────────────────────────────────────────────────
 
     public void LoadDeploymentState()
     {
-        var project = SelectedProject;
-        if (project == null)
+        var target = BuildCurrentDeploymentTarget();
+        if (target == null)
         {
             ClearDeploymentItems();
             return;
         }
 
         var snapshot = BuildDeploymentSnapshot(
-            project,
-            TargetSubPath,
+            target,
             [.. AgentDefinitions],
             [.. RuleDefinitions],
             [.. SkillDefinitions]);
@@ -546,19 +599,20 @@ public partial class AgentHubViewModel : ObservableObject
 
     private void OnAgentCliToggled(DeployAgentItemViewModel item, CliTarget cli, bool enabled)
     {
-        if (SelectedProject == null) return;
+        var target = BuildCurrentDeploymentTarget();
+        if (target == null) return;
         try
         {
             if (enabled)
             {
                 var content = _agentHubService.GetAgentContent(item.Definition);
-                _deploymentService.DeployAgent(SelectedProject, TargetSubPath, item.Definition, content, cli);
-                StatusMessage = $"Deployed '{item.Name}' to {cli}";
+                _deploymentService.DeployAgent(target, item.Definition, content, cli);
+                StatusMessage = $"{ScopeStatusLabel} / Deployed '{item.Name}' to {cli}";
             }
             else
             {
-                _deploymentService.UndeployAgent(SelectedProject, TargetSubPath, item.Definition, cli);
-                StatusMessage = $"Undeployed '{item.Name}' from {cli}";
+                _deploymentService.UndeployAgent(target, item.Definition, cli);
+                StatusMessage = $"{ScopeStatusLabel} / Undeployed '{item.Name}' from {cli}";
             }
         }
         catch (Exception ex)
@@ -570,19 +624,20 @@ public partial class AgentHubViewModel : ObservableObject
 
     private void OnRuleCliToggled(DeployRuleItemViewModel item, CliTarget cli, bool enabled)
     {
-        if (SelectedProject == null) return;
+        var target = BuildCurrentDeploymentTarget();
+        if (target == null) return;
         try
         {
             if (enabled)
             {
                 var content = _agentHubService.GetRuleContent(item.Definition);
-                _deploymentService.DeployRule(SelectedProject, TargetSubPath, item.Definition, content, cli);
-                StatusMessage = $"Deployed rule '{item.Name}' to {cli}";
+                _deploymentService.DeployRule(target, item.Definition, content, cli);
+                StatusMessage = $"{ScopeStatusLabel} / Deployed rule '{item.Name}' to {cli}";
             }
             else
             {
-                _deploymentService.UndeployRule(SelectedProject, TargetSubPath, item.Definition, cli);
-                StatusMessage = $"Undeployed rule '{item.Name}' from {cli}";
+                _deploymentService.UndeployRule(target, item.Definition, cli);
+                StatusMessage = $"{ScopeStatusLabel} / Undeployed rule '{item.Name}' from {cli}";
             }
         }
         catch (Exception ex)
@@ -594,18 +649,19 @@ public partial class AgentHubViewModel : ObservableObject
 
     private void OnSkillCliToggled(DeploySkillItemViewModel item, CliTarget cli, bool enabled)
     {
-        if (SelectedProject == null) return;
+        var target = BuildCurrentDeploymentTarget();
+        if (target == null) return;
         try
         {
             if (enabled)
             {
-                _deploymentService.DeploySkill(SelectedProject, TargetSubPath, item.Definition, cli);
-                StatusMessage = $"Deployed skill '{item.Name}' to {cli}";
+                _deploymentService.DeploySkill(target, item.Definition, cli);
+                StatusMessage = $"{ScopeStatusLabel} / Deployed skill '{item.Name}' to {cli}";
             }
             else
             {
-                _deploymentService.UndeploySkill(SelectedProject, TargetSubPath, item.Definition, cli);
-                StatusMessage = $"Undeployed skill '{item.Name}' from {cli}";
+                _deploymentService.UndeploySkill(target, item.Definition, cli);
+                StatusMessage = $"{ScopeStatusLabel} / Undeployed skill '{item.Name}' from {cli}";
             }
         }
         catch (Exception ex)
@@ -620,7 +676,6 @@ public partial class AgentHubViewModel : ObservableObject
     [RelayCommand]
     private async Task SyncStatus()
     {
-        if (SelectedProject == null) return;
         IsRefreshing = true;
         StatusMessage = "Syncing...";
         try
@@ -631,7 +686,7 @@ public partial class AgentHubViewModel : ObservableObject
                 [.. Projects],
                 [.. SkillDefinitions]));
             QueueDeploymentRefresh(includeTargetCandidates: false);
-            StatusMessage = "Sync complete";
+            StatusMessage = $"{ScopeStatusLabel} / Sync complete";
         }
         catch (Exception ex)
         {
@@ -656,7 +711,7 @@ public partial class AgentHubViewModel : ObservableObject
                 [.. Projects],
                 [.. SkillDefinitions]));
             QueueDeploymentRefresh(includeTargetCandidates: false);
-            StatusMessage = "All project sync complete";
+            StatusMessage = "All scope sync complete";
         }
         catch (Exception ex)
         {
@@ -671,6 +726,12 @@ public partial class AgentHubViewModel : ObservableObject
     [RelayCommand]
     private async Task DeploySelectionToAllProjects()
     {
+        if (SelectedScopeType != DeploymentScopeType.Project)
+        {
+            StatusMessage = "Deploy to all projects is available only in Project scope.";
+            return;
+        }
+
         if (Projects.Count == 0)
             return;
 
@@ -849,38 +910,86 @@ public partial class AgentHubViewModel : ObservableObject
     public string GetSkillFolderPath(SkillDefinition def)
         => def.ContentDirectory;
 
+    private AgentDeploymentService.DeploymentTarget? BuildCurrentDeploymentTarget()
+    {
+        if (SelectedScopeType == DeploymentScopeType.Global)
+        {
+            if (SelectedGlobalProfile == null)
+                return null;
+            return _deploymentService.CreateGlobalTarget(SelectedGlobalProfile);
+        }
+
+        if (SelectedProject == null)
+            return null;
+        return _deploymentService.CreateProjectTarget(SelectedProject, TargetSubPath);
+    }
+
+    private string BuildScopeStatusLabel()
+    {
+        if (SelectedScopeType == DeploymentScopeType.Global)
+            return "Scope=Global(Fixed)";
+
+        return $"Scope=Project(Project:{SelectedProject?.DisplayName ?? "(none)"})";
+    }
+
+    private static GlobalDeploymentProfile BuildFixedGlobalProfile()
+    {
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var githubDir = Path.Combine(userProfile, ".github");
+        var claudeDir = Path.Combine(userProfile, ".claude");
+        var codexDir = Path.Combine(userProfile, ".codex");
+        var geminiDir = Path.Combine(userProfile, ".gemini");
+        return new GlobalDeploymentProfile
+        {
+            Id = "personal",
+            Name = "Personal (Fixed)",
+            ClaudeBasePath = claudeDir,
+            CodexBasePath = codexDir,
+            CopilotBasePath = userProfile,
+            GeminiBasePath = geminiDir,
+            ClaudeRuleFilePath = Path.Combine(claudeDir, "CLAUDE.md"),
+            CodexRuleFilePath = Path.Combine(codexDir, "AGENTS.md"),
+            CopilotRuleFilePath = Path.Combine(githubDir, "copilot-instructions.md"),
+            GeminiRuleFilePath = Path.Combine(geminiDir, "GEMINI.md"),
+            UpdatedAt = DateTimeOffset.Now
+        };
+    }
+
     private void DeployOrUndeployAgent(ProjectInfo project, DeployAgentItemViewModel item, CliTarget cli, bool enabled)
     {
+        var target = _deploymentService.CreateProjectTarget(project, TargetSubPath);
         if (enabled)
         {
             var content = _agentHubService.GetAgentContent(item.Definition);
-            _deploymentService.DeployAgent(project, TargetSubPath, item.Definition, content, cli);
+            _deploymentService.DeployAgent(target, item.Definition, content, cli);
         }
         else
         {
-            _deploymentService.UndeployAgent(project, TargetSubPath, item.Definition, cli);
+            _deploymentService.UndeployAgent(target, item.Definition, cli);
         }
     }
 
     private void DeployOrUndeployRule(ProjectInfo project, DeployRuleItemViewModel item, CliTarget cli, bool enabled)
     {
+        var target = _deploymentService.CreateProjectTarget(project, TargetSubPath);
         if (enabled)
         {
             var content = _agentHubService.GetRuleContent(item.Definition);
-            _deploymentService.DeployRule(project, TargetSubPath, item.Definition, content, cli);
+            _deploymentService.DeployRule(target, item.Definition, content, cli);
         }
         else
         {
-            _deploymentService.UndeployRule(project, TargetSubPath, item.Definition, cli);
+            _deploymentService.UndeployRule(target, item.Definition, cli);
         }
     }
 
     private void DeployOrUndeploySkill(ProjectInfo project, DeploySkillItemViewModel item, CliTarget cli, bool enabled)
     {
+        var target = _deploymentService.CreateProjectTarget(project, TargetSubPath);
         if (enabled)
-            _deploymentService.DeploySkill(project, TargetSubPath, item.Definition, cli);
+            _deploymentService.DeploySkill(target, item.Definition, cli);
         else
-            _deploymentService.UndeploySkill(project, TargetSubPath, item.Definition, cli);
+            _deploymentService.UndeploySkill(target, item.Definition, cli);
     }
 
     private sealed record LibrarySnapshot(
@@ -940,8 +1049,20 @@ public partial class AgentHubViewModel : ObservableObject
     {
         try
         {
+            var scopeType = SelectedScopeType;
             var project = SelectedProject;
-            if (project == null)
+            var profile = SelectedGlobalProfile;
+            if (scopeType == DeploymentScopeType.Project && project == null)
+            {
+                if (version != _deploymentRefreshVersion)
+                    return;
+
+                TargetSubPathCandidates = new ObservableCollection<string>([""]);
+                ClearDeploymentItems();
+                return;
+            }
+
+            if (scopeType == DeploymentScopeType.Global && profile == null)
             {
                 if (version != _deploymentRefreshVersion)
                     return;
@@ -960,9 +1081,14 @@ public partial class AgentHubViewModel : ObservableObject
             {
                 ct.ThrowIfCancellationRequested();
                 var candidates = includeTargetCandidates
-                    ? BuildTargetSubPathCandidates(project)
+                    ? (scopeType == DeploymentScopeType.Project
+                        ? BuildTargetSubPathCandidates(project)
+                        : new List<string> { "" })
                     : null;
-                var snapshot = BuildDeploymentSnapshot(project, targetSubPath, agentDefs, ruleDefs, skillDefs);
+                var target = scopeType == DeploymentScopeType.Project
+                    ? _deploymentService.CreateProjectTarget(project!, targetSubPath)
+                    : _deploymentService.CreateGlobalTarget(profile!);
+                var snapshot = BuildDeploymentSnapshot(target, agentDefs, ruleDefs, skillDefs);
                 return (candidates, snapshot);
             }, ct);
 
@@ -1029,8 +1155,7 @@ public partial class AgentHubViewModel : ObservableObject
     }
 
     private DeploymentSnapshot BuildDeploymentSnapshot(
-        ProjectInfo selectedProject,
-        string targetSubPath,
+        AgentDeploymentService.DeploymentTarget target,
         List<AgentDefinition> agentDefs,
         List<ContextRuleDefinition> ruleDefs,
         List<SkillDefinition> skillDefs)
@@ -1040,7 +1165,7 @@ public partial class AgentHubViewModel : ObservableObject
         {
             var item = new DeployAgentItemViewModel(def);
             foreach (var cli in Enum.GetValues<CliTarget>())
-                item.SetDeployedState(cli, _deploymentService.IsAgentDeployed(selectedProject, targetSubPath, def, cli));
+                item.SetDeployedState(cli, _deploymentService.IsAgentDeployed(target, def, cli));
             item.OnCliToggled = OnAgentCliToggled;
             agentItems.Add(item);
         }
@@ -1050,7 +1175,7 @@ public partial class AgentHubViewModel : ObservableObject
         {
             var item = new DeployRuleItemViewModel(def);
             foreach (var cli in Enum.GetValues<CliTarget>())
-                item.SetDeployedState(cli, _deploymentService.IsRuleDeployed(selectedProject, targetSubPath, def, cli));
+                item.SetDeployedState(cli, _deploymentService.IsRuleDeployed(target, def, cli));
             item.OnCliToggled = OnRuleCliToggled;
             ruleItems.Add(item);
         }
@@ -1060,7 +1185,7 @@ public partial class AgentHubViewModel : ObservableObject
         {
             var item = new DeploySkillItemViewModel(def);
             foreach (var cli in Enum.GetValues<CliTarget>())
-                item.SetDeployedState(cli, _deploymentService.IsSkillDeployed(selectedProject, targetSubPath, def, cli));
+                item.SetDeployedState(cli, _deploymentService.IsSkillDeployed(target, def, cli));
             item.OnCliToggled = OnSkillCliToggled;
             skillItems.Add(item);
         }

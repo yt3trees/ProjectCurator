@@ -88,6 +88,16 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         SkillsTabButton.Foreground = ViewModel.IsSkillsTabSelected ? textBrush : subtextBrush;
     }
 
+    private void OnProjectScopeRadioClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.SelectedScopeType = DeploymentScopeType.Project;
+    }
+
+    private void OnGlobalScopeRadioClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.SelectedScopeType = DeploymentScopeType.Global;
+    }
+
     // ─── Library list selection ───────────────────────────────────────────
 
     private void OnAgentSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -663,7 +673,7 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         try
         {
             ViewModel.ExportLibraryZip(dialog.FileName);
-            ViewModel.StatusMessage = $"Exported library ZIP: {Path.GetFileName(dialog.FileName)}";
+            ViewModel.StatusMessage = $"{ViewModel.ScopeStatusLabel} / Exported library ZIP: {Path.GetFileName(dialog.FileName)}";
         }
         catch (Exception ex)
         {
@@ -683,7 +693,7 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         try
         {
             ViewModel.ImportLibraryZip(dialog.FileName);
-            ViewModel.StatusMessage = $"Imported library ZIP: {Path.GetFileName(dialog.FileName)}";
+            ViewModel.StatusMessage = $"{ViewModel.ScopeStatusLabel} / Imported library ZIP: {Path.GetFileName(dialog.FileName)}";
         }
         catch (Exception ex)
         {

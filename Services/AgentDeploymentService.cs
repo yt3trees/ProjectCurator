@@ -8,6 +8,15 @@ namespace ProjectCurator.Services;
 
 public class AgentDeploymentService
 {
+    public sealed class DeploymentTarget
+    {
+        public DeploymentScopeType ScopeType { get; init; }
+        public string ScopeId { get; init; } = "";
+        public ProjectInfo? Project { get; init; }
+        public string TargetSubPath { get; init; } = "";
+        public GlobalDeploymentProfile? Profile { get; init; }
+    }
+
     private readonly ConfigService _configService;
 
     public AgentDeploymentService(ConfigService configService)
@@ -15,12 +24,37 @@ public class AgentDeploymentService
         _configService = configService;
     }
 
+    public DeploymentTarget CreateProjectTarget(ProjectInfo project, string targetSubPath)
+    {
+        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
+        return new DeploymentTarget
+        {
+            ScopeType = DeploymentScopeType.Project,
+            ScopeId = project.Name,
+            Project = project,
+            TargetSubPath = normalizedSubPath
+        };
+    }
+
+    public DeploymentTarget CreateGlobalTarget(GlobalDeploymentProfile profile)
+    {
+        return new DeploymentTarget
+        {
+            ScopeType = DeploymentScopeType.Global,
+            ScopeId = profile.Id,
+            Profile = profile,
+            TargetSubPath = ""
+        };
+    }
+
     // ─── Agent Deploy/Undeploy ────────────────────────────────────────────
 
     public void DeployAgent(ProjectInfo project, string targetSubPath, AgentDefinition def, string content, CliTarget cli)
+        => DeployAgent(CreateProjectTarget(project, targetSubPath), def, content, cli);
+
+    public void DeployAgent(DeploymentTarget target, AgentDefinition def, string content, CliTarget cli)
     {
-        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
-        var writeDir = ResolveAgentWriteDir(project.Path, normalizedSubPath, cli);
+        var writeDir = ResolveAgentWriteDir(target, cli);
         try
         {
             Directory.CreateDirectory(writeDir);
@@ -28,7 +62,7 @@ public class AgentDeploymentService
             var normalizedContent = NormalizeAgentContent(def, content, cli);
             File.WriteAllText(filePath, normalizedContent, new UTF8Encoding(false));
             Debug.WriteLine($"[AgentDeploy] '{def.Name}' → {filePath}");
-            UpdateAgentState(project.Name, normalizedSubPath, def.Id, cli, deployed: true);
+            UpdateAgentState(target, def.Id, cli, deployed: true);
         }
         catch (Exception ex)
         {
@@ -38,9 +72,11 @@ public class AgentDeploymentService
     }
 
     public void UndeployAgent(ProjectInfo project, string targetSubPath, AgentDefinition def, CliTarget cli)
+        => UndeployAgent(CreateProjectTarget(project, targetSubPath), def, cli);
+
+    public void UndeployAgent(DeploymentTarget target, AgentDefinition def, CliTarget cli)
     {
-        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
-        var writeDir = ResolveAgentWriteDir(project.Path, normalizedSubPath, cli);
+        var writeDir = ResolveAgentWriteDir(target, cli);
         var filePath = ResolveAgentFilePath(writeDir, def, cli);
         try
         {
@@ -49,7 +85,7 @@ public class AgentDeploymentService
                 File.Delete(filePath);
                 Debug.WriteLine($"[AgentUndeploy] '{def.Name}' ← {filePath}");
             }
-            UpdateAgentState(project.Name, normalizedSubPath, def.Id, cli, deployed: false);
+            UpdateAgentState(target, def.Id, cli, deployed: false);
         }
         catch (Exception ex)
         {
@@ -59,17 +95,22 @@ public class AgentDeploymentService
     }
 
     public bool IsAgentDeployed(ProjectInfo project, string targetSubPath, AgentDefinition def, CliTarget cli)
+        => IsAgentDeployed(CreateProjectTarget(project, targetSubPath), def, cli);
+
+    public bool IsAgentDeployed(DeploymentTarget target, AgentDefinition def, CliTarget cli)
     {
-        var writeDir = ResolveAgentWriteDir(project.Path, NormalizeTargetSubPath(targetSubPath), cli);
+        var writeDir = ResolveAgentWriteDir(target, cli);
         return File.Exists(ResolveAgentFilePath(writeDir, def, cli));
     }
 
     // ─── Rule Deploy/Undeploy ─────────────────────────────────────────────
 
     public void DeployRule(ProjectInfo project, string targetSubPath, ContextRuleDefinition def, string content, CliTarget cli)
+        => DeployRule(CreateProjectTarget(project, targetSubPath), def, content, cli);
+
+    public void DeployRule(DeploymentTarget target, ContextRuleDefinition def, string content, CliTarget cli)
     {
-        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
-        var contextFilePaths = ResolveRuleContextFilePaths(project.Path, normalizedSubPath, cli);
+        var contextFilePaths = ResolveRuleContextFilePaths(target, cli);
         if (contextFilePaths.Count == 0) return;
 
         try
@@ -93,8 +134,7 @@ public class AgentDeploymentService
 
                 File.WriteAllText(contextFilePath, newContent, new UTF8Encoding(false));
             }
-
-            UpdateRuleState(project.Name, normalizedSubPath, def.Id, cli, deployed: true);
+            UpdateRuleState(target, def.Id, cli, deployed: true);
         }
         catch (Exception ex)
         {
@@ -104,9 +144,11 @@ public class AgentDeploymentService
     }
 
     public void UndeployRule(ProjectInfo project, string targetSubPath, ContextRuleDefinition def, CliTarget cli)
+        => UndeployRule(CreateProjectTarget(project, targetSubPath), def, cli);
+
+    public void UndeployRule(DeploymentTarget target, ContextRuleDefinition def, CliTarget cli)
     {
-        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
-        var contextFilePaths = ResolveRuleContextFilePaths(project.Path, normalizedSubPath, cli);
+        var contextFilePaths = ResolveRuleContextFilePaths(target, cli);
         if (contextFilePaths.Count == 0) return;
 
         try
@@ -124,8 +166,7 @@ public class AgentDeploymentService
                 var newContent = RemoveMarkedSection(existing, def.Id);
                 File.WriteAllText(contextFilePath, newContent, new UTF8Encoding(false));
             }
-
-            UpdateRuleState(project.Name, normalizedSubPath, def.Id, cli, deployed: false);
+            UpdateRuleState(target, def.Id, cli, deployed: false);
         }
         catch (Exception ex)
         {
@@ -135,8 +176,11 @@ public class AgentDeploymentService
     }
 
     public bool IsRuleDeployed(ProjectInfo project, string targetSubPath, ContextRuleDefinition def, CliTarget cli)
+        => IsRuleDeployed(CreateProjectTarget(project, targetSubPath), def, cli);
+
+    public bool IsRuleDeployed(DeploymentTarget target, ContextRuleDefinition def, CliTarget cli)
     {
-        var contextFilePaths = ResolveRuleContextFilePaths(project.Path, NormalizeTargetSubPath(targetSubPath), cli);
+        var contextFilePaths = ResolveRuleContextFilePaths(target, cli);
         if (contextFilePaths.Count == 0) return false;
 
         foreach (var contextFilePath in contextFilePaths)
@@ -162,14 +206,16 @@ public class AgentDeploymentService
     // ─── Skill Deploy/Undeploy ────────────────────────────────────────────
 
     public void DeploySkill(ProjectInfo project, string targetSubPath, SkillDefinition def, CliTarget cli)
+        => DeploySkill(CreateProjectTarget(project, targetSubPath), def, cli);
+
+    public void DeploySkill(DeploymentTarget target, SkillDefinition def, CliTarget cli)
     {
-        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
-        var targetSkillDir = ResolveSkillWriteDir(project.Path, normalizedSubPath, cli, def.Id);
+        var targetSkillDir = ResolveSkillWriteDir(target, cli, def.Id);
         try
         {
             CopyDirectory(def.ContentDirectory, targetSkillDir);
             Debug.WriteLine($"[SkillDeploy] '{def.Name}' → {targetSkillDir}");
-            UpdateSkillState(project.Name, normalizedSubPath, def.Id, cli, deployed: true);
+            UpdateSkillState(target, def.Id, cli, deployed: true);
         }
         catch (Exception ex)
         {
@@ -179,9 +225,11 @@ public class AgentDeploymentService
     }
 
     public void UndeploySkill(ProjectInfo project, string targetSubPath, SkillDefinition def, CliTarget cli)
+        => UndeploySkill(CreateProjectTarget(project, targetSubPath), def, cli);
+
+    public void UndeploySkill(DeploymentTarget target, SkillDefinition def, CliTarget cli)
     {
-        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
-        var targetSkillDir = ResolveSkillWriteDir(project.Path, normalizedSubPath, cli, def.Id);
+        var targetSkillDir = ResolveSkillWriteDir(target, cli, def.Id);
         try
         {
             if (Directory.Exists(targetSkillDir))
@@ -189,7 +237,7 @@ public class AgentDeploymentService
                 Directory.Delete(targetSkillDir, recursive: true);
                 Debug.WriteLine($"[SkillUndeploy] '{def.Name}' ← {targetSkillDir}");
             }
-            UpdateSkillState(project.Name, normalizedSubPath, def.Id, cli, deployed: false);
+            UpdateSkillState(target, def.Id, cli, deployed: false);
         }
         catch (Exception ex)
         {
@@ -199,35 +247,61 @@ public class AgentDeploymentService
     }
 
     public bool IsSkillDeployed(ProjectInfo project, string targetSubPath, SkillDefinition def, CliTarget cli)
+        => IsSkillDeployed(CreateProjectTarget(project, targetSubPath), def, cli);
+
+    public bool IsSkillDeployed(DeploymentTarget target, SkillDefinition def, CliTarget cli)
     {
-        var skillDir = ResolveSkillWriteDir(project.Path, NormalizeTargetSubPath(targetSubPath), cli, def.Id);
+        var skillDir = ResolveSkillWriteDir(target, cli, def.Id);
         return Directory.Exists(skillDir) && File.Exists(Path.Combine(skillDir, "SKILL.md"));
     }
 
     public string ResolveSkillWriteDir(string projectPath, string targetSubPath, CliTarget cli, string skillName)
-    {
-        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
-        var targetDir = string.IsNullOrEmpty(normalizedSubPath)
-            ? projectPath
-            : Path.Combine(projectPath, normalizedSubPath);
-
-        string skillsBaseDir;
-        if (cli == CliTarget.Copilot)
+        => ResolveSkillWriteDir(new DeploymentTarget
         {
-            skillsBaseDir = Path.Combine(targetDir, ".github", "skills");
+            ScopeType = DeploymentScopeType.Project,
+            ScopeId = "",
+            Project = new ProjectInfo { Path = projectPath },
+            TargetSubPath = NormalizeTargetSubPath(targetSubPath)
+        }, cli, skillName);
+
+    private string ResolveSkillWriteDir(DeploymentTarget target, CliTarget cli, string skillName)
+    {
+        string skillsBaseDir;
+        if (target.ScopeType == DeploymentScopeType.Global)
+        {
+            var profile = target.Profile ?? throw new InvalidOperationException("Global profile is required for global scope.");
+            var basePath = GetBasePath(profile, cli);
+            if (string.IsNullOrWhiteSpace(basePath))
+                throw new InvalidOperationException($"Base path for {cli} is not configured.");
+            skillsBaseDir = cli == CliTarget.Copilot
+                ? Path.Combine(basePath, ".github", "skills")
+                : Path.Combine(basePath, "skills");
         }
         else
         {
-            var cliDirName = cli switch
+            var projectPath = target.Project?.Path ?? throw new InvalidOperationException("Project is required for project scope.");
+            var normalizedSubPath = NormalizeTargetSubPath(target.TargetSubPath);
+            var targetDir = string.IsNullOrEmpty(normalizedSubPath)
+                ? projectPath
+                : Path.Combine(projectPath, normalizedSubPath);
+
+            if (cli == CliTarget.Copilot)
             {
-                CliTarget.Claude => ".claude",
-                CliTarget.Codex => ".codex",
-                CliTarget.Gemini => ".gemini",
-                _ => ".claude"
-            };
-            var localCliDir = Path.Combine(targetDir, cliDirName);
-            var resolved = ResolveJunctionTarget(localCliDir);
-            skillsBaseDir = Path.Combine(resolved ?? localCliDir, "skills");
+                skillsBaseDir = Path.Combine(targetDir, ".github", "skills");
+            }
+            else
+            {
+                var cliDirName = cli switch
+                {
+                    CliTarget.Claude => ".claude",
+                    CliTarget.Codex => ".codex",
+                    CliTarget.Gemini => ".gemini",
+                    _ => ".claude"
+                };
+                var localCliDir = Path.Combine(targetDir, cliDirName);
+                var resolved = ResolveJunctionTarget(localCliDir);
+                skillsBaseDir = Path.Combine(resolved ?? localCliDir, "skills");
+            }
         }
 
         return Path.Combine(skillsBaseDir, skillName);
@@ -252,17 +326,20 @@ public class AgentDeploymentService
         List<SkillDefinition>? skillDefs = null)
     {
         var state = _configService.LoadAgentHubState();
+        var profiles = _configService.LoadGlobalAgentHubProfiles();
         bool changed = false;
 
         var validAgents = new List<AgentDeployment>();
         foreach (var dep in state.AgentDeployments)
         {
-            var project = projects.FirstOrDefault(p => p.Name == dep.ProjectName);
+            var scopeType = dep.ScopeType;
+            var scopeId = ResolveScopeId(scopeType, dep.ScopeId, dep.ProjectName);
+            var target = ResolveDeploymentTarget(scopeType, scopeId, dep.TargetSubPath, projects, profiles);
             var agentDef = agentDefs.FirstOrDefault(a => a.Id == dep.AgentId);
-            if (project == null || agentDef == null) { changed = true; continue; }
+            if (target == null || agentDef == null) { changed = true; continue; }
 
             var validClis = dep.CliTargets
-                .Where(cli => IsAgentDeployed(project, dep.TargetSubPath, agentDef, cli))
+                .Where(cli => IsAgentDeployed(target, agentDef, cli))
                 .ToList();
 
             if (validClis.Count != dep.CliTargets.Count) changed = true;
@@ -271,6 +348,8 @@ public class AgentDeploymentService
                 {
                     ProjectName = dep.ProjectName,
                     TargetSubPath = dep.TargetSubPath,
+                    ScopeType = scopeType,
+                    ScopeId = scopeId,
                     AgentId = dep.AgentId,
                     CliTargets = validClis,
                     DeployedAt = dep.DeployedAt
@@ -282,12 +361,14 @@ public class AgentDeploymentService
         var validRules = new List<RuleDeployment>();
         foreach (var dep in state.RuleDeployments)
         {
-            var project = projects.FirstOrDefault(p => p.Name == dep.ProjectName);
+            var scopeType = dep.ScopeType;
+            var scopeId = ResolveScopeId(scopeType, dep.ScopeId, dep.ProjectName);
+            var target = ResolveDeploymentTarget(scopeType, scopeId, dep.TargetSubPath, projects, profiles);
             var ruleDef = ruleDefs.FirstOrDefault(r => r.Id == dep.RuleId);
-            if (project == null || ruleDef == null) { changed = true; continue; }
+            if (target == null || ruleDef == null) { changed = true; continue; }
 
             var validClis = dep.CliTargets
-                .Where(cli => IsRuleDeployed(project, dep.TargetSubPath, ruleDef, cli))
+                .Where(cli => IsRuleDeployed(target, ruleDef, cli))
                 .ToList();
 
             if (validClis.Count != dep.CliTargets.Count) changed = true;
@@ -296,6 +377,8 @@ public class AgentDeploymentService
                 {
                     ProjectName = dep.ProjectName,
                     TargetSubPath = dep.TargetSubPath,
+                    ScopeType = scopeType,
+                    ScopeId = scopeId,
                     RuleId = dep.RuleId,
                     CliTargets = validClis,
                     DeployedAt = dep.DeployedAt
@@ -309,12 +392,14 @@ public class AgentDeploymentService
         {
             foreach (var dep in state.SkillDeployments)
             {
-                var project = projects.FirstOrDefault(p => p.Name == dep.ProjectName);
+                var scopeType = dep.ScopeType;
+                var scopeId = ResolveScopeId(scopeType, dep.ScopeId, dep.ProjectName);
+                var target = ResolveDeploymentTarget(scopeType, scopeId, dep.TargetSubPath, projects, profiles);
                 var skillDef = skillDefs.FirstOrDefault(s => s.Id == dep.SkillId);
-                if (project == null || skillDef == null) { changed = true; continue; }
+                if (target == null || skillDef == null) { changed = true; continue; }
 
                 var validClis = dep.CliTargets
-                    .Where(cli => IsSkillDeployed(project, dep.TargetSubPath, skillDef, cli))
+                    .Where(cli => IsSkillDeployed(target, skillDef, cli))
                     .ToList();
 
                 if (validClis.Count != dep.CliTargets.Count) changed = true;
@@ -323,6 +408,8 @@ public class AgentDeploymentService
                     {
                         ProjectName = dep.ProjectName,
                         TargetSubPath = dep.TargetSubPath,
+                        ScopeType = scopeType,
+                        ScopeId = scopeId,
                         SkillId = dep.SkillId,
                         CliTargets = validClis,
                         DeployedAt = dep.DeployedAt
@@ -348,8 +435,30 @@ public class AgentDeploymentService
     // ─── Path Resolution ─────────────────────────────────────────────────
 
     public string ResolveAgentWriteDir(string projectPath, string targetSubPath, CliTarget cli)
+        => ResolveAgentWriteDir(new DeploymentTarget
+        {
+            ScopeType = DeploymentScopeType.Project,
+            ScopeId = "",
+            Project = new ProjectInfo { Path = projectPath },
+            TargetSubPath = NormalizeTargetSubPath(targetSubPath)
+        }, cli);
+
+    public string ResolveAgentWriteDir(DeploymentTarget target, CliTarget cli)
     {
-        var normalizedSubPath = NormalizeTargetSubPath(targetSubPath);
+        if (target.ScopeType == DeploymentScopeType.Global)
+        {
+            var profile = target.Profile ?? throw new InvalidOperationException("Global profile is required for global scope.");
+            var basePath = GetBasePath(profile, cli);
+            if (string.IsNullOrWhiteSpace(basePath))
+                throw new InvalidOperationException($"Base path for {cli} is not configured.");
+
+            return cli == CliTarget.Copilot
+                ? Path.Combine(basePath, ".github", "agents")
+                : Path.Combine(basePath, "agents");
+        }
+
+        var projectPath = target.Project?.Path ?? throw new InvalidOperationException("Project is required for project scope.");
+        var normalizedSubPath = NormalizeTargetSubPath(target.TargetSubPath);
         var targetDir = string.IsNullOrEmpty(normalizedSubPath)
             ? projectPath
             : Path.Combine(projectPath, normalizedSubPath);
@@ -387,9 +496,26 @@ public class AgentDeploymentService
         };
     }
 
-    private static List<string> ResolveRuleContextFilePaths(string projectPath, string targetSubPath, CliTarget cli)
+    private static List<string> ResolveRuleContextFilePaths(DeploymentTarget target, CliTarget cli)
     {
         var result = new List<string>();
+        if (target.ScopeType == DeploymentScopeType.Global)
+        {
+            var profile = target.Profile;
+            if (profile == null)
+                return result;
+
+            var globalPath = GetRuleFilePath(profile, cli);
+            if (!string.IsNullOrWhiteSpace(globalPath))
+                result.Add(globalPath);
+            return result;
+        }
+
+        var projectPath = target.Project?.Path;
+        if (string.IsNullOrWhiteSpace(projectPath))
+            return result;
+
+        var targetSubPath = NormalizeTargetSubPath(target.TargetSubPath);
         var primary = ResolveContextFilePath(projectPath, targetSubPath, cli);
         if (!string.IsNullOrWhiteSpace(primary))
             result.Add(primary);
@@ -638,11 +764,16 @@ public class AgentDeploymentService
 
     // ─── State Management ─────────────────────────────────────────────────
 
-    private void UpdateAgentState(string projectName, string targetSubPath, string agentId, CliTarget cli, bool deployed)
+    private void UpdateAgentState(DeploymentTarget target, string agentId, CliTarget cli, bool deployed)
     {
         var state = _configService.LoadAgentHubState();
+        var targetSubPath = NormalizeTargetSubPath(target.TargetSubPath);
+        var scopeType = target.ScopeType;
+        var scopeId = ResolveScopeId(scopeType, target.ScopeId, target.Project?.Name ?? target.Profile?.Id ?? "");
+        var projectName = scopeType == DeploymentScopeType.Project ? (target.Project?.Name ?? scopeId) : "";
         var existing = state.AgentDeployments
-            .FirstOrDefault(d => d.ProjectName == projectName
+            .FirstOrDefault(d => d.ScopeType == scopeType
+                              && ResolveScopeId(d.ScopeType, d.ScopeId, d.ProjectName) == scopeId
                               && d.TargetSubPath == targetSubPath
                               && d.AgentId == agentId);
 
@@ -653,6 +784,8 @@ public class AgentDeploymentService
                 {
                     ProjectName = projectName,
                     TargetSubPath = targetSubPath,
+                    ScopeType = scopeType,
+                    ScopeId = scopeId,
                     AgentId = agentId,
                     CliTargets = [cli],
                     DeployedAt = DateTimeOffset.Now
@@ -672,11 +805,16 @@ public class AgentDeploymentService
         _configService.SaveAgentHubState(state);
     }
 
-    private void UpdateRuleState(string projectName, string targetSubPath, string ruleId, CliTarget cli, bool deployed)
+    private void UpdateRuleState(DeploymentTarget target, string ruleId, CliTarget cli, bool deployed)
     {
         var state = _configService.LoadAgentHubState();
+        var targetSubPath = NormalizeTargetSubPath(target.TargetSubPath);
+        var scopeType = target.ScopeType;
+        var scopeId = ResolveScopeId(scopeType, target.ScopeId, target.Project?.Name ?? target.Profile?.Id ?? "");
+        var projectName = scopeType == DeploymentScopeType.Project ? (target.Project?.Name ?? scopeId) : "";
         var existing = state.RuleDeployments
-            .FirstOrDefault(d => d.ProjectName == projectName
+            .FirstOrDefault(d => d.ScopeType == scopeType
+                              && ResolveScopeId(d.ScopeType, d.ScopeId, d.ProjectName) == scopeId
                               && d.TargetSubPath == targetSubPath
                               && d.RuleId == ruleId);
 
@@ -687,6 +825,8 @@ public class AgentDeploymentService
                 {
                     ProjectName = projectName,
                     TargetSubPath = targetSubPath,
+                    ScopeType = scopeType,
+                    ScopeId = scopeId,
                     RuleId = ruleId,
                     CliTargets = [cli],
                     DeployedAt = DateTimeOffset.Now
@@ -706,11 +846,16 @@ public class AgentDeploymentService
         _configService.SaveAgentHubState(state);
     }
 
-    private void UpdateSkillState(string projectName, string targetSubPath, string skillId, CliTarget cli, bool deployed)
+    private void UpdateSkillState(DeploymentTarget target, string skillId, CliTarget cli, bool deployed)
     {
         var state = _configService.LoadAgentHubState();
+        var targetSubPath = NormalizeTargetSubPath(target.TargetSubPath);
+        var scopeType = target.ScopeType;
+        var scopeId = ResolveScopeId(scopeType, target.ScopeId, target.Project?.Name ?? target.Profile?.Id ?? "");
+        var projectName = scopeType == DeploymentScopeType.Project ? (target.Project?.Name ?? scopeId) : "";
         var existing = state.SkillDeployments
-            .FirstOrDefault(d => d.ProjectName == projectName
+            .FirstOrDefault(d => d.ScopeType == scopeType
+                              && ResolveScopeId(d.ScopeType, d.ScopeId, d.ProjectName) == scopeId
                               && d.TargetSubPath == targetSubPath
                               && d.SkillId == skillId);
 
@@ -721,6 +866,8 @@ public class AgentDeploymentService
                 {
                     ProjectName = projectName,
                     TargetSubPath = targetSubPath,
+                    ScopeType = scopeType,
+                    ScopeId = scopeId,
                     SkillId = skillId,
                     CliTargets = [cli],
                     DeployedAt = DateTimeOffset.Now
@@ -738,6 +885,61 @@ public class AgentDeploymentService
             }
         }
         _configService.SaveAgentHubState(state);
+    }
+
+    private DeploymentTarget? ResolveDeploymentTarget(
+        DeploymentScopeType scopeType,
+        string scopeId,
+        string targetSubPath,
+        List<ProjectInfo> projects,
+        List<GlobalDeploymentProfile> profiles)
+    {
+        if (scopeType == DeploymentScopeType.Global)
+        {
+            var profile = profiles.FirstOrDefault(p => string.Equals(p.Id, scopeId, StringComparison.OrdinalIgnoreCase));
+            if (profile == null)
+                return null;
+            return CreateGlobalTarget(profile);
+        }
+
+        var project = projects.FirstOrDefault(p => string.Equals(p.Name, scopeId, StringComparison.OrdinalIgnoreCase));
+        if (project == null)
+            return null;
+        return CreateProjectTarget(project, targetSubPath);
+    }
+
+    private static string ResolveScopeId(DeploymentScopeType scopeType, string? scopeId, string? fallbackProjectName)
+    {
+        if (!string.IsNullOrWhiteSpace(scopeId))
+            return scopeId;
+
+        return scopeType == DeploymentScopeType.Project
+            ? fallbackProjectName ?? ""
+            : "";
+    }
+
+    private static string GetBasePath(GlobalDeploymentProfile profile, CliTarget cli)
+    {
+        return cli switch
+        {
+            CliTarget.Claude => profile.ClaudeBasePath,
+            CliTarget.Codex => profile.CodexBasePath,
+            CliTarget.Copilot => profile.CopilotBasePath,
+            CliTarget.Gemini => profile.GeminiBasePath,
+            _ => ""
+        };
+    }
+
+    private static string GetRuleFilePath(GlobalDeploymentProfile profile, CliTarget cli)
+    {
+        return cli switch
+        {
+            CliTarget.Claude => profile.ClaudeRuleFilePath,
+            CliTarget.Codex => profile.CodexRuleFilePath,
+            CliTarget.Copilot => profile.CopilotRuleFilePath,
+            CliTarget.Gemini => profile.GeminiRuleFilePath,
+            _ => ""
+        };
     }
 
     // ─── Marker Helpers ───────────────────────────────────────────────────

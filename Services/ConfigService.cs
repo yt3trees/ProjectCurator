@@ -197,6 +197,61 @@ public class ConfigService
         File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
+    // ---------- GlobalAgentHubProfiles ----------
+
+    public List<GlobalDeploymentProfile> LoadGlobalAgentHubProfiles()
+    {
+        var path = Path.Combine(ConfigDir, "global_agent_hub_profiles.json");
+        if (!File.Exists(path))
+        {
+            var defaults = CreateDefaultGlobalProfiles();
+            SaveGlobalAgentHubProfiles(defaults);
+            return defaults;
+        }
+
+        try
+        {
+            var content = File.ReadAllText(path, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            var parsed = JsonSerializer.Deserialize<GlobalDeploymentProfilesConfig>(content, JsonOptionsWithEnum);
+            var profiles = parsed?.Profiles ?? [];
+            if (profiles.Count == 0)
+            {
+                profiles = CreateDefaultGlobalProfiles();
+                SaveGlobalAgentHubProfiles(profiles);
+            }
+
+            ExpandGlobalProfilePaths(profiles);
+            return profiles;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ConfigService] LoadGlobalAgentHubProfiles error: {ex}");
+            var fallback = CreateDefaultGlobalProfiles();
+            ExpandGlobalProfilePaths(fallback);
+            return fallback;
+        }
+    }
+
+    public void SaveGlobalAgentHubProfiles(List<GlobalDeploymentProfile> profiles)
+    {
+        EnsureConfigDir();
+        var normalized = profiles
+            .Where(p => p != null)
+            .Select(p =>
+            {
+                p.UpdatedAt = DateTimeOffset.Now;
+                return p;
+            })
+            .ToList();
+        var payload = new GlobalDeploymentProfilesConfig
+        {
+            Profiles = normalized
+        };
+        var path = Path.Combine(ConfigDir, "global_agent_hub_profiles.json");
+        var json = JsonSerializer.Serialize(payload, JsonOptionsWithEnum);
+        File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
     // ---------- private ----------
 
     private void EnsureConfigDir()
@@ -219,6 +274,42 @@ public class ConfigService
         catch (JsonException)
         {
             return new AppSettings();
+        }
+    }
+
+    private static List<GlobalDeploymentProfile> CreateDefaultGlobalProfiles()
+    {
+        return
+        [
+            new GlobalDeploymentProfile
+            {
+                Id = "personal",
+                Name = "Personal",
+                ClaudeBasePath = "%USERPROFILE%\\.claude",
+                CodexBasePath = "%USERPROFILE%\\.codex",
+                CopilotBasePath = "%USERPROFILE%",
+                GeminiBasePath = "%USERPROFILE%\\.gemini",
+                ClaudeRuleFilePath = "%USERPROFILE%\\CLAUDE.md",
+                CodexRuleFilePath = "%USERPROFILE%\\AGENTS.md",
+                CopilotRuleFilePath = "%USERPROFILE%\\.github\\copilot-instructions.md",
+                GeminiRuleFilePath = "%USERPROFILE%\\GEMINI.md",
+                UpdatedAt = DateTimeOffset.Now
+            }
+        ];
+    }
+
+    private static void ExpandGlobalProfilePaths(IEnumerable<GlobalDeploymentProfile> profiles)
+    {
+        foreach (var profile in profiles)
+        {
+            profile.ClaudeBasePath = Environment.ExpandEnvironmentVariables(profile.ClaudeBasePath ?? "");
+            profile.CodexBasePath = Environment.ExpandEnvironmentVariables(profile.CodexBasePath ?? "");
+            profile.CopilotBasePath = Environment.ExpandEnvironmentVariables(profile.CopilotBasePath ?? "");
+            profile.GeminiBasePath = Environment.ExpandEnvironmentVariables(profile.GeminiBasePath ?? "");
+            profile.ClaudeRuleFilePath = Environment.ExpandEnvironmentVariables(profile.ClaudeRuleFilePath ?? "");
+            profile.CodexRuleFilePath = Environment.ExpandEnvironmentVariables(profile.CodexRuleFilePath ?? "");
+            profile.CopilotRuleFilePath = Environment.ExpandEnvironmentVariables(profile.CopilotRuleFilePath ?? "");
+            profile.GeminiRuleFilePath = Environment.ExpandEnvironmentVariables(profile.GeminiRuleFilePath ?? "");
         }
     }
 }

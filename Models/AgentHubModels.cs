@@ -11,6 +11,13 @@ public enum CliTarget
     Gemini
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum DeploymentScopeType
+{
+    Project,
+    Global
+}
+
 public class AgentDefinition
 {
     public string Id { get; set; } = "";
@@ -40,6 +47,8 @@ public class AgentDeployment
 {
     public string ProjectName { get; set; } = "";
     public string TargetSubPath { get; set; } = "";
+    public DeploymentScopeType ScopeType { get; set; } = DeploymentScopeType.Project;
+    public string ScopeId { get; set; } = "";
     public string AgentId { get; set; } = "";
     public List<CliTarget> CliTargets { get; set; } = [];
     public DateTimeOffset DeployedAt { get; set; } = DateTimeOffset.Now;
@@ -49,6 +58,8 @@ public class RuleDeployment
 {
     public string ProjectName { get; set; } = "";
     public string TargetSubPath { get; set; } = "";
+    public DeploymentScopeType ScopeType { get; set; } = DeploymentScopeType.Project;
+    public string ScopeId { get; set; } = "";
     public string RuleId { get; set; } = "";
     public List<CliTarget> CliTargets { get; set; } = [];
     public DateTimeOffset DeployedAt { get; set; } = DateTimeOffset.Now;
@@ -69,9 +80,34 @@ public class SkillDeployment
 {
     public string ProjectName { get; set; } = "";
     public string TargetSubPath { get; set; } = "";
+    public DeploymentScopeType ScopeType { get; set; } = DeploymentScopeType.Project;
+    public string ScopeId { get; set; } = "";
     public string SkillId { get; set; } = "";
     public List<CliTarget> CliTargets { get; set; } = [];
     public DateTimeOffset DeployedAt { get; set; } = DateTimeOffset.Now;
+}
+
+public class GlobalDeploymentProfile
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+
+    public string ClaudeBasePath { get; set; } = "";
+    public string CodexBasePath { get; set; } = "";
+    public string CopilotBasePath { get; set; } = "";
+    public string GeminiBasePath { get; set; } = "";
+
+    public string ClaudeRuleFilePath { get; set; } = "";
+    public string CodexRuleFilePath { get; set; } = "";
+    public string CopilotRuleFilePath { get; set; } = "";
+    public string GeminiRuleFilePath { get; set; } = "";
+
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.Now;
+}
+
+public class GlobalDeploymentProfilesConfig
+{
+    public List<GlobalDeploymentProfile> Profiles { get; set; } = [];
 }
 
 public class AgentHubState
