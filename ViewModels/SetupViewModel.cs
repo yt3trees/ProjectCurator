@@ -398,6 +398,16 @@ public partial class SetupViewModel : ObservableObject
             var sharedWorkDir = Path.Combine(project.Path, "shared", "_work", normalizedId);
             Directory.CreateDirectory(sharedWorkDir);
 
+            var obsidianNotes = Path.Combine(project.Path, "_ai-context", "obsidian_notes");
+            string? obsidianWsDir = null;
+            if (Directory.Exists(obsidianNotes))
+            {
+                obsidianWsDir = Path.Combine(obsidianNotes, "workstreams", normalizedId);
+                Directory.CreateDirectory(obsidianWsDir);
+                foreach (var folder in new[] { "troubleshooting", "daily", "meetings", "notes" })
+                    Directory.CreateDirectory(Path.Combine(obsidianWsDir, folder));
+            }
+
             var label = NewWorkstreamLabel.Trim();
             if (!string.IsNullOrWhiteSpace(label))
                 await UpsertWorkstreamLabelAsync(wsRoot, normalizedId, label, _cts!.Token);
@@ -405,6 +415,8 @@ public partial class SetupViewModel : ObservableObject
             AppendOutput($"[OK] Created workstream '{normalizedId}'.");
             AppendOutput($"  - Context: {wsDir}");
             AppendOutput($"  - Shared:  {sharedWorkDir}");
+            if (obsidianWsDir != null)
+                AppendOutput($"  - Obsidian: {obsidianWsDir}");
 
             NewWorkstreamId = "";
             NewWorkstreamLabel = "";

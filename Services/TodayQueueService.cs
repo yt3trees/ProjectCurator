@@ -212,7 +212,6 @@ public class TodayQueueService
                     currentParent = null;
                     continue;
                 }
-                if (ColaboTagRx.IsMatch(body) || OtherTagRx.IsMatch(body)) { currentParent = null; continue; }
 
                 var dueDate = ParseDueDate(body);
                 var (asanaUrl, asanaGid) = ParseAsanaLink(body);
@@ -230,10 +229,12 @@ public class TodayQueueService
                     AsanaFilePath = asanaPath,
                     IsSubtask = false,
                 };
+                // [コラボ]/[他] の親でも currentParent に設定する。
+                // これにより配下に [担当] サブタスクがある場合にそれを拾える。
                 currentParent = task;
 
-                // 未チェックのみリストに追加
-                if (TopLevelUncheckedRx.IsMatch(line))
+                // [コラボ]/[他] は親タスク自体はリストに追加しない。未チェックの [担当] のみ追加。
+                if (!ColaboTagRx.IsMatch(body) && !OtherTagRx.IsMatch(body) && TopLevelUncheckedRx.IsMatch(line))
                     tasks.Add(task);
                 continue;
             }
