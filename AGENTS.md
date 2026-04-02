@@ -74,9 +74,9 @@ LLM settings are configured in `Settings > LLM API`. Supported providers are `op
 Local Projects Root/
   MyProject/
     development/source/     # local-only repos
-    shared/  (junction)     # → Box Projects Root/MyProject/
+    shared/  (junction)     # → [cloudSyncRoot]/MyProject/
     _ai-context/
-      context/ (junction)   # → Obsidian Vault/Projects/MyProject/ai-context/
+      context/ (junction)   # → [obsidianVaultRoot]/Projects/MyProject/ai-context/
 ```
 
 Projects are classified by tier (`full`/`mini`) and category (`project`/`domain`), detected from path conventions.

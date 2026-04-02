@@ -818,9 +818,9 @@ Last Update: YYYY-MM-DD
 
 | Local path | Link target | Purpose |
 |------------|-------------|---------|
-| `_ai-context/context/` | `Obsidian-Vault/Projects/{{PROJECT_NAME}}/ai-context/` | AI context |
-| `_ai-context/obsidian_notes/` | `Obsidian-Vault/Projects/{{PROJECT_NAME}}/` | Obsidian notes |
-| `shared/` | `Box/Projects/{{PROJECT_NAME}}/` | Shared assets |
+| `_ai-context/context/` | `[obsidianVaultRoot]/Projects/{{PROJECT_NAME}}/ai-context/` | AI context |
+| `_ai-context/obsidian_notes/` | `[obsidianVaultRoot]/Projects/{{PROJECT_NAME}}/` | Obsidian notes |
+| `shared/` | `[cloudSyncRoot]/Projects/{{PROJECT_NAME}}/` | Shared assets |
 
 ## Primary files
 

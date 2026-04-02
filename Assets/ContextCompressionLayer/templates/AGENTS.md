@@ -8,19 +8,17 @@
 - `_ai-context/obsidian_notes/` - Obsidian Knowledge Layer
 - `shared/` - Cloud Sync shared folder junction
 
-Key paths:
-- Obsidian: `%USERPROFILE%\Box\Obsidian-Vault\`
-- BOX: `%USERPROFILE%\Box\Projects\`
-
 ## Directory Structure
 
 ```
 Documents/Projects/{{PROJECT_NAME}}/
 ├── _ai-context/
-│   ├── context/          # → CloudSync/Obsidian-Vault/.../ai-context/
-│   └── obsidian_notes/   # → CloudSync/Obsidian-Vault/...
-├── shared/               # → Box/Projects/{{PROJECT_NAME}}/
+│   ├── context/          # → [obsidianVaultRoot]/.../ai-context/
+│   └── obsidian_notes/   # → [obsidianVaultRoot]/...
+├── shared/               # → [cloudSyncRoot]/Projects/{{PROJECT_NAME}}/
 │   ├── docs/ reference/ records/ _work/
 └── development/source/   # Git-managed
 
 ```
+
+> Actual paths: `%USERPROFILE%\Documents\Projects\_config\curator_state.json`
