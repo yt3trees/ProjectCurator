@@ -568,8 +568,13 @@
                                                             <ui:Button Grid.Column="3"
                                                                        Padding="8,3"
                                                                        Click="OnPinWorkstreamFolderClick"
-                                                                       ToolTip="Pin a recent work folder">
+                                                                       ToolTip="Pin a recent work folder / Right-click: specify full path">
                                                                 <ui:SymbolIcon Symbol="Pin24" FontSize="16"/>
+                                                                <ui:Button.ContextMenu>
+                                                                    <ContextMenu>
+                                                                        <MenuItem Header="Specify Full Path..." Click="OnPinWorkstreamFolderByPathClick"/>
+                                                                    </ContextMenu>
+                                                                </ui:Button.ContextMenu>
                                                             </ui:Button>
                                                         </Grid>
                                                     </DataTemplate>
@@ -640,8 +645,13 @@
                                                    Tag="{Binding}"
                                                    Click="OnPinGeneralWorkFolderClick"
                                                    Margin="0,0,4,0"
-                                                   ToolTip="Pin a general work folder">
+                                                   ToolTip="Pin a general work folder / Right-click: specify full path">
                                             <ui:SymbolIcon Symbol="Pin24" FontSize="16"/>
+                                            <ui:Button.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Specify Full Path..." Click="OnPinGeneralWorkFolderByPathClick"/>
+                                                </ContextMenu>
+                                            </ui:Button.ContextMenu>
                                         </ui:Button>
                                         <ui:Button Padding="8,3"
                                                    Tag="{Binding}"

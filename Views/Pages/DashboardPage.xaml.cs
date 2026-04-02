@@ -1255,6 +1255,20 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         ViewModel.PinFolder(card, ws, picked.Value.FolderName, picked.Value.FullPath);
     }
 
+    private void OnPinWorkstreamFolderByPathClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.MenuItem mi) return;
+        if (mi.Parent is not System.Windows.Controls.ContextMenu cm) return;
+        if (cm.PlacementTarget is not FrameworkElement fe) return;
+        if (fe.DataContext is not WorkstreamCardItem ws) return;
+        var card = FindAncestorDataContext<ProjectCardViewModel>(fe);
+        if (card is null) return;
+
+        var picked = ShowPinByFullPathDialog($"Pin Workstream Folder ({ws.Label})");
+        if (picked is null) return;
+        ViewModel.PinFolder(card, ws, picked.Value.FolderName, picked.Value.FullPath);
+    }
+
     private async void OnPinGeneralWorkFolderClick(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: ProjectCardViewModel card }) return;
@@ -1265,6 +1279,14 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     {
         if (GetCardFromMenuItem(sender) is { } card)
             await PinGeneralWorkFolderAsync(card);
+    }
+
+    private void OnPinGeneralWorkFolderByPathClick(object sender, RoutedEventArgs e)
+    {
+        if (GetCardFromMenuItem(sender) is not { } card) return;
+        var picked = ShowPinByFullPathDialog($"Pin General Work Folder ({card.Info.Name})");
+        if (picked is null) return;
+        ViewModel.PinFolder(card, workstream: null, picked.Value.FolderName, picked.Value.FullPath);
     }
 
     private async Task PinGeneralWorkFolderAsync(ProjectCardViewModel card)
@@ -1473,6 +1495,214 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
 
         _ = dialogWindow.ShowDialog();
         return Task.FromResult(result);
+    }
+
+    private (string FolderName, string FullPath)? ShowPinByFullPathDialog(string title)
+    {
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var accent   = appResources.Contains("AppOverlay2")
+            ? (System.Windows.Media.Brush)appResources["AppOverlay2"]
+            : text;
+
+        // --- タイトルバー ---
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var titleIcon = new System.Windows.Controls.TextBlock
+        {
+            Text = "★", Foreground = accent, FontSize = 13,
+            Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleIcon, 0);
+
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = title, Foreground = text, FontSize = 14,
+            FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(titleText, 1);
+
+        var closeButton = new System.Windows.Controls.Button
+        {
+            Content = "✕", Width = 34, Height = 26,
+            Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
+        };
+        Grid.SetColumn(closeButton, 2);
+
+        titleBar.Children.Add(titleIcon);
+        titleBar.Children.Add(titleText);
+        titleBar.Children.Add(closeButton);
+
+        // --- コンテンツ ---
+        var helper = new System.Windows.Controls.TextBlock
+        {
+            Text = "Enter or browse for the folder to pin:",
+            Foreground = subtext, FontSize = 12,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+
+        var pathBox = new System.Windows.Controls.TextBox
+        {
+            FontSize = 12,
+            Height = 30,
+            Background = surface1,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(6, 4, 6, 4),
+            VerticalContentAlignment = VerticalAlignment.Center,
+        };
+
+        var browseButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Browse...",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            FontSize = 12,
+            Height = 30,
+            MinHeight = 0,
+            Padding = new Thickness(10, 0, 10, 0),
+            Margin = new Thickness(6, 0, 0, 0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+        };
+
+        var pathRow = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(browseButton, Dock.Right);
+        pathRow.Children.Add(browseButton);
+        pathRow.Children.Add(pathBox);
+
+        var folderNameCaption = new System.Windows.Controls.TextBlock
+        {
+            Text = "Folder Name:",
+            Foreground = subtext, FontSize = 11,
+            Margin = new Thickness(0, 10, 0, 2)
+        };
+
+        var folderNameLabel = new System.Windows.Controls.TextBlock
+        {
+            Foreground = text, FontSize = 12,
+            FontStyle = FontStyles.Italic
+        };
+
+        var contentPanel = new StackPanel
+        {
+            Margin = new Thickness(16, 12, 16, 8),
+        };
+        contentPanel.Children.Add(helper);
+        contentPanel.Children.Add(pathRow);
+        contentPanel.Children.Add(folderNameCaption);
+        contentPanel.Children.Add(folderNameLabel);
+
+        // --- フッター ---
+        var pinButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Pin",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 100, Height = 32,
+            Margin = new Thickness(0, 0, 8, 0), IsDefault = true
+        };
+        var cancelButton = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 100, Height = 32, IsCancel = true,
+            Margin = new Thickness(0)
+        };
+
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 0, 16, 12),
+        };
+        footer.Children.Add(pinButton);
+        footer.Children.Add(cancelButton);
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(contentPanel, 1);
+        Grid.SetRow(footer, 2);
+        root.Children.Add(titleBar);
+        root.Children.Add(contentPanel);
+        root.Children.Add(footer);
+
+        var owner = Window.GetWindow(this);
+        var dialogWindow = new Window
+        {
+            Title = "",
+            Owner = owner,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            SizeToContent = SizeToContent.Height,
+            WindowStyle = WindowStyle.None,
+            MinWidth = 480, Width = 480,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            Content = root
+        };
+        (string FolderName, string FullPath)? result = null;
+
+        // パス入力変更 → フォルダ名ラベル自動更新
+        pathBox.TextChanged += (_, _) =>
+        {
+            var p = pathBox.Text.TrimEnd('\\', '/');
+            folderNameLabel.Text = string.IsNullOrWhiteSpace(p) ? "" : Path.GetFileName(p);
+        };
+
+        browseButton.Click += (_, _) =>
+        {
+            using var dlg = new System.Windows.Forms.FolderBrowserDialog
+            {
+                Description = "Select folder to pin",
+                UseDescriptionForTitle = true,
+                SelectedPath = Directory.Exists(pathBox.Text) ? pathBox.Text : ""
+            };
+            if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                pathBox.Text = dlg.SelectedPath;
+        };
+
+        pinButton.Click += (_, _) =>
+        {
+            var fullPath = pathBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(fullPath)) return;
+            if (!Directory.Exists(fullPath))
+            {
+                System.Windows.MessageBox.Show(
+                    $"Folder not found:\n{fullPath}",
+                    "Pin Folder",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Warning);
+                return;
+            }
+            var folderName = Path.GetFileName(fullPath.TrimEnd('\\', '/'));
+            if (string.IsNullOrWhiteSpace(folderName)) folderName = fullPath;
+            result = (folderName, fullPath);
+            dialogWindow.DialogResult = true;
+            dialogWindow.Close();
+        };
+        cancelButton.Click += (_, _) => { dialogWindow.DialogResult = false; dialogWindow.Close(); };
+        closeButton.Click  += (_, _) => { dialogWindow.DialogResult = false; dialogWindow.Close(); };
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) dialogWindow.DragMove();
+        };
+
+        _ = dialogWindow.ShowDialog();
+        return result;
     }
 
     private static T? FindAncestorDataContext<T>(DependencyObject start)
