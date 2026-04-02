@@ -1647,7 +1647,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             ResizeMode = ResizeMode.NoResize,
             SizeToContent = SizeToContent.Height,
             WindowStyle = WindowStyle.None,
-            MinWidth = 480, Width = 480,
+            MinWidth = 480, MinHeight = 0, Width = 480,
             Background = surface,
             Foreground = text,
             BorderBrush = surface2,

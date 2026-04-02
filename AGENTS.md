@@ -120,6 +120,8 @@ When adding modal dialogs, follow the patterns in `DashboardPage.xaml.cs` (canon
   - simple text row: `DisplayMemberPath`
   - custom row layout (trimming/wrap/icon/multi-column): `ItemTemplate`
 - `ListBox` in themed dialogs: avoid default OS selection visuals. Define `ItemContainerStyle` (or override selection brushes) so selected/hover states use app theme brushes (`AppSurface*`, `AppText`) for consistent dark-mode appearance.
+- Code-behind dialog windows with `SizeToContent = SizeToContent.Height`: always set `MinHeight = 0` explicitly. The wpf-ui `ControlsDictionary` applies a `MinHeight` via style setters to `Window`, which takes precedence over `SizeToContent` and makes the window far taller than its content. A local value (`MinHeight = 0`) overrides the style setter and lets `SizeToContent` size the window correctly.
+- `WindowChrome` on `NoResize` dialogs: do NOT apply `WindowChrome` when `ResizeMode = ResizeMode.NoResize`. `WindowChrome` is only required for `ResizeMode.CanResize` + `WindowStyle.None` (to remove the DWM white resize border). Applying it to a `NoResize` dialog interferes with `SizeToContent` and causes the window to render with excess height.
 - Frameless resizable windows: when using `WindowStyle = WindowStyle.None` with `ResizeMode = ResizeMode.CanResize`, the DWM adds a white resize border. Apply `WindowChrome` immediately after window creation to remove it while keeping resize functionality:
 
 ```csharp
