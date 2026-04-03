@@ -678,8 +678,9 @@ public class ProjectDiscoveryService
 
     private List<ProjectInfo> ScanProjects()
     {
-        var root = _configService.WorkspaceRoot;
+        var root = _configService.LoadSettings().LocalProjectsRoot;
         var projects = new List<ProjectInfo>();
+        if (string.IsNullOrWhiteSpace(root)) return projects;
         var now = DateTime.Now;
 
         if (Directory.Exists(root))

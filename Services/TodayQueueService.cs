@@ -276,7 +276,7 @@ public class TodayQueueService
     // ---- Snooze 管理 ----
 
     private string SnoozeFilePath =>
-        Path.Combine(_configService.WorkspaceRoot, "_config", "today_queue_snooze.json");
+        Path.Combine(_configService.ConfigDir, "today_queue_snooze.json");
 
     public void EnsureSnoozeLoaded()
     {

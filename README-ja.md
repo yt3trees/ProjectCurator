@@ -658,7 +658,7 @@ Asanaを使う場合のみ設定します。
 - `Dashboard` を再読み込みして Today Queue を更新
 
 補足(通常は直接編集不要):
-- Asana の設定値は `Documents\Projects\_config\asana_global.json` に保存されます
+- Asana の設定値は設定ディレクトリ (`%USERPROFILE%\.projectcurator\asana_global.json` がデフォルト) に保存されます
 - プロジェクト単位の詳細設定は `{CloudSyncProject}\asana_config.json` に保存されます
 
 </details>
@@ -757,7 +757,9 @@ Convert Tier タブ:
 `ConfigService` は次のフォルダを利用します。
 
 ```text
-%USERPROFILE%\Documents\Projects\_config\
+%USERPROFILE%\.projectcurator\          ← デフォルト (新規インストール)
+  (既存ユーザーは %USERPROFILE%\Documents\Projects\_config\ を自動検出)
+  (PROJECTCURATOR_CONFIG_DIR 環境変数で任意のパスに上書き可)
 ├── settings.json
 ├── hidden_projects.json
 ├── asana_global.json

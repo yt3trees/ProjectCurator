@@ -661,7 +661,7 @@ If tasks do not appear:
 - Refresh `Dashboard` to reload Today Queue
 
 Reference (you usually do not edit these directly):
-- Global Asana values are stored in `Documents\Projects\_config\asana_global.json`
+- Global Asana values are stored in the config directory (`%USERPROFILE%\.projectcurator\asana_global.json` by default)
 - Per-project advanced settings are stored in `{CloudSyncProject}\asana_config.json`
 
 </details>
@@ -760,7 +760,9 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 `ConfigService` reads and writes:
 
 ```text
-%USERPROFILE%\Documents\Projects\_config\
+%USERPROFILE%\.projectcurator\          ← default (new installs)
+  (or %USERPROFILE%\Documents\Projects\_config\ for existing installs — detected automatically)
+  (or override via PROJECTCURATOR_CONFIG_DIR environment variable)
 ├── settings.json
 ├── hidden_projects.json
 ├── asana_global.json

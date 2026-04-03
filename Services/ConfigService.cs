@@ -23,31 +23,39 @@ public class ConfigService
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public string WorkspaceRoot { get; }
-    public string ConfigDir => Path.Combine(WorkspaceRoot, "_config");
+    public string ConfigDir { get; }
 
     public ConfigService()
     {
-        WorkspaceRoot = DetectWorkspaceRoot();
+        ConfigDir = DetectConfigDir();
     }
 
-    public ConfigService(string workspaceRoot)
+    public ConfigService(string configDir)
     {
-        WorkspaceRoot = workspaceRoot;
+        ConfigDir = configDir;
     }
 
-    private static string DetectWorkspaceRoot()
+    private static string DetectConfigDir()
     {
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var candidate = Path.Combine(userProfile, "Documents", "Projects", "_config", "settings.json");
-        if (File.Exists(candidate))
-        {
-            // WorkspaceRoot は _config の親
-            return Path.GetFullPath(Path.Combine(Path.GetDirectoryName(candidate)!, ".."));
-        }
 
-        // 見つからなければデフォルト
-        return Path.Combine(userProfile, "Documents", "Projects");
+        // 1. 環境変数オーバーライド
+        var envOverride = Environment.GetEnvironmentVariable("PROJECTCURATOR_CONFIG_DIR");
+        if (!string.IsNullOrWhiteSpace(envOverride) && Directory.Exists(envOverride))
+            return envOverride;
+
+        // 2. 新標準パス
+        var newPath = Path.Combine(userProfile, ".projectcurator");
+        if (File.Exists(Path.Combine(newPath, "settings.json")))
+            return newPath;
+
+        // 3. 後方互換 (旧パス)
+        var legacyPath = Path.Combine(userProfile, "Documents", "Projects", "_config");
+        if (File.Exists(Path.Combine(legacyPath, "settings.json")))
+            return legacyPath;
+
+        // 4. 初回起動デフォルト
+        return newPath;
     }
 
     // ---------- AppSettings ----------
