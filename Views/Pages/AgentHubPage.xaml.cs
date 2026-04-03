@@ -681,6 +681,27 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
         }
     }
 
+    private void OnImportFromDirectoryClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Select directory containing agents and/or skills",
+            Multiselect = false
+        };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            var result = ViewModel.ImportFromDirectory(dialog.FolderName);
+            ViewModel.StatusMessage = result.Errors.Count > 0
+                ? $"Import: {result.ToStatusMessage()} — {string.Join("; ", result.Errors)}"
+                : $"Import from directory: {result.ToStatusMessage()}";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"Import directory error: {ex.Message}";
+        }
+    }
+
     private void OnImportLibraryZipClick(object sender, RoutedEventArgs e)
     {
         var dialog = new Win32OpenFileDialog

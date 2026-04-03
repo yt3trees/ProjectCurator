@@ -808,6 +808,14 @@ public partial class AgentHubViewModel : ObservableObject
         QueueDeploymentRefresh(includeTargetCandidates: true);
     }
 
+    public ImportDirectoryResult ImportFromDirectory(string dirPath)
+    {
+        var result = _agentHubService.ImportFromDirectory(dirPath, overwrite: false);
+        LoadLibrary();
+        QueueDeploymentRefresh(includeTargetCandidates: true);
+        return result;
+    }
+
     // ── Agent CRUD ────────────────────────────────────────────────────────
 
     public (string Body, string ExtraFrontmatter) GetAgentContentForEdit(AgentDefinition def)

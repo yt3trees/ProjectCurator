@@ -116,3 +116,23 @@ public class AgentHubState
     public List<RuleDeployment> RuleDeployments { get; set; } = [];
     public List<SkillDeployment> SkillDeployments { get; set; } = [];
 }
+
+public class ImportDirectoryResult
+{
+    public int AgentsImported { get; set; }
+    public int AgentsSkipped  { get; set; }
+    public int SkillsImported { get; set; }
+    public int SkillsSkipped  { get; set; }
+    public List<string> Errors { get; set; } = [];
+
+    public string ToStatusMessage()
+    {
+        var parts = new List<string>();
+        if (AgentsImported > 0) parts.Add($"{AgentsImported} agent(s) imported");
+        if (AgentsSkipped  > 0) parts.Add($"{AgentsSkipped} skipped (already exist)");
+        if (SkillsImported > 0) parts.Add($"{SkillsImported} skill(s) imported");
+        if (SkillsSkipped  > 0) parts.Add($"{SkillsSkipped} skill(s) skipped (already exist)");
+        if (Errors.Count   > 0) parts.Add($"{Errors.Count} error(s)");
+        return parts.Count == 0 ? "Nothing found to import." : string.Join(", ", parts) + ".";
+    }
+}

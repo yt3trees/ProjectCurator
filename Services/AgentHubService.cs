@@ -390,6 +390,164 @@ public class AgentHubService
     }
 
 
+    public ImportDirectoryResult ImportFromDirectory(string dirPath, bool overwrite)
+    {
+        if (!Directory.Exists(dirPath))
+            throw new DirectoryNotFoundException($"Directory not found: {dirPath}");
+
+        EnsureDir(AgentHubDir);
+        EnsureDir(AgentsDir);
+        EnsureDir(SkillsDir);
+
+        var result = new ImportDirectoryResult();
+
+        // Agents
+        var agentsMdDir = Directory.Exists(Path.Combine(dirPath, "agents"))
+            ? Path.Combine(dirPath, "agents")
+            : dirPath;
+        foreach (var mdFile in Directory.GetFiles(agentsMdDir, "*.md", SearchOption.TopDirectoryOnly))
+        {
+            if (Path.GetFileName(mdFile).Equals("SKILL.md", StringComparison.OrdinalIgnoreCase))
+                continue;
+            try   { ImportAgentFromMd(mdFile, overwrite, result); }
+            catch (Exception ex) { result.Errors.Add($"Agent '{Path.GetFileName(mdFile)}': {ex.Message}"); }
+        }
+
+        // Skills
+        IEnumerable<string> skillDirs = Directory.Exists(Path.Combine(dirPath, "skills"))
+            ? Directory.GetDirectories(Path.Combine(dirPath, "skills"))
+            : Directory.GetDirectories(dirPath).Where(d => File.Exists(Path.Combine(d, "SKILL.md")));
+        foreach (var skillSrcDir in skillDirs)
+        {
+            if (!File.Exists(Path.Combine(skillSrcDir, "SKILL.md"))) continue;
+            try   { ImportSkillFromDirectory(skillSrcDir, overwrite, result); }
+            catch (Exception ex) { result.Errors.Add($"Skill '{Path.GetFileName(skillSrcDir)}': {ex.Message}"); }
+        }
+
+        return result;
+    }
+
+    private void ImportAgentFromMd(string mdPath, bool overwrite, ImportDirectoryResult result)
+    {
+        var raw = File.ReadAllText(mdPath, new UTF8Encoding(false));
+        string name = "", description = "";
+
+        var match = Regex.Match(raw.TrimStart(),
+            @"\A---\r?\n([\s\S]*?)\r?\n---\r?\n?", RegexOptions.CultureInvariant);
+        if (match.Success)
+        {
+            foreach (var line in match.Groups[1].Value.Replace("\r\n", "\n").Split('\n'))
+            {
+                var idx = line.IndexOf(':');
+                if (idx <= 0) continue;
+                var key = line[..idx].Trim();
+                var val = line[(idx + 1)..].Trim().Trim('"', '\'');
+                if (key.Equals("name",        StringComparison.OrdinalIgnoreCase)) name        = val;
+                if (key.Equals("description", StringComparison.OrdinalIgnoreCase)) description = val;
+            }
+        }
+        if (string.IsNullOrWhiteSpace(name))
+            name = Path.GetFileNameWithoutExtension(mdPath);
+
+        var id = name.ToLowerInvariant()
+                     .Replace(" ", "-").Replace("/", "-").Replace("\\", "-");
+
+        if (!overwrite && File.Exists(Path.Combine(AgentsDir, id + ".json")))
+        { result.AgentsSkipped++; return; }
+
+        var now = DateTimeOffset.Now;
+        var existingJsonPath = Path.Combine(AgentsDir, id + ".json");
+        AgentDefinition? existing = null;
+        if (File.Exists(existingJsonPath))
+        {
+            try { existing = JsonSerializer.Deserialize<AgentDefinition>(
+                      File.ReadAllText(existingJsonPath, new UTF8Encoding(false)), JsonOptions); }
+            catch { }
+        }
+
+        var def = new AgentDefinition
+        {
+            Id          = id,
+            Name        = name,
+            Description = description,
+            ContentFile = id + ".md",
+            CreatedAt   = existing?.CreatedAt ?? now,
+            UpdatedAt   = now
+        };
+
+        File.WriteAllText(Path.Combine(AgentsDir, id + ".json"),
+            JsonSerializer.Serialize(def, JsonOptions), new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(AgentsDir, id + ".md"), raw, new UTF8Encoding(false));
+
+        result.AgentsImported++;
+    }
+
+    private void ImportSkillFromDirectory(string skillSrcDir, bool overwrite, ImportDirectoryResult result)
+    {
+        var skillMdPath = Path.Combine(skillSrcDir, "SKILL.md");
+        var raw = File.ReadAllText(skillMdPath, new UTF8Encoding(false));
+        string name = "", description = "";
+
+        var match = Regex.Match(raw.TrimStart(),
+            @"\A---\r?\n([\s\S]*?)\r?\n---\r?\n?", RegexOptions.CultureInvariant);
+        if (match.Success)
+        {
+            foreach (var line in match.Groups[1].Value.Replace("\r\n", "\n").Split('\n'))
+            {
+                var idx = line.IndexOf(':');
+                if (idx <= 0) continue;
+                var key = line[..idx].Trim();
+                var val = line[(idx + 1)..].Trim().Trim('"', '\'');
+                if (key.Equals("name",        StringComparison.OrdinalIgnoreCase)) name        = val;
+                if (key.Equals("description", StringComparison.OrdinalIgnoreCase)) description = val;
+            }
+        }
+        if (string.IsNullOrWhiteSpace(name))
+            name = Path.GetFileName(skillSrcDir);
+
+        var id = name.ToLowerInvariant()
+                     .Replace(" ", "-").Replace("/", "-").Replace("\\", "-");
+
+        if (Array.Exists(BuiltInSkillNames, n => n == id))
+        {
+            result.Errors.Add($"'{id}' is a built-in skill and cannot be overwritten.");
+            return;
+        }
+
+        var dstSkillDir = Path.Combine(SkillsDir, id);
+        if (!overwrite && Directory.Exists(dstSkillDir))
+        { result.SkillsSkipped++; return; }
+
+        CopyDirectoryContents(skillSrcDir, dstSkillDir);
+
+        var metaPath = Path.Combine(dstSkillDir, "meta.json");
+        SkillDefinition meta;
+        if (File.Exists(metaPath))
+        {
+            try { meta = JsonSerializer.Deserialize<SkillDefinition>(
+                      File.ReadAllText(metaPath, new UTF8Encoding(false)), JsonOptions)
+                      ?? new SkillDefinition { CreatedAt = DateTimeOffset.Now }; }
+            catch { meta = new SkillDefinition { CreatedAt = DateTimeOffset.Now }; }
+        }
+        else
+        {
+            meta = new SkillDefinition { CreatedAt = DateTimeOffset.Now };
+        }
+
+        if (string.IsNullOrWhiteSpace(meta.Name))        meta.Name        = name;
+        if (string.IsNullOrWhiteSpace(meta.Description)) meta.Description = description;
+        meta.Id               = id;
+        meta.IsBuiltIn        = false;
+        meta.ContentDirectory = dstSkillDir;
+        meta.UpdatedAt        = DateTimeOffset.Now;
+
+        File.WriteAllText(metaPath,
+            JsonSerializer.Serialize(meta, JsonOptions), new UTF8Encoding(false));
+
+        result.SkillsImported++;
+    }
+
+
     private static string EmbedFrontmatter(AgentDefinition def, string content)
     {
         var trimmed = content.TrimStart();
