@@ -95,6 +95,14 @@ Required config files are created automatically when you save.
 - Enable schedule if needed and save
 - Run a manual sync once to create/update task files
 
+To distribute personal project tasks across your local projects:
+
+- Add your personal Asana project GIDs to `personal_project_gids` in `Settings`
+  - These are Asana projects not tied to any specific local project (e.g. a personal GTD project), separate from per-project `asana_config.json` mappings
+- During sync, tasks from `personal_project_gids` are distributed using the task's `Project` custom field
+  - If the `Project` field matches a local project name → appended to that project's `asana-tasks.md`
+  - If no match is found → written to `asana-tasks-personal.md`
+
 </details>
 
 ### 5. Optional: Set up LLM / AI features
