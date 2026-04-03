@@ -259,6 +259,30 @@ internal static class ProposalReviewDialog
         root.Children.Add(diffHeader); root.Children.Add(diffViewer);
         root.Children.Add(refineRow); root.Children.Add(footerGrid);
 
+        // ウィンドウ境界線
+        var border = new Border
+        {
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            IsHitTestVisible = false
+        };
+        var borderStyle = new Style(typeof(Border));
+        var borderTrigger = new DataTrigger
+        {
+            Binding = new System.Windows.Data.Binding("WindowState")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(Window), 1)
+            },
+            Value = WindowState.Maximized
+        };
+        borderTrigger.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(0)));
+        borderStyle.Triggers.Add(borderTrigger);
+        border.Style = borderStyle;
+
+        Grid.SetRow(border, 0);
+        Grid.SetRowSpan(border, 6);
+        root.Children.Add(border);
+
         var dialog = new Window
         {
             Content = root, Width = 760, Height = 580,
@@ -420,6 +444,17 @@ internal static class ProposalReviewDialog
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         Grid.SetRow(titleBar, 0); Grid.SetRow(textBox, 1);
         root.Children.Add(titleBar); root.Children.Add(textBox);
+
+        // ウィンドウ境界線
+        var b = new Border
+        {
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            IsHitTestVisible = false
+        };
+        Grid.SetRow(b, 0);
+        Grid.SetRowSpan(b, 2);
+        root.Children.Add(b);
 
         var d = new Window
         {

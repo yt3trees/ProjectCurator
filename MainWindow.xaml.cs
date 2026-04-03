@@ -104,10 +104,10 @@ public partial class MainWindow : FluentWindow
             SetClassLong32(_hwnd, GCLP_HBRBACKGROUND, 0);
         var disabled = 1;
         DwmSetWindowAttribute(_hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, ref disabled, sizeof(int));
-        // ウィンドウ枠をアプリ背景色 (#0D1117) に統一する (Windows 11+)
-        // 最大化時のアクセントカラーちらつきを目立たなくする
-        // COLORREF 形式: 0x00BBGGRR = B=0x17, G=0x11, R=0x0D
-        var borderColor = 0x0017110D;
+        // ウィンドウ枠にうっすらグレー (#30363D) を設定する (Windows 11+)
+        // 背景が暗い場合に境界線をわかりやすくするため
+        // COLORREF 形式: 0x00BBGGRR = B=0x3D, G=0x36, R=0x30
+        var borderColor = 0x003D3630;
         DwmSetWindowAttribute(_hwnd, DWMWA_BORDER_COLOR, ref borderColor, sizeof(int));
     }
 

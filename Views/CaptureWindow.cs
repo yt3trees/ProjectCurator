@@ -206,6 +206,19 @@ public class CaptureWindow : Window
             BorderThickness = new Thickness(1),
             IsHitTestVisible = false
         };
+        var borderStyle = new Style(typeof(Border));
+        var borderTrigger = new DataTrigger
+        {
+            Binding = new System.Windows.Data.Binding("WindowState")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(Window), 1)
+            },
+            Value = WindowState.Maximized
+        };
+        borderTrigger.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(0)));
+        borderStyle.Triggers.Add(borderTrigger);
+        border.Style = borderStyle;
+
         Grid.SetRow(border, 0);
         Grid.SetRowSpan(border, 2);
         _root.Children.Add(border);

@@ -2917,7 +2917,18 @@ internal class InputDialog : Window
         btnPanel.Children.Add(ok);
         btnPanel.Children.Add(cancel);
         panel.Children.Add(btnPanel);
-        Content = panel;
+
+        var border = new Border
+        {
+            BorderBrush = appSurface2 ?? fallbackSurface2,
+            BorderThickness = new Thickness(1),
+            IsHitTestVisible = false
+        };
+        var root = new Grid();
+        root.Children.Add(panel);
+        root.Children.Add(border);
+
+        Content = root;
         Loaded += (s, e) => _textBox.Focus();
     }
 }

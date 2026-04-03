@@ -140,6 +140,30 @@ public partial class GitReposPage : WpfUserControl, INavigableView<GitReposViewM
         root.Children.Add(content);
         root.Children.Add(footer);
 
+        // ウィンドウ境界線
+        var border = new Border
+        {
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            IsHitTestVisible = false
+        };
+        var borderStyle = new Style(typeof(Border));
+        var borderTrigger = new DataTrigger
+        {
+            Binding = new System.Windows.Data.Binding("WindowState")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(Window), 1)
+            },
+            Value = WindowState.Maximized
+        };
+        borderTrigger.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(0)));
+        borderStyle.Triggers.Add(borderTrigger);
+        border.Style = borderStyle;
+
+        Grid.SetRow(border, 0);
+        Grid.SetRowSpan(border, 3);
+        root.Children.Add(border);
+
         dialog = new Window
         {
             Owner = Window.GetWindow(this),
@@ -151,6 +175,8 @@ public partial class GitReposPage : WpfUserControl, INavigableView<GitReposViewM
             MinWidth = 500,
             MinHeight = 300,
             Content = root,
+            Background = surface0,
+            Foreground = text,
             ShowInTaskbar = false
         };
         System.Windows.Shell.WindowChrome.SetWindowChrome(dialog,
