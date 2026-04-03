@@ -39,13 +39,17 @@ Whether you run many projects in parallel or manage a single complex one, Projec
 | Asana Sync | Sync Asana tasks to project/workstream Markdown outputs |
 | Agent Hub | Manage reusable sub-agent/context-rule library and deploy per project, per CLI |
 | Setup | Create/check/archive projects, tier conversion, workstream management |
-| Settings | Theme, hotkey, workspace paths, LLM API configuration |
+| Settings | Hotkey, workspace roots, LLM API configuration |
 
 ## Screenshots
 
 | Dashboard | Editor |
 |---|---|
-| ![](_assets/Dashboard-Card.png) | ![](_assets/Editor.png) |
+| ![](_assets/Dashboard.png) | ![](_assets/Editor.png) |
+
+| Agent Hub | Timeline |
+|---|---|
+| ![](_assets/AgentHub.png) | ![](_assets/Timeline.png) |
 
 | AI: What's Next | AI: Import Meeting Notes |
 |---|---|
@@ -116,22 +120,11 @@ Required config files are created automatically when you save.
 
 Your environment is now ready. Configure Asana Sync later if needed.
 
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|---|---|
-| `Ctrl+K` | Open Command Palette |
-| `Ctrl+1` - `Ctrl+8` | Navigate pages |
-| `Ctrl+S` | Save in Editor |
-| `Ctrl+F` | Search in Editor |
-| `Ctrl+Shift+P` | Toggle app visibility (default) |
-| `Ctrl+Shift+C` | Open Quick Capture window |
-
 ## Requirements
 
 - Windows
-- .NET 9 Runtime (SDK if building from source)
 - Git
+- .NET 9 SDK is needed only when building from source (release builds are self-contained and require no runtime)
 
 Tech stack: .NET 9 + WPF, wpf-ui 3.x, AvalonEdit, CommunityToolkit.Mvvm
 

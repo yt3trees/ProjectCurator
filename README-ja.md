@@ -37,13 +37,17 @@ ProjectCurator は、人間とAI両方にとっての「面倒な行き来」を
 | Asana Sync | Asanaタスクをプロジェクト別/Workstream別Markdownに同期 |
 | Agent Hub | サブエージェント/コンテキストルールのライブラリ管理と、CLI別Deploy/Undeploy |
 | Setup | プロジェクト作成、構成チェック、Tier変換、Workstream管理 |
-| Settings | テーマ、ホットキー、パス、LLM API設定 |
+| Settings | ホットキー、ワークスペースルート、LLM API設定 |
 
 ## 画面イメージ
 
 | Dashboard | Editor |
 |---|---|
-| ![](_assets/Dashboard-Card.png) | ![](_assets/Editor.png) |
+| ![](_assets/Dashboard.png) | ![](_assets/Editor.png) |
+
+| Agent Hub | Timeline |
+|---|---|
+| ![](_assets/AgentHub.png) | ![](_assets/Timeline.png) |
 
 | AI: What's Next | AI: Import Meeting Notes |
 |---|---|
@@ -114,22 +118,11 @@ ProjectCurator は、人間とAI両方にとっての「面倒な行き来」を
 
 これで準備は完了です。必要に応じて Asana Sync 等を設定してください。
 
-## キーボードショートカット
-
-| Shortcut | Action |
-|---|---|
-| `Ctrl+K` | Command Paletteを開く |
-| `Ctrl+1` - `Ctrl+8` | 各ページへ移動 |
-| `Ctrl+S` | Editorで保存 |
-| `Ctrl+F` | Editor検索 |
-| `Ctrl+Shift+P` | アプリ表示/非表示(既定) |
-| `Ctrl+Shift+C` | Quick Capture ウィンドウを開く |
-
 ## 前提環境
 
 - Windows
-- .NET 9 Runtime(ソースビルドする場合はSDK)
 - Git
+- ソースからビルドする場合のみ .NET 9 SDK が必要(リリース版は自己完結型のため Runtime 不要)
 
 技術スタック: .NET 9 + WPF, wpf-ui 3.x, AvalonEdit, CommunityToolkit.Mvvm
 
