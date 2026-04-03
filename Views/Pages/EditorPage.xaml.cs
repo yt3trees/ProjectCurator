@@ -1419,7 +1419,19 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             chk.Unchecked += (s, e) => UpdateGenerateButtonState();
         }
         // 初期状態
-        generateButton.IsEnabled = candidates.Count > 0 && candidates.Any(c => c.IsSelected);
+        UpdateGenerateButtonState();
+
+        // Ctrl+Enter で Generate
+        inputBox.KeyDown += (s, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.Enter
+                && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0
+                && generateButton.IsEnabled)
+            {
+                generateButton.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+                e.Handled = true;
+            }
+        };
 
         // ---- レイアウト ----
         var root = new Grid();

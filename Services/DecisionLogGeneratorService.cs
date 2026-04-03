@@ -135,7 +135,9 @@ public class DecisionLogGeneratorService
         IReadOnlyList<string>? attachedFilePaths = null,
         CancellationToken ct = default)
     {
-        var systemPrompt = BuildDraftSystemPrompt();
+        var isJapanese   = System.Globalization.CultureInfo.CurrentUICulture
+                               .TwoLetterISOLanguageName == "ja";
+        var systemPrompt = BuildDraftSystemPrompt(isJapanese);
         var userPrompt   = await BuildDraftUserPromptAsync(
             userInput, selectedCandidates, status, trigger, project, workstreamId, attachedFilePaths);
 
@@ -322,7 +324,9 @@ public class DecisionLogGeneratorService
         IReadOnlyList<(string instruction, string result)> history,
         CancellationToken ct = default)
     {
-        var systemPrompt = BuildDraftSystemPrompt();
+        var isJapanese   = System.Globalization.CultureInfo.CurrentUICulture
+                               .TwoLetterISOLanguageName == "ja";
+        var systemPrompt = BuildDraftSystemPrompt(isJapanese);
         var messages = new List<(string role, string content)>
         {
             ("user",      initialUserPrompt),
@@ -413,53 +417,107 @@ public class DecisionLogGeneratorService
         Output ONLY the JSON array, no explanation.
         """;
 
-    private static string BuildDraftSystemPrompt() => """
-        You are an assistant that creates structured decision log entries.
+    private static string BuildDraftSystemPrompt(bool isJapanese)
+    {
+        if (isJapanese)
+            return """
+                You are an assistant that creates structured decision log entries.
 
-        ## Output rules
-        - Output the decision log in Markdown following the template below.
-        - Title and filename must be in English (snake_case for filename).
-        - Body text should match the language of the user's input and context files.
-        - Options section must list at least 2 alternatives (if info is insufficient, note what was implicitly rejected).
-        - Why section must cite specific reasoning (not "AI recommended").
-        - Revisit Trigger must be a measurable condition.
-        - If information is insufficient, write "TBD" for that field.
+                ## Output rules
+                - Output the decision log in Markdown following the template below.
+                - Title and filename must be in Japanese. Use a natural Japanese noun phrase for the filename (e.g. りんごの選択, データベースの選定, 認証方式の変更).
+                - Body text should match the language of the user's input and context files.
+                - Options section must list at least 2 alternatives (if info is insufficient, note what was implicitly rejected).
+                - Why section must cite specific reasoning (not "AI recommended").
+                - Revisit Trigger must be a measurable condition.
+                - If information is insufficient, write "TBD" for that field.
 
-        ## Template
-        # Decision: {English Title}
+                ## Template
+                # Decision: {Japanese Title}
 
-        > Date: {YYYY-MM-DD}
-        > Status: Confirmed / Tentative
-        > Trigger: {AI session / Meeting / Solo decision}
+                > Date: {YYYY-MM-DD}
+                > Status: Confirmed / Tentative
+                > Trigger: {AI session / Meeting / Solo decision}
 
-        ## Context
-        {2-3 sentences based on current_focus.md and project_summary.md}
+                ## Context
+                {2-3 sentences based on current_focus.md and project_summary.md}
 
-        ## Options
+                ## Options
 
-        ### Option A: {Name}
-        - Pros:
-        - Cons:
+                ### Option A: {Name}
+                - Pros:
+                - Cons:
 
-        ### Option B: {Name}
-        - Pros:
-        - Cons:
+                ### Option B: {Name}
+                - Pros:
+                - Cons:
 
-        ## Chosen
-        Option {X}: {Name}
+                ## Chosen
+                Option {X}: {Name}
 
-        ## Why
-        {2-4 sentences}
+                ## Why
+                {2-4 sentences}
 
-        ## Risk
-        -
+                ## Risk
+                -
 
-        ## Revisit Trigger
-        -
+                ## Revisit Trigger
+                -
 
-        ## Additional output (after --- separator)
-        After the decision log content, output a separator line "---" followed by:
-        FILENAME: {english_snake_case_topic}
-        RESOLVED_TENSION: {item text from tensions.md that this decision resolves, or "none"}
-        """;
+                ## Additional output (after --- separator)
+                After the decision log content, output a separator line "---" followed by:
+                FILENAME: {自然な日本語名詞句 e.g. りんごの選択}
+                RESOLVED_TENSION: {item text from tensions.md that this decision resolves, or "none"}
+                """;
+
+        return """
+            You are an assistant that creates structured decision log entries.
+
+            ## Output rules
+            - Output the decision log in Markdown following the template below.
+            - Title and filename must be in English (snake_case for filename).
+            - Body text should match the language of the user's input and context files.
+            - Options section must list at least 2 alternatives (if info is insufficient, note what was implicitly rejected).
+            - Why section must cite specific reasoning (not "AI recommended").
+            - Revisit Trigger must be a measurable condition.
+            - If information is insufficient, write "TBD" for that field.
+
+            ## Template
+            # Decision: {English Title}
+
+            > Date: {YYYY-MM-DD}
+            > Status: Confirmed / Tentative
+            > Trigger: {AI session / Meeting / Solo decision}
+
+            ## Context
+            {2-3 sentences based on current_focus.md and project_summary.md}
+
+            ## Options
+
+            ### Option A: {Name}
+            - Pros:
+            - Cons:
+
+            ### Option B: {Name}
+            - Pros:
+            - Cons:
+
+            ## Chosen
+            Option {X}: {Name}
+
+            ## Why
+            {2-4 sentences}
+
+            ## Risk
+            -
+
+            ## Revisit Trigger
+            -
+
+            ## Additional output (after --- separator)
+            After the decision log content, output a separator line "---" followed by:
+            FILENAME: {english_snake_case_topic}
+            RESOLVED_TENSION: {item text from tensions.md that this decision resolves, or "none"}
+            """;
+    }
 }
