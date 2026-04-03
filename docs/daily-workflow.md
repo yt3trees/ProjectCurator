@@ -1,0 +1,60 @@
+# Daily Workflow
+
+[< Back to README](../README.md)
+
+## Recommended Daily Flow
+
+1. Open `Dashboard`
+2. (If AI Features is enabled) Click the What's Next button to see AI-prioritized action suggestions across all projects
+3. Click a project or workstream and open `current_focus.md`
+4. Update context in `Editor` and save with `Ctrl+S`
+5. Add a `decision_log` entry if needed (when AI Features is enabled, the Dec Log button opens an AI-assisted dialog)
+6. If you have meeting notes from a recent meeting, click `Import Meeting Notes` in the Editor toolbar to analyze and apply them
+7. If using Asana, run `Asana Sync` to refresh task files
+8. If AI Features is enabled, click `Update Focus from Asana` in the Editor toolbar to get an LLM-generated update proposal
+
+```mermaid
+flowchart TD
+    A["Open Dashboard"] --> B["What's Next (optional, AI)"]
+    B --> C["Pick project or workstream"]
+    C --> D["Open current_focus.md in Editor"]
+    D --> E["Update context and save"]
+    E --> F["Add decision_log entry (optional)"]
+    F --> G["Run Asana Sync (optional)"]
+    G --> H["Update Focus from Asana (optional, AI)"]
+```
+
+## Core Context Files
+
+The application relies on maintaining the following Markdown files to preserve project context:
+
+- `current_focus.md` - The "you are here" map of the project. Tracks what you are currently doing and what's next.
+- `tensions.md` - A log of open technical questions, unmitigated risks, and unresolved trade-offs.
+- `decision_log/` - A structured folder recording "why we chose this" and "what was decided" for critical architecture choices.
+
+## Feature Map
+
+```mermaid
+flowchart TD
+    U["👤 You"] -->|"Check status"| DB["📊 Dashboard"]
+    DB -->|"Open"| ED["📝 Editor"]
+    ED -->|"Update"| CTX["🧠 current_focus.md / decision_log"]
+
+    U -->|"Sync tasks (optional)"| AS["🔄 Asana Sync"]
+    AS -->|"Write"| TASKS["✅ asana-tasks.md"]
+    DB -->|"Read"| TASKS
+    TASKS -->|"Feed to LLM"| LLM["🤖 LLM (OpenAI / Azure)"]
+    DB -->|"What's Next (AI)"| LLM
+    LLM -->|"Propose update"| ED
+    LLM -->|"Suggest actions"| DB
+
+    U -->|"Manage folders"| SU["🧰 Setup"]
+    U -->|"Review activity"| TL["🕒 Timeline"]
+    U -->|"Scan repositories"| GR["🌿 Git Repos"]
+    U -->|"Manage sub-agents/rules"| AH["🧩 Agent Hub"]
+    U -->|"Configure paths / hotkey / theme"| ST["⚙️ Settings"]
+
+    GR -->|"Show uncommitted changes"| DB
+    ST -->|"Apply settings"| DB
+    ST -->|"Apply settings"| AS
+```

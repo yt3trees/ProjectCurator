@@ -1,0 +1,60 @@
+# 日々のワークフロー
+
+[< READMEに戻る](../README-ja.md)
+
+## おすすめ運用フロー
+
+1. `Dashboard` を開く
+2. AI機能が有効な場合は What's Next ボタンをクリックして、全プロジェクト横断の優先アクション提案を確認
+3. 気になるプロジェクト/Workstreamをクリックして `current_focus.md` を開く
+4. `Editor` で更新して `Ctrl+S` で保存
+5. 必要なら `decision_log` を1件追加(AI機能有効時は Dec Log ボタンでAI支援ダイアログが開く)
+6. 直近の会議メモがあれば `Import Meeting Notes` ボタンで分析して取り込む
+7. Asanaを使う場合は `Asana Sync` を実行してToday Queueを更新
+8. AI機能が有効な場合は `Update Focus from Asana` ボタンでLLMによる更新提案を取得
+
+```mermaid
+flowchart TD
+    A["Dashboardを開く"] --> B["What's Next確認(任意、AI)"]
+    B --> C["案件/Workstreamを選ぶ"]
+    C --> D["Editorでcurrent_focus.mdを開く"]
+    D --> E["文脈を更新して保存"]
+    E --> F["decision_log追加(任意)"]
+    F --> G["Asana Sync実行(任意)"]
+    G --> H["Update Focus from Asana(任意、AI)"]
+```
+
+## プロジェクトを支える主要ファイル
+
+本アプリでは、以下のMarkdownファイルを育てていくことでプロジェクトのコンテキストを維持します。
+
+- `current_focus.md` - 「今何をやっているか」「次に取り組むべきことは何か」をまとめる、プロジェクトの現在地となるファイルです。
+- `tensions.md` - 技術的な疑問、トレードオフ、未解決の懸念事項など、プロジェクトが抱える課題を記録します。
+- `decision_log/` - 「なぜその技術を選んだか」「何を決定したか」を構造化して記録するフォルダです。後から経緯を思い出すための重要な記憶となります。
+
+## 機能マップ
+
+```mermaid
+flowchart TD
+    U["👤 あなた"] -->|"状況を確認"| DB["📊 Dashboard"]
+    DB -->|"開く"| ED["📝 Editor"]
+    ED -->|"更新"| CTX["🧠 current_focus.md / decision_log"]
+
+    U -->|"タスク同期(任意)"| AS["🔄 Asana Sync"]
+    AS -->|"書き出す"| TASKS["✅ asana-tasks.md"]
+    DB -->|"読み取る"| TASKS
+    TASKS -->|"Feed to LLM"| LLM["🤖 LLM (OpenAI / Azure)"]
+    DB -->|"What's Next (AI)"| LLM
+    LLM -->|"Propose update"| ED
+    LLM -->|"Suggest actions"| DB
+
+    U -->|"フォルダ管理"| SU["🧰 Setup"]
+    U -->|"変更履歴を見る"| TL["🕒 Timeline"]
+    U -->|"リポジトリを探索"| GR["🌿 Git Repos"]
+    U -->|"SubAgent/Ruleを管理"| AH["🧩 Agent Hub"]
+    U -->|"パス・ホットキー・テーマ設定"| ST["⚙️ Settings"]
+
+    GR -->|"未コミット変更を表示"| DB
+    ST -->|"設定を反映"| DB
+    ST -->|"設定を反映"| AS
+```
