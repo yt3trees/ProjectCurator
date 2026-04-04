@@ -88,9 +88,6 @@ public partial class SettingsViewModel : ObservableObject
     private string asanaPersonalProjectGids = "";
 
     [ObservableProperty]
-    private string asanaOutputFile = "";
-
-    [ObservableProperty]
     private string asanaGlobalStatus = "";
 
     // LLM API settings
@@ -194,7 +191,6 @@ public partial class SettingsViewModel : ObservableObject
             AsanaWorkspaceGid = asana.WorkspaceGid;
             AsanaUserGid = asana.UserGid;
             AsanaPersonalProjectGids = string.Join("\n", asana.PersonalProjectGids);
-            AsanaOutputFile = asana.OutputFile;
             AsanaGlobalStatus = "";
 
             // LLM
@@ -352,7 +348,6 @@ public partial class SettingsViewModel : ObservableObject
                 WorkspaceGid = AsanaWorkspaceGid.Trim(),
                 UserGid = AsanaUserGid.Trim(),
                 PersonalProjectGids = gids,
-                OutputFile = AsanaOutputFile.Trim()
             };
 
             _configService.SaveAsanaGlobalConfig(config);

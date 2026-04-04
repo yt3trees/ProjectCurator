@@ -124,21 +124,21 @@ Required config files are created automatically when you save.
 <summary>Show Asana setup steps</summary>
 
 - Create/check your Asana token in Developer Console: `https://app.asana.com/0/my-apps`
-- Open `Settings` and enter global Asana values
-  - `asana_token`
-  - `workspace_gid`
-  - `user_gid`
-- Open `Asana Sync`
+- Open `Settings` and enter global Asana values in `Asana Global Config`:
+  - `Asana Token`
+  - `Workspace GID`
+  - `User GID`
+- Open `Asana Sync` page
 - Enable schedule if needed and save
-- Run a manual sync once to create/update task files
+- Run a manual sync once to fetch tasks
 
 To distribute personal project tasks across your local projects:
 
-- Add your personal Asana project GIDs to `personal_project_gids` in `Settings`
-  - These are Asana projects not tied to any specific local project (e.g. a personal GTD project), separate from per-project `asana_config.json` mappings
-- During sync, tasks from `personal_project_gids` are distributed using the task's `Project` custom field
-  - If the `Project` field matches a local project name → appended to that project's `asana-tasks.md`
-  - If no match is found → written to `asana-tasks-personal.md`
+- Add your personal Asana project GIDs to `Personal Project GIDs` in `Settings`
+  - These are Asana projects not tied to any specific local project (e.g. a personal GTD project), separate from per-project Asana settings configured in `Setup`
+- During sync, tasks from these personal projects are distributed using the task's `Project` custom field
+  - If the `Project` field matches a local project name → tasks appear in that project's Dashboard Today Queue
+  - If no match is found → tasks are output to a separate personal tasks Markdown file
 
 </details>
 

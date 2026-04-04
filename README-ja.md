@@ -122,21 +122,21 @@ ProjectCurator は、人間とAI両方にとっての「面倒な行き来」を
 <summary>Asana設定手順を表示</summary>
 
 - Asanaトークンは Developer Console(`https://app.asana.com/0/my-apps`)で作成・確認
-- `Settings` を開いて Asana のグローバル値を入力
-  - `asana_token`
-  - `workspace_gid`
-  - `user_gid`
-- `Asana Sync` を開く
+- `Settings` を開いて `Asana Global Config` に値を入力
+  - `Asana Token`
+  - `Workspace GID`
+  - `User GID`
+- `Asana Sync` ページを開く
 - 必要ならスケジュールを有効化して保存
-- 手動同期を1回実行してタスクファイルを作成/更新
+- 手動同期を1回実行してタスクを取得
 
 個人プロジェクトのタスクを各プロジェクトに振り分けたい場合:
 
-- `Settings` で `personal_project_gids` に個人用Asanaプロジェクトの GID を追加する
-  - 各プロジェクトの `asana_config.json` で管理されている通常プロジェクトとは別に、特定プロジェクトに属さない個人タスク(GTD的な個人プロジェクトなど)を登録する
-- Asana同期時、`personal_project_gids` のタスクはタスクの `Project` カスタムフィールドの値でローカルプロジェクトに振り分けられる
-  - `Project` フィールドの値がローカルプロジェクト名と一致 → そのプロジェクトの `asana-tasks.md` に追記
-  - どのプロジェクトにも一致しない → `asana-tasks-personal.md` にまとめて出力
+- `Settings` で `Personal Project GIDs` に個人用Asanaプロジェクトの GID を追加する
+  - `Setup` ページで構成される各プロジェクトの通常設定とは別に、特定プロジェクトに属さない個人タスク(GTD的な個人プロジェクトなど)を登録する
+- Asana同期時、これらの個人タスクはタスクの `Project` カスタムフィールドの値で振り分けられる
+  - `Project` フィールドの値がローカルプロジェクト名と一致 → そのプロジェクトの Dashboard Today Queue に追加される
+  - どのプロジェクトにも一致しない → 専用の個人タスク用Markdownファイルに出力される
 
 </details>
 

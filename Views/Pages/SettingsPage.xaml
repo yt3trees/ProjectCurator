@@ -294,13 +294,6 @@
                              Foreground="{DynamicResource AppText}"
                              BorderBrush="{DynamicResource AppSurface2}"/>
 
-                    <TextBlock Text="Output File" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
-                    <TextBox Text="{Binding AsanaOutputFile, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,2,0,10" Padding="6,4"
-                             Background="{DynamicResource AppSurface1}"
-                             Foreground="{DynamicResource AppText}"
-                             BorderBrush="{DynamicResource AppSurface2}"/>
-
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>

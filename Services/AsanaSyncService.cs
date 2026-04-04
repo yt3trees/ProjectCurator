@@ -56,18 +56,7 @@ public class AsanaSyncService
 
         var personalProjectGids = asanaGlobal.PersonalProjectGids ?? [];
 
-        var outputFile = Environment.GetEnvironmentVariable("ASANA_OUTPUT_FILE");
-        if (string.IsNullOrWhiteSpace(outputFile))
-        {
-            var configured = asanaGlobal.OutputFile;
-            if (!string.IsNullOrWhiteSpace(configured))
-            {
-                var configuredDir = Path.GetDirectoryName(configured);
-                if (!string.IsNullOrWhiteSpace(configuredDir) && Directory.Exists(configuredDir))
-                    outputFile = configured;
-            }
-        }
-        outputFile ??= Path.Combine(obsidianRoot, "asana-tasks-view.md");
+        var outputFile = Path.Combine(obsidianRoot, "asana-tasks-view.md");
 
         // 非表示プロジェクトのフィルタリング
         HashSet<string>? hiddenSet = null;

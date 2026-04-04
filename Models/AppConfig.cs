@@ -32,9 +32,6 @@ public class AsanaGlobalConfig
 
     [JsonPropertyName("personal_project_gids")]
     public List<string> PersonalProjectGids { get; set; } = [];
-
-    [JsonPropertyName("output_file")]
-    public string OutputFile { get; set; } = "";
 }
 
 /// <summary>

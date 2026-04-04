@@ -272,13 +272,16 @@ public class CaptureService
     }
 
     /// <summary>
-    /// task 起票成功後の補助ログ追記 (asana-tasks.md)。失敗は無視する。
+    /// task 起票成功後の補助ログ追記 (asana-tasks-view.md)。失敗は無視する。
     /// </summary>
     private async Task AppendTaskToAsanaLogAsync(AsanaTaskCreatePreview preview, string gid, CancellationToken ct)
     {
-        var global = _configService.LoadAsanaGlobalConfig();
-        var outputFile = global.OutputFile;
-        if (string.IsNullOrWhiteSpace(outputFile) || !File.Exists(outputFile)) return;
+        var settings = _configService.LoadSettings();
+        var obsidianRoot = settings.ObsidianVaultRoot.Trim();
+        if (string.IsNullOrWhiteSpace(obsidianRoot)) return;
+
+        var outputFile = Path.Combine(obsidianRoot, "asana-tasks-view.md");
+        if (!File.Exists(outputFile)) return;
 
         try
         {
