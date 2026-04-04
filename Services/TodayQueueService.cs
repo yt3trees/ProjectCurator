@@ -110,15 +110,15 @@ public class TodayQueueService
     private static readonly Regex AsanaGidRx =
         new(@"/(\d+)$", RegexOptions.Compiled);
     private static readonly Regex RoleTagRx =
-        new(@"^\[(?:担当|コラボ|他)\]\s*", RegexOptions.Compiled);
+        new(@"^\[(?:Owner|Collab|Other)\]\s*", RegexOptions.Compiled);
     private static readonly Regex ColaboTagRx =
-        new(@"^\[コラボ\]", RegexOptions.Compiled);
+        new(@"^\[Collab\]", RegexOptions.Compiled);
     private static readonly Regex OtherTagRx =
-        new(@"^\[他\]", RegexOptions.Compiled);
+        new(@"^\[Other\]", RegexOptions.Compiled);
     private static readonly Regex InProgressHeadingRx =
-        new(@"^\s*#{2,3}\s*進行中", RegexOptions.Compiled);
+        new(@"^\s*#{2,3}\s*In\s+Progress\b", RegexOptions.Compiled);
     private static readonly Regex DoneHeadingRx =
-        new(@"^\s*#{2,3}\s*完了", RegexOptions.Compiled);
+        new(@"^\s*#{2,3}\s*Completed\b", RegexOptions.Compiled);
 
     public TodayQueueService(ConfigService configService, FileEncodingService fileEncodingService)
     {

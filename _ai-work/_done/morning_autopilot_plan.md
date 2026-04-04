@@ -1,4 +1,4 @@
-# Time-Block → Plan My Day 改修計画
+﻿# Time-Block → Plan My Day 改修計画
 
 既存の「Smart Time-Block」機能 (Clock24 ボタン / OnTimeBlockClickAsync) を Morning Autopilot 相当に昇格させる改修。
 新規ファイルゼロ、変更ファイル 2 つ (DashboardPage.xaml + DashboardPage.xaml.cs)。
@@ -250,7 +250,7 @@ Your job is to create a time-blocked plan for today that maximizes productivity 
 - "focus": Update current_focus.md
 - "decision": Record a decision in decision_log
 - "commit": Commit or review uncommitted changes
-- "tension": Address an item in tensions.md
+- "tension": Address an item in open_issues.md
 - "meeting_prep": Prepare for an upcoming meeting
 - "review": Review status, summary, or weekly priorities
 

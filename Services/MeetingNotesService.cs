@@ -14,7 +14,7 @@ using ProjectCurator.Models;
 namespace ProjectCurator.Services;
 
 /// <summary>
-/// 会議メモを解析し、decision_log / current_focus.md / tensions.md への反映を管理するサービス。
+/// 会議メモを解析し、decision_log / current_focus.md / open_issues.md への反映を管理するサービス。
 /// </summary>
 public class MeetingNotesService
 {
@@ -31,12 +31,11 @@ public class MeetingNotesService
         PropertyNamingPolicy        = JsonNamingPolicy.SnakeCaseLower,
     };
 
-    // tensions.md のセクション見出し (日本語優先 → 英語フォールバック)
-    private static readonly (string Key, string[] Candidates)[] TensionSections =
+    // open_issues.md のセクション見出し (日本語優先 → 英語フォールバック)
+    private static readonly (string Key, string[] Candidates)[] OpenIssueSections =
     [
-        ("technical_questions", ["## 技術的なオープンクエスチョン", "## Technical Questions", "## Open Questions"]),
-        ("tradeoffs",           ["## 未解決のトレードオフ",         "## Tradeoffs",           "## Trade-offs"]),
-        ("concerns",            ["## プロジェクト上の懸念・違和感", "## Concerns",            "## Risks"]),
+        ("open_questions", ["## Open questions", "## オープンクエスチョン"]),
+        ("concerns",       ["## Risks and concerns", "## Concerns", "## Risks"]),
     ];
 
     // current_focus.md のセクション見出し
@@ -69,16 +68,16 @@ public class MeetingNotesService
         CancellationToken ct)
     {
         var focusPath     = ResolveFocusPath(project, workstreamId);
-        var tensionsPath  = ResolveTensionsPath(project, workstreamId);
+        var openIssuesPath  = ResolveOpenIssuesPath(project, workstreamId);
         var asanaPath     = ResolveAsanaTasksPath(project, workstreamId);
 
         var currentFocus    = "";
-        var currentTensions = "";
+        var currentOpenIssues = "";
 
         if (File.Exists(focusPath))
             (currentFocus, _) = await _encoding.ReadFileAsync(focusPath, ct);
-        if (File.Exists(tensionsPath))
-            (currentTensions, _) = await _encoding.ReadFileAsync(tensionsPath, ct);
+        if (File.Exists(openIssuesPath))
+            (currentOpenIssues, _) = await _encoding.ReadFileAsync(openIssuesPath, ct);
 
         var currentAsanaSummary = "";
         if (File.Exists(asanaPath))
@@ -89,7 +88,7 @@ public class MeetingNotesService
         }
 
         var systemPrompt = BuildSystemPrompt();
-        var userPrompt   = BuildUserPrompt(meetingNotes, project.Name, workstreamId, currentFocus, currentTensions, currentAsanaSummary);
+        var userPrompt   = BuildUserPrompt(meetingNotes, project.Name, workstreamId, currentFocus, currentOpenIssues, currentAsanaSummary);
 
         string raw;
         try
@@ -116,11 +115,11 @@ public class MeetingNotesService
                 result.FocusUpdate.ProposedContent = BuildFocusProposed(currentFocus, result.FocusUpdate);
         }
 
-        // Tensions の AppendContent を組み立て
+        // Open Issues の AppendContent を組み立て
         if (result.Tensions.HasItems)
         {
-            result.Tensions.CurrentContent = currentTensions;
-            result.Tensions.AppendContent  = BuildTensionsAppend(result.Tensions);
+            result.Tensions.CurrentContent = currentOpenIssues;
+            result.Tensions.AppendContent  = BuildOpenIssuesAppend(result.Tensions);
         }
 
         // AsanaTasks の AppendContent を組み立て
@@ -178,9 +177,9 @@ public class MeetingNotesService
     }
 
     // =========================================================================
-    // 4. tensions.md 更新
+    // 4. open_issues.md 更新
     // =========================================================================
-    public async Task<string?> ApplyTensionsAsync(
+    public async Task<string?> ApplyOpenIssuesAsync(
         MeetingAnalysisResult result,
         ProjectInfo project,
         string? workstreamId)
@@ -188,27 +187,27 @@ public class MeetingNotesService
         if (!result.Tensions.IsSelected) return null;
         if (!result.Tensions.HasItems) return null;
 
-        var tensionsPath = ResolveTensionsPath(project, workstreamId);
+        var openIssuesPath = ResolveOpenIssuesPath(project, workstreamId);
 
         string existingContent;
         string enc;
 
-        if (File.Exists(tensionsPath))
+        if (File.Exists(openIssuesPath))
         {
-            (existingContent, enc) = await _encoding.ReadFileAsync(tensionsPath);
+            (existingContent, enc) = await _encoding.ReadFileAsync(openIssuesPath);
         }
         else
         {
-            var dir = Path.GetDirectoryName(tensionsPath);
+            var dir = Path.GetDirectoryName(openIssuesPath);
             if (!string.IsNullOrWhiteSpace(dir))
                 Directory.CreateDirectory(dir);
-            existingContent = BuildNewTensionsTemplate();
+            existingContent = BuildNewOpenIssuesTemplate();
             enc = "utf-8";
         }
 
-        var updated = ApplyTensionsToContent(existingContent, result.Tensions);
-        await _encoding.WriteFileAsync(tensionsPath, updated, enc);
-        return tensionsPath;
+        var updated = ApplyOpenIssuesToContent(existingContent, result.Tensions);
+        await _encoding.WriteFileAsync(openIssuesPath, updated, enc);
+        return openIssuesPath;
     }
 
     // =========================================================================
@@ -307,15 +306,15 @@ public class MeetingNotesService
         return Path.Combine(project.AiContextContentPath, "current_focus.md");
     }
 
-    private static string ResolveTensionsPath(ProjectInfo project, string? workstreamId)
+    private static string ResolveOpenIssuesPath(ProjectInfo project, string? workstreamId)
     {
         if (!string.IsNullOrWhiteSpace(workstreamId))
         {
             var wsPath = Path.Combine(
-                project.AiContextContentPath, "workstreams", workstreamId, "tensions.md");
+                project.AiContextContentPath, "workstreams", workstreamId, "open_issues.md");
             if (File.Exists(wsPath)) return wsPath;
         }
-        return Path.Combine(project.AiContextContentPath, "tensions.md");
+        return Path.Combine(project.AiContextContentPath, "open_issues.md");
     }
 
     private static string ResolveAsanaTasksPath(ProjectInfo project, string? workstreamId)
@@ -376,8 +375,7 @@ public class MeetingNotesService
             "proposed_content": "<full updated content of current_focus.md>"
           },
           "tensions": {
-            "technical_questions": ["question 1"],
-            "tradeoffs": ["tradeoff 1"],
+            "open_questions": ["question or trade-off 1"],
             "concerns": ["concern 1"]
           },
           "asana_tasks": [
@@ -417,8 +415,7 @@ public class MeetingNotesService
           - Output must be a valid JSON string (escape newlines as \\n, quotes as \\")
 
         ### tensions
-        - technical_questions: unresolved technical questions still open
-        - tradeoffs: competing constraints with no clear resolution
+        - open_questions: unresolved questions and trade-offs with no clear resolution yet
         - concerns: risks or inconsistencies to watch
         - Omit categories that are empty
 
@@ -441,7 +438,7 @@ public class MeetingNotesService
         string projectName,
         string? workstreamId,
         string currentFocus,
-        string currentTensions,
+        string currentOpenIssues,
         string currentAsanaSummary)
     {
         var sb = new StringBuilder();
@@ -453,8 +450,8 @@ public class MeetingNotesService
         sb.AppendLine($"- Workstream: {workstreamId ?? "general"}");
         sb.AppendLine($"- Date: {DateTime.Now:yyyy-MM-dd}");
         sb.AppendLine();
-        sb.AppendLine("## Existing tensions (to avoid duplicates)");
-        sb.AppendLine(string.IsNullOrWhiteSpace(currentTensions) ? "(none)" : currentTensions);
+        sb.AppendLine("## Existing open issues (to avoid duplicates)");
+        sb.AppendLine(string.IsNullOrWhiteSpace(currentOpenIssues) ? "(none)" : currentOpenIssues);
         sb.AppendLine();
         sb.AppendLine("## Existing focus (for context)");
         sb.AppendLine(string.IsNullOrWhiteSpace(currentFocus) ? "(none)" : currentFocus);
@@ -521,9 +518,8 @@ public class MeetingNotesService
             if (root.TryGetProperty("tensions", out var tensionsEl) &&
                 tensionsEl.ValueKind == JsonValueKind.Object)
             {
-                result.Tensions.TechnicalQuestions = GetStrList(tensionsEl, "technical_questions");
-                result.Tensions.Tradeoffs          = GetStrList(tensionsEl, "tradeoffs");
-                result.Tensions.Concerns           = GetStrList(tensionsEl, "concerns");
+                result.Tensions.OpenQuestions = GetStrList(tensionsEl, "open_questions");
+                result.Tensions.Concerns      = GetStrList(tensionsEl, "concerns");
             }
 
             // asana_tasks
@@ -625,28 +621,21 @@ public class MeetingNotesService
     }
 
     // =========================================================================
-    // Tensions: AppendContent 組み立て (プレビュー用テキスト)
+    // Open Issues: AppendContent 組み立て (プレビュー用テキスト)
     // =========================================================================
-    private static string BuildTensionsAppend(MeetingTensions tensions)
+    private static string BuildOpenIssuesAppend(MeetingTensions tensions)
     {
         var sb = new StringBuilder();
-        if (tensions.TechnicalQuestions.Count > 0)
+        if (tensions.OpenQuestions.Count > 0)
         {
-            sb.AppendLine("## 技術的なオープンクエスチョン");
-            foreach (var q in tensions.TechnicalQuestions)
+            sb.AppendLine("## Open questions");
+            foreach (var q in tensions.OpenQuestions)
                 sb.AppendLine($"- {q}");
-            sb.AppendLine();
-        }
-        if (tensions.Tradeoffs.Count > 0)
-        {
-            sb.AppendLine("## 未解決のトレードオフ");
-            foreach (var t in tensions.Tradeoffs)
-                sb.AppendLine($"- {t}");
             sb.AppendLine();
         }
         if (tensions.Concerns.Count > 0)
         {
-            sb.AppendLine("## プロジェクト上の懸念・違和感");
+            sb.AppendLine("## Risks and concerns");
             foreach (var c in tensions.Concerns)
                 sb.AppendLine($"- {c}");
             sb.AppendLine();
@@ -655,23 +644,22 @@ public class MeetingNotesService
     }
 
     // =========================================================================
-    // Tensions: tensions.md への実際の書き込み内容を生成
+    // Open Issues: open_issues.md への実際の書き込み内容を生成
     // =========================================================================
-    private static string ApplyTensionsToContent(string existingContent, MeetingTensions tensions)
+    private static string ApplyOpenIssuesToContent(string existingContent, MeetingTensions tensions)
     {
         var lines = existingContent.Split('\n').ToList();
 
         var sectionItems = new (string[] Candidates, List<string> Items)[]
         {
-            (TensionSections[0].Candidates, tensions.TechnicalQuestions),
-            (TensionSections[1].Candidates, tensions.Tradeoffs),
-            (TensionSections[2].Candidates, tensions.Concerns),
+            (OpenIssueSections[0].Candidates, tensions.OpenQuestions),
+            (OpenIssueSections[1].Candidates, tensions.Concerns),
         };
 
         foreach (var (candidates, items) in sectionItems)
         {
             if (items.Count == 0) continue;
-            lines = InsertTensionItems(lines, candidates, items);
+            lines = InsertOpenIssueItems(lines, candidates, items);
         }
 
         // Last Update 行を更新 / 追加
@@ -680,7 +668,7 @@ public class MeetingNotesService
         return string.Join('\n', lines);
     }
 
-    private static List<string> InsertTensionItems(
+    private static List<string> InsertOpenIssueItems(
         List<string> lines, string[] sectionCandidates, List<string> items)
     {
         // 既存セクション見出しを探す
@@ -845,11 +833,10 @@ public class MeetingNotesService
     // =========================================================================
     // Helpers
     // =========================================================================
-    private static string BuildNewTensionsTemplate() =>
-        "# Tensions\n\n" +
-        "## 技術的なオープンクエスチョン\n\n" +
-        "## 未解決のトレードオフ\n\n" +
-        "## プロジェクト上の懸念・違和感\n\n";
+    private static string BuildNewOpenIssuesTemplate() =>
+        "# Open Issues\n\n" +
+        "## Open questions\n\n" +
+        "## Risks and concerns\n\n";
 
     private static string SanitizeTopic(string topic)
     {

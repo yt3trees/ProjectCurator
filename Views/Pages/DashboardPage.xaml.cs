@@ -1812,10 +1812,10 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         new(@"^(?<date>\d{4}-\d{2}-\d{2})_(?<topic>.+)$", RegexOptions.Compiled);
 
     private static readonly Regex InProgressHeadingRx =
-        new(@"^\s*#{2,3}\s*(進行中|In\s*progress)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        new(@"^\s*#{2,3}\s*In\s+Progress\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex DoneHeadingRx =
-        new(@"^\s*#{2,3}\s*(完了|Done|Completed)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        new(@"^\s*#{2,3}\s*Completed\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex AnyHeadingRx =
         new(@"^\s*#{2,3}\s+\S", RegexOptions.Compiled);
@@ -1867,7 +1867,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     {
         public required ProjectInfo Project { get; init; }
         public string FocusContent { get; set; } = "(no focus file)";
-        public string TensionsContent { get; set; } = "(no tensions file)";
+        public string OpenIssuesContent { get; set; } = "(no open issues file)";
         public List<string> WorkstreamFocusSnippets { get; } = [];
         public List<BriefingDecisionItem> Decisions { get; } = [];
         public List<BriefingTaskItem> ActiveTasks { get; } = [];
@@ -1877,7 +1877,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         public int SummaryAgeDays { get; set; } = -1;
         public int UncommittedRepoCount { get; set; }
         public int DecisionLogThisMonth { get; set; }
-        public int OpenTensionsCount { get; set; }
+        public int OpenIssuesCount { get; set; }
         public int OverdueTaskCount { get; set; }
         public bool HasCoreContext { get; set; }
     }
@@ -1979,12 +1979,12 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         }
 
         ct.ThrowIfCancellationRequested();
-        var tensionsPath = Path.Combine(project.AiContextContentPath, "tensions.md");
-        if (File.Exists(tensionsPath))
+        var openIssuesPath = Path.Combine(project.AiContextContentPath, "open_issues.md");
+        if (File.Exists(openIssuesPath))
         {
-            var (tensionsContent, _) = await _fileEncodingService.ReadFileAsync(tensionsPath, ct);
-            data.TensionsContent = TrimForPrompt(tensionsContent, 2000);
-            data.OpenTensionsCount = tensionsContent
+            var (openIssuesContent, _) = await _fileEncodingService.ReadFileAsync(openIssuesPath, ct);
+            data.OpenIssuesContent = TrimForPrompt(openIssuesContent, 2000);
+            data.OpenIssuesCount = openIssuesContent
                 .Split('\n')
                 .Count(l => l.TrimStart().StartsWith("- ", StringComparison.Ordinal) || l.TrimStart().StartsWith("* ", StringComparison.Ordinal));
             data.HasCoreContext = true;
@@ -2203,7 +2203,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         normalized = Regex.Replace(normalized, @"\[\[Asana\]\([^)]+\)\]", "", RegexOptions.IgnoreCase);
         normalized = DueRx.Replace(normalized, "");
         normalized = Regex.Replace(normalized, @"^\s*-\s+\[[ xX]\]\s+", "");
-        normalized = Regex.Replace(normalized, @"^\s*\[(担当|コラボ|他)\]\s*", "");
+        normalized = Regex.Replace(normalized, @"^\s*\[(Owner|Collab|Other)\]\s*", "");
         return normalized.Trim();
     }
 
@@ -2235,8 +2235,8 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         }
         sb.AppendLine();
 
-        sb.AppendLine("## Open Tensions");
-        sb.AppendLine(string.IsNullOrWhiteSpace(data.TensionsContent) ? "(no tensions file)" : data.TensionsContent);
+        sb.AppendLine("## Open Issues");
+        sb.AppendLine(string.IsNullOrWhiteSpace(data.OpenIssuesContent) ? "(no open issues file)" : data.OpenIssuesContent);
         sb.AppendLine();
 
         sb.AppendLine("## Recent Decisions (latest 3)");
@@ -2277,7 +2277,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         sb.AppendLine("## Project Metrics");
         sb.AppendLine($"- Focus age: {(data.FocusAgeDays >= 0 ? $"{data.FocusAgeDays} days" : "missing")}");
         sb.AppendLine($"- Summary age: {(data.SummaryAgeDays >= 0 ? $"{data.SummaryAgeDays} days" : "missing")}");
-        sb.AppendLine($"- Open tensions: {data.OpenTensionsCount}");
+        sb.AppendLine($"- Open issues: {data.OpenIssuesCount}");
         sb.AppendLine($"- Uncommitted repos: {data.UncommittedRepoCount} ({repoNames})");
         sb.AppendLine($"- Decision log entries this month: {data.DecisionLogThisMonth}");
         sb.AppendLine($"- Overdue tasks: {data.OverdueTaskCount}");
@@ -2820,7 +2820,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         3. Stale focus - current_focus.md not updated in 7+ days with recent task activity
         4. Uncommitted changes - repos with changes that should be committed
         5. Unrecorded decisions - focus file mentions conclusions/choices without matching decision log
-        6. Unresolved tensions - open items in tensions.md
+        6. Unresolved tensions - open items in open_issues.md
         7. Upcoming tasks (1-2 days) - tasks due soon
 
         ## Category mapping
@@ -2828,7 +2828,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         - "focus": Update current_focus.md (stale or missing)
         - "decision": Record a decision in decision_log
         - "commit": Commit or review uncommitted changes
-        - "tension": Address an item in tensions.md
+        - "tension": Address an item in open_issues.md
         - "review": Review or update project_summary.md
 
         ## Tone
@@ -2957,14 +2957,14 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         sb.AppendLine();
         foreach (var proj in projects)
         {
-            var tensionsPath = Path.Combine(proj.AiContextContentPath, "tensions.md");
-            int tensionsCount = 0;
-            bool tensionsExists = File.Exists(tensionsPath);
-            if (tensionsExists)
+            var openIssuesPath = Path.Combine(proj.AiContextContentPath, "open_issues.md");
+            int openIssuesCount = 0;
+            bool openIssuesExists = File.Exists(openIssuesPath);
+            if (openIssuesExists)
             {
                 try
                 {
-                    tensionsCount = File.ReadAllLines(tensionsPath)
+                    openIssuesCount = File.ReadAllLines(openIssuesPath)
                         .Count(l => l.TrimStart().StartsWith("- ") || l.TrimStart().StartsWith("* "));
                 }
                 catch { }
@@ -2980,10 +2980,10 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             sb.AppendLine($"### {proj.Name}");
             sb.AppendLine($"- Focus age: {(proj.FocusAge.HasValue ? $"{proj.FocusAge}d{focusStale}" : "missing")}");
             sb.AppendLine($"- Uncommitted repos: {uncommittedCount}");
-            if (tensionsExists)
-                sb.AppendLine($"- Open tensions: yes ({tensionsCount} items)");
+            if (openIssuesExists)
+                sb.AppendLine($"- Open issues: yes ({openIssuesCount} items)");
             else
-                sb.AppendLine("- Open tensions: no");
+                sb.AppendLine("- Open issues: no");
             sb.AppendLine($"- Recent decisions: {latestDecision}");
             if (focusPreviews.TryGetValue(proj.Name, out var preview) && !string.IsNullOrWhiteSpace(preview))
                 sb.AppendLine($"- Focus preview: {preview}");
@@ -3649,7 +3649,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         - "focus": Update current_focus.md
         - "decision": Record a decision in decision_log
         - "commit": Commit or review uncommitted changes
-        - "tension": Address an item in tensions.md
+        - "tension": Address an item in open_issues.md
         - "meeting_prep": Prepare for an upcoming meeting
         - "review": Review status, summary, or weekly priorities
 
@@ -3799,14 +3799,14 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         sb.AppendLine();
         foreach (var proj in projects)
         {
-            var tensionsPath = Path.Combine(proj.AiContextContentPath, "tensions.md");
-            int tensionsCount = 0;
-            bool tensionsExists = File.Exists(tensionsPath);
-            if (tensionsExists)
+            var openIssuesPath = Path.Combine(proj.AiContextContentPath, "open_issues.md");
+            int openIssuesCount = 0;
+            bool openIssuesExists = File.Exists(openIssuesPath);
+            if (openIssuesExists)
             {
                 try
                 {
-                    tensionsCount = File.ReadAllLines(tensionsPath)
+                    openIssuesCount = File.ReadAllLines(openIssuesPath)
                         .Count(l => l.TrimStart().StartsWith("- ") || l.TrimStart().StartsWith("* "));
                 }
                 catch { }
@@ -3822,10 +3822,10 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             sb.AppendLine($"### {proj.Name}");
             sb.AppendLine($"- Focus age: {(proj.FocusAge.HasValue ? $"{proj.FocusAge}d{focusStale}" : "missing")}");
             sb.AppendLine($"- Uncommitted repos: {uncommittedCount}");
-            if (tensionsExists)
-                sb.AppendLine($"- Open tensions: yes ({tensionsCount} items)");
+            if (openIssuesExists)
+                sb.AppendLine($"- Open issues: yes ({openIssuesCount} items)");
             else
-                sb.AppendLine("- Open tensions: no");
+                sb.AppendLine("- Open issues: no");
             sb.AppendLine($"- Recent decisions: {latestDecision}");
             sb.AppendLine($"- Active workstreams: {proj.Workstreams.Count}");
             if (focusPreviews.TryGetValue(proj.Name, out var preview) && !string.IsNullOrWhiteSpace(preview))

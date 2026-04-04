@@ -719,9 +719,9 @@ public partial class EditorViewModel : ObservableObject
                 result, SelectedProject, input.WorkstreamId);
             if (focusPath != null) createdFiles.Add(focusPath);
 
-            var tensionsPath = await _meetingNotesService.ApplyTensionsAsync(
+            var openIssuesPath = await _meetingNotesService.ApplyOpenIssuesAsync(
                 result, SelectedProject, input.WorkstreamId);
-            if (tensionsPath != null) createdFiles.Add(tensionsPath);
+            if (openIssuesPath != null) createdFiles.Add(openIssuesPath);
 
             asanaApply = await _meetingNotesService.ApplyAsanaTasksAsync(
                 result, SelectedProject, input.WorkstreamId, CancellationToken.None);
@@ -912,7 +912,7 @@ public partial class EditorViewModel : ObservableObject
 
             await _encodingService.WriteFileAsync(filePath, content ?? draft.DraftContent, "UTF8");
 
-            // Step 7: tensions.md 解決項目の削除 (ユーザーが承認した場合のみ)
+            // Step 7: open_issues.md 解決項目の削除 (ユーザーが承認した場合のみ)
             if (removeTension && !string.IsNullOrWhiteSpace(draft.ResolvedTension))
                 await RemoveResolvedTensionAsync(draft.ResolvedTension, wsId);
 
@@ -958,30 +958,30 @@ public partial class EditorViewModel : ObservableObject
     {
         if (SelectedProject == null) return;
 
-        string? tensionsPath = null;
+        string? openIssuesPath = null;
         if (!string.IsNullOrWhiteSpace(workstreamId))
         {
             var wsPath = Path.Combine(
-                SelectedProject.AiContextContentPath, "workstreams", workstreamId, "tensions.md");
-            if (File.Exists(wsPath)) tensionsPath = wsPath;
+                SelectedProject.AiContextContentPath, "workstreams", workstreamId, "open_issues.md");
+            if (File.Exists(wsPath)) openIssuesPath = wsPath;
         }
-        if (tensionsPath == null)
+        if (openIssuesPath == null)
         {
-            var rootPath = Path.Combine(SelectedProject.AiContextContentPath, "tensions.md");
-            if (File.Exists(rootPath)) tensionsPath = rootPath;
+            var rootPath = Path.Combine(SelectedProject.AiContextContentPath, "open_issues.md");
+            if (File.Exists(rootPath)) openIssuesPath = rootPath;
         }
-        if (tensionsPath == null) return;
+        if (openIssuesPath == null) return;
 
         try
         {
-            var (content, enc) = await _encodingService.ReadFileAsync(tensionsPath);
+            var (content, enc) = await _encodingService.ReadFileAsync(openIssuesPath);
             var lines = content.Split('\n').ToList();
             var filtered = lines.Where(l =>
                 !l.Trim().Contains(tensionText.Trim(), StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             if (filtered.Count < lines.Count)
-                await _encodingService.WriteFileAsync(tensionsPath, string.Join('\n', filtered), enc);
+                await _encodingService.WriteFileAsync(openIssuesPath, string.Join('\n', filtered), enc);
         }
         catch { /* エラーは無視 */ }
     }

@@ -1,4 +1,4 @@
-# AIエージェント協業 (Claude Code / Codex CLI)
+﻿# AIエージェント協業 (Claude Code / Codex CLI)
 
 [< READMEに戻る](../README-ja.md)
 
@@ -15,7 +15,7 @@ shared/_work/2026/202603/20260321_fix-login-bug/
 Claude Code や Codex CLI は上位ディレクトリの `AGENTS.md` とスキル定義を自動的に読み込みます。これにより、エージェントは以下を把握した状態で作業を開始します:
 
 - プロジェクト構成と主要パス
-- AIコンテキストファイル(`current_focus.md`、`decision_log`、`tensions.md`)
+- AIコンテキストファイル(`current_focus.md`、`decision_log`、`open_issues.md`)
 - Obsidian Knowledge Layer のノート
 - Asana タスク(同期済みの場合)
 

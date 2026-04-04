@@ -65,7 +65,7 @@ public class ContextCompressionLayerService
         WriteIfMissing(Path.Combine(workspaceContext, "workspace_summary.md"), WorkspaceSummaryTemplate, logs);
         WriteIfMissing(Path.Combine(workspaceContext, "current_focus.md"), CurrentFocusTemplate, logs);
         WriteIfMissing(Path.Combine(workspaceContext, "active_projects.md"), ActiveProjectsTemplate, logs);
-        WriteIfMissing(Path.Combine(workspaceContext, "tensions.md"), TensionsTemplate, logs);
+        WriteIfMissing(Path.Combine(workspaceContext, "open_issues.md"), OpenIssuesTemplate, logs);
 
         var globalAiContext = Path.Combine(obsidianRoot, "ai-context");
         EnsureDirectory(globalAiContext, logs);
@@ -109,7 +109,7 @@ public class ContextCompressionLayerService
 
         WriteIfMissing(Path.Combine(obsidianAiContext, "project_summary.md"), ProjectSummaryTemplate, logs);
         WriteIfMissing(Path.Combine(obsidianAiContext, "current_focus.md"), CurrentFocusTemplate, logs);
-        WriteIfMissing(Path.Combine(obsidianAiContext, "tensions.md"), TensionsTemplate, logs);
+        WriteIfMissing(Path.Combine(obsidianAiContext, "open_issues.md"), OpenIssuesTemplate, logs);
         WriteIfMissing(Path.Combine(obsidianAiContext, "file_map.md"), BuildFileMap(projectName, tier), logs);
         WriteIfMissing(Path.Combine(obsidianAiContext, "decision_log", "TEMPLATE.md"), DecisionLogTemplate, logs);
 
@@ -708,20 +708,16 @@ public class ContextCompressionLayerService
 Last Updated: YYYY-MM-DD
 """;
 
-    private const string TensionsTemplate = """
-# Tensions
+    private const string OpenIssuesTemplate = """
+# Open Issues
 
-## Open technical questions
+## Open questions
 
-- 
-
-## Unresolved trade-offs
-
-- 
+-
 
 ## Risks and concerns
 
-- 
+-
 
 ---
 Last Update: YYYY-MM-DD
@@ -843,7 +839,7 @@ Before responding to the first message, read in order:
    (shared_work mode: prefer `workstreams/<workstreamId>/current_focus.md` when the
    workstream is known; fall back to the root `current_focus.md`)
 2. `_ai-context/context/project_summary.md`
-3. `_ai-context/context/tensions.md` (if it exists)
+3. `_ai-context/context/open_issues.md` (if it exists)
 4. `_ai-context/obsidian_notes/asana-tasks.md` (if it exists)
 5. Other files on demand only.
 

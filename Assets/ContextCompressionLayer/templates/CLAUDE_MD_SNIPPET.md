@@ -1,4 +1,4 @@
-# CLAUDE.md Snippet
+﻿# CLAUDE.md Snippet
 
 Append the relevant section below to each project's CLAUDE.md.
 For workspace-level instructions, see the "Workspace" section at the bottom.
@@ -18,7 +18,7 @@ Before responding to the first message, read in order:
    (shared_work mode: prefer `workstreams/<workstreamId>/current_focus.md` when the
    workstream is known; fall back to the root `current_focus.md`)
 2. `_ai-context/context/project_summary.md`
-3. `_ai-context/context/tensions.md` (if it exists)
+3. `_ai-context/context/open_issues.md` (if it exists)
 4. `_ai-context/obsidian_notes/asana-tasks.md` (if it exists)
 5. Other files on demand only.
 

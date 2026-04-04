@@ -1,4 +1,4 @@
-# UI Guide
+﻿# UI Guide
 
 [< Back to README](../README.md)
 
@@ -45,7 +45,7 @@ Tree-based file browser for AI context files (`current_focus.md`, `decision_log`
 ![](../_assets/Editor.png)
 
 - Project selector dropdown at the top left to switch between projects
-- Tree view on the left lists AI context files: `current_focus.md`, `file_map.md`, `project_summary.md`, `tensions.md`, `decision_log/`, `focus_history/`, `obsidian_notes/`, `workstreams/`, `CLAUDE.md`, `AGENTS.md`
+- Tree view on the left lists AI context files: `current_focus.md`, `file_map.md`, `project_summary.md`, `open_issues.md`, `decision_log/`, `focus_history/`, `obsidian_notes/`, `workstreams/`, `CLAUDE.md`, `AGENTS.md`
 - Syntax-highlighted Markdown editor on the right with section-based coloring
 - Toolbar buttons: Refresh, Dec Log (quick decision log entry), P (pin folder), Save
 - Full file path displayed in the header bar

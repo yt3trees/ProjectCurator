@@ -1,4 +1,4 @@
-# Decision Detection and Logging
+﻿# Decision Detection and Logging
 
 AI behavioral guideline: autonomously detect decisions during conversation
 and propose structured logging.
@@ -97,4 +97,4 @@ Ask supplementary questions:
 ## Post-Save Actions
 
 - Propose adding to `project_summary.md` decisions table
-- If a `tensions.md` item is resolved by this decision, propose removing it
+- If a `open_issues.md` item is resolved by this decision, propose removing it

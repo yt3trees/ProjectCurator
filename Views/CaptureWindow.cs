@@ -840,7 +840,7 @@ public class CaptureWindow : Window
         string encoding;
         try
         {
-            (proposal, encoding) = await _captureService.GenerateTensionsProposalAsync(classification, project, ct);
+            (proposal, encoding) = await _captureService.GenerateOpenIssuesProposalAsync(classification, project, ct);
         }
         catch (OperationCanceledException)
         {
@@ -869,7 +869,7 @@ public class CaptureWindow : Window
 
         var (apply, content) = await ProposalReviewDialog.ShowAsync(
             this, proposal,
-            titleText:  "Review Tension",
+            titleText:  "Review Open Issue",
             titleIcon:  "⚡",
             refineFunc: refineFunc);
 
@@ -879,10 +879,10 @@ public class CaptureWindow : Window
             return;
         }
 
-        var tensionsPath = System.IO.Path.Combine(project.AiContextContentPath, "tensions.md");
+        var openIssuesPath = System.IO.Path.Combine(project.AiContextContentPath, "open_issues.md");
         try
         {
-            await _captureService.WriteTensionsAsync(tensionsPath, content, encoding, ct);
+            await _captureService.WriteOpenIssuesAsync(openIssuesPath, content, encoding, ct);
         }
         catch (Exception ex)
         {
@@ -894,13 +894,13 @@ public class CaptureWindow : Window
         // capture_log.md に副次記録
         var proj = $" [{classification.ProjectName}]";
         _ = _captureService.AppendCaptureLogEntryAsync(
-            $"[tension]{proj} {classification.Summary}\n{_inputBox.Text}", ct);
+            $"[open_issue]{proj} {classification.Summary}\n{_inputBox.Text}", ct);
 
         HandleRouteResult(new CaptureRouteResult
         {
             Success        = true,
-            Message        = $"Added to {project.Name}/tensions.md",
-            TargetFilePath = tensionsPath
+            Message        = $"Added to {project.Name}/open_issues.md",
+            TargetFilePath = openIssuesPath
         });
     }
 

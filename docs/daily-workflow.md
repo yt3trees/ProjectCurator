@@ -1,4 +1,4 @@
-# Daily Workflow
+﻿# Daily Workflow
 
 [< Back to README](../README.md)
 
@@ -29,7 +29,7 @@ flowchart TD
 The application relies on maintaining the following Markdown files to preserve project context:
 
 - `current_focus.md` - The "you are here" map of the project. Tracks what you are currently doing and what's next.
-- `tensions.md` - A log of open technical questions, unmitigated risks, and unresolved trade-offs.
+- `open_issues.md` - A log of open technical questions, unmitigated risks, and unresolved trade-offs.
 - `decision_log/` - A structured folder recording "why we chose this" and "what was decided" for critical architecture choices.
 
 ## Feature Map

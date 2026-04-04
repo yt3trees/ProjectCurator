@@ -1,4 +1,4 @@
-# AI Agent Collaboration (Claude Code / Codex CLI)
+﻿# AI Agent Collaboration (Claude Code / Codex CLI)
 
 [< Back to README](../README.md)
 
@@ -15,7 +15,7 @@ shared/_work/2026/202603/20260321_fix-login-bug/
 Claude Code or Codex CLI automatically reads the `AGENTS.md` and skill definitions above this directory. This gives the agent full awareness of:
 
 - Project structure and key paths
-- AI context files (`current_focus.md`, `decision_log`, `tensions.md`)
+- AI context files (`current_focus.md`, `decision_log`, `open_issues.md`)
 - Obsidian Knowledge Layer notes
 - Active Asana tasks (if synced)
 

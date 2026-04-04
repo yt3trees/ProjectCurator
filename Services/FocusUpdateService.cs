@@ -245,7 +245,7 @@ public class FocusUpdateService
         sb.AppendLine(currentContent);
         sb.AppendLine();
 
-        sb.AppendLine("## Asana tasks: In-progress [担当]");
+        sb.AppendLine("## Asana tasks: In-progress [Owner]");
         if (asanaTasks.InProgress.Count == 0)
         {
             sb.AppendLine("(none)");
@@ -263,7 +263,7 @@ public class FocusUpdateService
         }
 
         sb.AppendLine();
-        sb.AppendLine("## Asana tasks: Completed [担当]");
+        sb.AppendLine("## Asana tasks: Completed [Owner]");
         if (asanaTasks.Completed.Count == 0)
         {
             sb.AppendLine("(none)");
@@ -276,13 +276,13 @@ public class FocusUpdateService
 
         sb.AppendLine();
         var highPriorityNotStarted = asanaTasks.NotStarted
-            .Where(t => t.Priority is "高" or "High")
+            .Where(t => t.Priority is "High")
             .ToList();
         var otherNotStarted = asanaTasks.NotStarted
-            .Where(t => t.Priority is not ("高" or "High"))
+            .Where(t => t.Priority is not "High")
             .ToList();
 
-        sb.AppendLine("## Asana tasks: Not started, high priority [担当]");
+        sb.AppendLine("## Asana tasks: Not started, high priority [Owner]");
         if (highPriorityNotStarted.Count == 0)
         {
             sb.AppendLine("(none)");
@@ -301,7 +301,7 @@ public class FocusUpdateService
         if (otherNotStarted.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("## Asana tasks: Not started, other [担当]");
+            sb.AppendLine("## Asana tasks: Not started, other [Owner]");
             foreach (var t in otherNotStarted)
             {
                 var due = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
@@ -322,7 +322,7 @@ public class FocusUpdateService
         if (urgentCollab.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("## Asana tasks: Urgent collab [コラボ] (due today or tomorrow — include only if user action clearly needed)");
+            sb.AppendLine("## Asana tasks: Urgent collab [Collab] (due today or tomorrow — include only if user action clearly needed)");
             foreach (var t in urgentCollab)
                 sb.AppendLine($"- {t.Title}  [due: {t.DueDate}]");
         }
@@ -335,7 +335,7 @@ public class FocusUpdateService
                 var displayName = string.IsNullOrWhiteSpace(wsLabel) ? wsId : wsLabel;
 
                 sb.AppendLine();
-                sb.AppendLine($"## Workstream [{displayName}] — In-progress [担当]");
+                sb.AppendLine($"## Workstream [{displayName}] — In-progress [Owner]");
                 if (wsTasks.InProgress.Count == 0)
                 {
                     sb.AppendLine("(none)");
@@ -350,12 +350,12 @@ public class FocusUpdateService
                     }
                 }
 
-                var wsOther = wsTasks.NotStarted.Where(t => t.Priority is not ("高" or "High")).ToList();
-                var wsHigh  = wsTasks.NotStarted.Where(t => t.Priority is "高" or "High").ToList();
+                var wsOther = wsTasks.NotStarted.Where(t => t.Priority is not "High").ToList();
+                var wsHigh  = wsTasks.NotStarted.Where(t => t.Priority is "High").ToList();
 
                 if (wsHigh.Count > 0)
                 {
-                    sb.AppendLine($"## Workstream [{displayName}] — Not started, high priority [担当]");
+                    sb.AppendLine($"## Workstream [{displayName}] — Not started, high priority [Owner]");
                     foreach (var t in wsHigh)
                     {
                         var due = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
@@ -365,7 +365,7 @@ public class FocusUpdateService
 
                 if (wsOther.Count > 0)
                 {
-                    sb.AppendLine($"## Workstream [{displayName}] — Not started, other [担当]");
+                    sb.AppendLine($"## Workstream [{displayName}] — Not started, other [Owner]");
                     foreach (var t in wsOther)
                     {
                         var due    = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";

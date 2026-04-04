@@ -1,4 +1,4 @@
-# Folder Layout
+﻿# Folder Layout
 
 [< Back to README](../README.md)
 
@@ -68,7 +68,7 @@ Local Projects Root/
 │   ├── workspace_summary.md           # Your role, tools, working principles
 │   ├── current_focus.md               # Cross-project focus (workspace level)
 │   ├── active_projects.md             # Status list of all projects
-│   └── tensions.md                    # Workspace-wide open questions
+│   └── open_issues.md                    # Workspace-wide open questions
 │
 └── MyProject/                         # One project
     ├── _ai-context/
@@ -111,7 +111,7 @@ Obsidian Vault Root/
         ├── ai-context/                # Project AI context (= _ai-context/context/)
         │   ├── current_focus.md       # What you're working on now
         │   ├── project_summary.md     # Project overview, tech stack, architecture
-        │   ├── tensions.md            # Open questions, trade-offs, risks
+        │   ├── open_issues.md            # Open questions, trade-offs, risks
         │   ├── file_map.md            # Junction mappings and key file list
         │   ├── decision_log/          # Structured decision records
         │   │   └── TEMPLATE.md        # Template for new decisions
@@ -135,7 +135,7 @@ Setup populates the following files with starter templates. Existing files are n
 |---|---|
 | `current_focus.md` | Sections: Currently Doing / Recent Updates / Next Actions / Notes |
 | `project_summary.md` | Sections: Overview / Tech Stack / Architecture / Notes |
-| `tensions.md` | Sections: Open technical questions / Unresolved trade-offs / Risks |
+| `open_issues.md` | Sections: Open technical questions / Unresolved trade-offs / Risks |
 | `file_map.md` | Junction mapping table and key file paths for the project |
 | `decision_log/TEMPLATE.md` | Full decision record template: Context / Options / Chosen / Why / Risks / Revisit Trigger |
 | `AGENTS.md` | AI agent instructions with project name and directory structure |
@@ -147,7 +147,7 @@ Workspace-level files (under `.context/`):
 | `workspace_summary.md` | Your role, tools, and working principles |
 | `current_focus.md` | Cross-project focus and priorities |
 | `active_projects.md` | Status list template for all projects |
-| `tensions.md` | Workspace-wide open questions |
+| `open_issues.md` | Workspace-wide open questions |
 
 ### How Junctions Connect Everything
 

@@ -407,21 +407,17 @@ public class ProjectDiscoveryService
             logs);
 
         WriteIfMissing(
-            Path.Combine(obsidianAiContext, "tensions.md"),
+            Path.Combine(obsidianAiContext, "open_issues.md"),
             """
-            # Tensions
+            # Open Issues
 
-            ## Open technical questions
+            ## Open questions
 
-            - 
-
-            ## Unresolved trade-offs
-
-            - 
+            -
 
             ## Risks and concerns
 
-            - 
+            -
 
             ---
             Last Update: YYYY-MM-DD
@@ -461,7 +457,7 @@ public class ProjectDiscoveryService
         |------|---------|
         | `project_summary.md` | Project overview and goals |
         | `current_focus.md` | Current focus and near-term tasks |
-        | `tensions.md` | Open issues, trade-offs, and risks |
+        | `open_issues.md` | Open issues, trade-offs, and risks |
         | `file_map.md` | This map |
 
         ## Notes

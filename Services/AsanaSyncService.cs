@@ -468,19 +468,19 @@ public class AsanaSyncService
     }
 
     private static bool IsOwnedOrCollaborating(AsanaTask task, string userGid)
-        => ClassifyTaskRole(task, userGid) is "担当" or "コラボ";
+        => ClassifyTaskRole(task, userGid) is "Owner" or "Collab";
 
     private static string ClassifyTaskRole(AsanaTask task, string userGid)
     {
         if (task.Assignee?.Gid == userGid)
-            return "担当";
+            return "Owner";
 
         foreach (var follower in task.Followers)
         {
             if (follower.Gid == userGid)
-                return "コラボ";
+                return "Collab";
         }
-        return "他";
+        return "Other";
     }
 
     private static string? GetCustomFieldValue(AsanaTask task, string fieldName)
@@ -588,7 +588,7 @@ public class AsanaSyncService
             WriteProjectSection(w, sec.ProjectName, sec.ProjectGid, sec.Tasks, userGid, memos);
 
         if (personalTasks.Count > 0)
-            WriteProjectSection(w, "個人タスクより", null, personalTasks, userGid, memos);
+            WriteProjectSection(w, "From personal tasks", null, personalTasks, userGid, memos);
     }
 
     private static void WritePersonalFile(string outputPath, List<AsanaTask> tasks, string userGid)
@@ -597,7 +597,7 @@ public class AsanaSyncService
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
         using var w = new StreamWriter(outputPath, false, new UTF8Encoding(false));
-        w.WriteLine("# Asana Tasks: 個人 / 未分類");
+        w.WriteLine("# Asana Tasks: Personal / Uncategorized");
         w.WriteLine($"Last Sync: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         w.WriteLine();
         w.WriteLine("> このファイルは C# 実装により自動生成されます。");
@@ -608,7 +608,7 @@ public class AsanaSyncService
         var inProgress = tasks.Where(t => !t.Completed).OrderBy(t => TaskSortKey(t, userGid)).ToList();
         var completed = tasks.Where(t => t.Completed).ToList();
 
-        w.WriteLine("## 進行中");
+        w.WriteLine("## In Progress");
         w.WriteLine();
         if (inProgress.Count > 0)
         {
@@ -617,11 +617,11 @@ public class AsanaSyncService
         }
         else
         {
-            w.WriteLine("(タスクなし)");
+            w.WriteLine("(no tasks)");
             w.WriteLine();
         }
 
-        w.WriteLine("## 完了 (直近)");
+        w.WriteLine("## Completed (recent)");
         w.WriteLine();
         if (completed.Count > 0)
         {
@@ -630,7 +630,7 @@ public class AsanaSyncService
         }
         else
         {
-            w.WriteLine("(タスクなし)");
+            w.WriteLine("(no tasks)");
         }
     }
 
@@ -656,7 +656,7 @@ public class AsanaSyncService
         var inProgress = tasks.Where(t => !t.Completed).OrderBy(t => TaskSortKey(t, userGid)).ToList();
         var completed = tasks.Where(t => t.Completed).ToList();
 
-        w.WriteLine("## 進行中");
+        w.WriteLine("## In Progress");
         w.WriteLine();
         if (inProgress.Count > 0)
         {
@@ -665,11 +665,11 @@ public class AsanaSyncService
         }
         else
         {
-            w.WriteLine("(タスクなし)");
+            w.WriteLine("(no tasks)");
             w.WriteLine();
         }
 
-        w.WriteLine("## 完了 (直近)");
+        w.WriteLine("## Completed (recent)");
         w.WriteLine();
         if (completed.Count > 0)
         {
@@ -678,7 +678,7 @@ public class AsanaSyncService
         }
         else
         {
-            w.WriteLine("(タスクなし)");
+            w.WriteLine("(no tasks)");
         }
     }
 
@@ -786,10 +786,10 @@ public class AsanaSyncService
             var anchor = p.ProjectName.Replace(" ", "-")
                 .Replace("(", "").Replace(")", "")
                 .Replace("[", "").Replace("]", "");
-            w.WriteLine($"- [{p.ProjectName}](#{anchor}) (進行中: {inProgressCount})");
+            w.WriteLine($"- [{p.ProjectName}](#{anchor}) (In Progress: {inProgressCount})");
         }
         if (personalTasks.Count > 0)
-            w.WriteLine($"- [個人 / 未分類](#個人--未分類) (進行中: {personalTasks.Count(t => !t.Completed)})");
+            w.WriteLine($"- [Personal / Uncategorized](#personal--uncategorized) (In Progress: {personalTasks.Count(t => !t.Completed)})");
 
         w.WriteLine();
         w.WriteLine("---");
@@ -822,7 +822,7 @@ public class AsanaSyncService
 
         if (personalTasks.Count > 0)
         {
-            w.WriteLine("## 個人 / 未分類");
+            w.WriteLine("## Personal / Uncategorized");
             w.WriteLine();
             var inProgress = personalTasks.Where(t => !t.Completed)
                 .OrderBy(t => TaskSortKey(t, userGid))
@@ -858,7 +858,7 @@ public class AsanaSyncService
         var inProgress = tasks.Where(t => !t.Completed).OrderBy(t => TaskSortKey(t, userGid)).ToList();
         var completed = tasks.Where(t => t.Completed).ToList();
 
-        w.WriteLine("### 進行中");
+        w.WriteLine("### In Progress");
         w.WriteLine();
         if (inProgress.Count > 0)
         {
@@ -867,11 +867,11 @@ public class AsanaSyncService
         }
         else
         {
-            w.WriteLine("(タスクなし)");
+            w.WriteLine("(no tasks)");
             w.WriteLine();
         }
 
-        w.WriteLine("### 完了 (直近)");
+        w.WriteLine("### Completed (recent)");
         w.WriteLine();
         if (completed.Count > 0)
         {
@@ -880,7 +880,7 @@ public class AsanaSyncService
         }
         else
         {
-            w.WriteLine("(タスクなし)");
+            w.WriteLine("(no tasks)");
         }
         w.WriteLine();
     }
@@ -898,7 +898,7 @@ public class AsanaSyncService
         var roleTag = string.IsNullOrWhiteSpace(role) ? "" : $"[{role}] ";
         var anken = GetCustomFieldValue(task, "Project");
         var ankenTag = string.IsNullOrWhiteSpace(anken) ? "" : $"[{anken}] ";
-        var priority = !task.Completed ? GetCustomFieldValue(task, "優先度") : null;
+        var priority = !task.Completed ? GetCustomFieldValue(task, "Priority") : null;
         var priorityTag = string.IsNullOrWhiteSpace(priority) ? "" : $" [{priority}]";
         var completedTag = "";
         if (task.Completed && !string.IsNullOrWhiteSpace(task.CompletedAt)
@@ -952,8 +952,8 @@ public class AsanaSyncService
     {
         var roleOrder = ClassifyTaskRole(task, userGid) switch
         {
-            "担当" => 0,
-            "コラボ" => 1,
+            "Owner" => 0,
+            "Collab" => 1,
             _ => 2
         };
         var due = string.IsNullOrWhiteSpace(task.DueOn) ? "9999-99-99" : task.DueOn;

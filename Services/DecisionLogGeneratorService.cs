@@ -210,13 +210,13 @@ public class DecisionLogGeneratorService
             sb.AppendLine();
         }
 
-        // tensions.md (任意)
-        var tensionsPath = ResolveTensionsPath(project, workstreamId);
-        if (tensionsPath != null)
+        // open_issues.md (任意)
+        var openIssuesPath = ResolveOpenIssuesPath(project, workstreamId);
+        if (openIssuesPath != null)
         {
-            var (tensionsContent, _) = await _encoding.ReadFileAsync(tensionsPath);
-            sb.AppendLine("### tensions.md (check if this decision resolves any item)");
-            sb.AppendLine(tensionsContent);
+            var (openIssuesContent, _) = await _encoding.ReadFileAsync(openIssuesPath);
+            sb.AppendLine("### open_issues.md (check if this decision resolves any item)");
+            sb.AppendLine(openIssuesContent);
             sb.AppendLine();
         }
 
@@ -368,15 +368,15 @@ public class DecisionLogGeneratorService
         return (focusPath, histDir);
     }
 
-    private static string? ResolveTensionsPath(ProjectInfo project, string? workstreamId)
+    private static string? ResolveOpenIssuesPath(ProjectInfo project, string? workstreamId)
     {
         if (!string.IsNullOrWhiteSpace(workstreamId))
         {
             var wsPath = Path.Combine(
-                project.AiContextContentPath, "workstreams", workstreamId, "tensions.md");
+                project.AiContextContentPath, "workstreams", workstreamId, "open_issues.md");
             if (File.Exists(wsPath)) return wsPath;
         }
-        var rootPath = Path.Combine(project.AiContextContentPath, "tensions.md");
+        var rootPath = Path.Combine(project.AiContextContentPath, "open_issues.md");
         return File.Exists(rootPath) ? rootPath : null;
     }
 
@@ -467,7 +467,7 @@ public class DecisionLogGeneratorService
                 ## Additional output (after --- separator)
                 After the decision log content, output a separator line "---" followed by:
                 FILENAME: {自然な日本語名詞句 e.g. りんごの選択}
-                RESOLVED_TENSION: {item text from tensions.md that this decision resolves, or "none"}
+                RESOLVED_TENSION: {item text from open_issues.md that this decision resolves, or "none"}
                 """;
 
         return """
@@ -517,7 +517,7 @@ public class DecisionLogGeneratorService
             ## Additional output (after --- separator)
             After the decision log content, output a separator line "---" followed by:
             FILENAME: {english_snake_case_topic}
-            RESOLVED_TENSION: {item text from tensions.md that this decision resolves, or "none"}
+            RESOLVED_TENSION: {item text from open_issues.md that this decision resolves, or "none"}
             """;
     }
 }

@@ -1,4 +1,4 @@
-# AI Decision Log - 自動起票機能 実装計画
+﻿# AI Decision Log - 自動起票機能 実装計画
 
 既存の「Dec Log」ボタンを拡張し、LLM によるDecision Log エントリの自動生成機能を追加する。
 ユーザー入力からの構造化 (モード1) と focus 差分からの決定検出 (モード2) を単一のダイアログに統合する。
@@ -52,7 +52,7 @@
   │  Refine: [                              ] [Refine]   │
   │                                                      │
   │  Resolved tension: "API設計の方針未定"               │
-  │    → Remove from tensions.md?  [Yes] [No]            │
+  │    → Remove from open_issues.md?  [Yes] [No]            │
   │                                                      │
   │                     [Cancel]  [Save]                  │
   └─────────────────────────────────────────────────────┘
@@ -60,7 +60,7 @@
         ▼
   [ファイル保存] → YYYY-MM-DD_{topic}.md
   [ツリー更新] → エディタで自動オープン
-  [(任意) tensions.md から解決項目を削除]
+  [(任意) open_issues.md から解決項目を削除]
 ```
 
 ## アーキテクチャ
@@ -94,7 +94,7 @@ LlmClientService (既存: そのまま利用)
 | 検出候補 (選択分) | 決定内容の核 | いずれか必須 (入力 or 検出候補) |
 | current_focus.md | 作業文脈の把握 | 必須 |
 | project_summary.md | プロジェクト背景 | 任意 |
-| tensions.md | 解決判定の材料 | 任意 |
+| open_issues.md | 解決判定の材料 | 任意 |
 | 直近 decision_log 1-2件 | トーン・粒度の参考 | 任意 |
 | focus_history 差分 | 候補検出の入力 (モード2) | 候補検出時のみ |
 
@@ -114,7 +114,7 @@ LlmClientService (既存: そのまま利用)
 
 - [ ] 1-3. `DecisionLogGeneratorService` にドラフト生成ロジックを実装
   - `GenerateDraftAsync()`: ユーザー入力 + 選択された検出候補 + コンテキストファイル群 → 構造化ドラフト
-  - コンテキスト収集: current_focus.md, project_summary.md (任意), tensions.md (任意), 直近 decision_log 1-2件 (任意)
+  - コンテキスト収集: current_focus.md, project_summary.md (任意), open_issues.md (任意), 直近 decision_log 1-2件 (任意)
   - LLM レスポンスからファイル名候補 (英語 snake_case) と解決 tension を抽出
   - ファイル: `Services/DecisionLogGeneratorService.cs`
 
@@ -172,7 +172,7 @@ LlmClientService (既存: そのまま利用)
   - タイトルバー: アイコン + 推奨ファイル名 (編集可能)
   - 本文表示: AvalonEdit (読み取り専用、Markdown ハイライト付き)
   - Refine: テキスト入力 + Refine ボタン (FocusUpdate ダイアログと同パターン)
-  - Tensions 解決通知: tensions.md で解決した項目があれば表示 + 削除確認
+  - Tensions 解決通知: open_issues.md で解決した項目があれば表示 + 削除確認
   - ボタン: [Cancel] [Save]
   - ファイル: `Views/Pages/EditorPage.xaml.cs`
 
@@ -194,8 +194,8 @@ LlmClientService (既存: そのまま利用)
   - 新規ファイルをエディタで自動オープン (既存の OpenFileAndSelectNodeAsync を利用)
   - ファイル: `ViewModels/EditorViewModel.cs`
 
-- [ ] 5-3. tensions.md 解決項目の削除 (任意)
-  - LLM が解決と判定した tensions.md の項目を表示
+- [ ] 5-3. open_issues.md 解決項目の削除 (任意)
+  - LLM が解決と判定した open_issues.md の項目を表示
   - ユーザーが承認した場合のみ、該当行を削除して保存
   - ファイル: `ViewModels/EditorViewModel.cs`
 
@@ -208,7 +208,7 @@ LlmClientService (既存: そのまま利用)
 - [ ] 6-2. コンテキストファイル不在時の処理
   - current_focus.md が存在しない場合: 検出候補はスキップし、ユーザー入力のみで生成
   - focus_history が存在しない場合: 検出候補セクションを非表示
-  - project_summary.md / tensions.md が存在しない場合: プロンプトから除外 (エラーにしない)
+  - project_summary.md / open_issues.md が存在しない場合: プロンプトから除外 (エラーにしない)
   - ファイル: `Services/DecisionLogGeneratorService.cs`
 
 - [ ] 6-3. LLM API 呼び出し失敗時の処理
@@ -304,7 +304,7 @@ Option {X}: {Name}
 ## Additional output (after --- separator)
 After the decision log content, output a separator line "---" followed by:
 FILENAME: {english_snake_case_topic}
-RESOLVED_TENSION: {item text from tensions.md that this decision resolves, or "none"}
+RESOLVED_TENSION: {item text from open_issues.md that this decision resolves, or "none"}
 ```
 
 ### ドラフト生成用 User Prompt 構造
@@ -329,7 +329,7 @@ RESOLVED_TENSION: {item text from tensions.md that this decision resolves, or "n
 ### project_summary.md (background)
 {content, if exists}
 
-### tensions.md (check if this decision resolves any item)
+### open_issues.md (check if this decision resolves any item)
 {content, if exists}
 
 ### Recent decision logs (for tone/granularity reference)
@@ -371,5 +371,5 @@ Phase 7 (複数候補対応) は基本機能が安定してから着手する。
 | バックアップ | focus_history に自動保存 | 不要 (新規作成) |
 | diff 表示 | 現在 vs 提案 | 全文プレビュー (新規なのでdiff不要) |
 | Refine | 会話履歴保持で反復修正 | 同パターン |
-| 後処理 | なし | tensions.md 解決チェック |
+| 後処理 | なし | open_issues.md 解決チェック |
 | Workstream | ダイアログで選択 | 現在開いているファイルから自動判定 |

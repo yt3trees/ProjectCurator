@@ -1,4 +1,4 @@
-# 画面ガイド
+﻿# 画面ガイド
 
 [< READMEに戻る](../README-ja.md)
 
@@ -45,7 +45,7 @@ AI コンテキストファイル(`current_focus.md`、`decision_log` など)を
 ![](../_assets/Editor.png)
 
 - 左上のプロジェクト選択ドロップダウンでプロジェクトを切り替え
-- 左側のツリーに AI コンテキストファイルを表示: `current_focus.md`、`file_map.md`、`project_summary.md`、`tensions.md`、`decision_log/`、`focus_history/`、`obsidian_notes/`、`workstreams/`、`CLAUDE.md`、`AGENTS.md`
+- 左側のツリーに AI コンテキストファイルを表示: `current_focus.md`、`file_map.md`、`project_summary.md`、`open_issues.md`、`decision_log/`、`focus_history/`、`obsidian_notes/`、`workstreams/`、`CLAUDE.md`、`AGENTS.md`
 - 右側にシンタックスハイライト付きの Markdown エディタ(セクション単位で色分け)
 - ツールバーボタン: Refresh、Dec Log(decision log 簡易追加)、P(フォルダ Pin)、Save
 - ヘッダーバーにファイルのフルパスを表示

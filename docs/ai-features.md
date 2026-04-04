@@ -1,4 +1,4 @@
-# AI Features
+﻿# AI Features
 
 [< Back to README](../README.md)
 
@@ -65,7 +65,7 @@ Click the lightbulb icon in the Dashboard toolbar to get 3-5 AI-prioritized acti
 
 ## Context Briefing (Dashboard Card)
 
-Click the lightbulb icon on a project card to generate a project-specific resume briefing. The model reads `current_focus.md`, recent `decision_log` entries, `tensions.md`, active/completed Asana tasks, and uncommitted repo signals, then outputs:
+Click the lightbulb icon on a project card to generate a project-specific resume briefing. The model reads `current_focus.md`, recent `decision_log` entries, `open_issues.md`, active/completed Asana tasks, and uncommitted repo signals, then outputs:
 
 - `Where you left off` (short narrative summary)
 - `Suggested next steps` (prioritized action list)
@@ -89,7 +89,7 @@ Click the `Update Focus from Asana` button in the Editor toolbar to generate a d
 
 ## AI Decision Log (Editor)
 
-Click `Dec Log` in the Editor toolbar (AI mode) to open the decision log assistant. Describe what was decided; the model generates a structured draft with Options / Why / Risk / Revisit Trigger sections. Supports natural-language refinement and optionally removes the resolved item from `tensions.md`. Saves as `decision_log/YYYY-MM-DD_{topic}.md`.
+Click `Dec Log` in the Editor toolbar (AI mode) to open the decision log assistant. Describe what was decided; the model generates a structured draft with Options / Why / Risk / Revisit Trigger sections. Supports natural-language refinement and optionally removes the resolved item from `open_issues.md`. Saves as `decision_log/YYYY-MM-DD_{topic}.md`.
 
 <img src="../_assets/ai-feature/AI-DecisionLog_1.png" width="70%" alt="AI Decision Log dialog step 1" />
 <img src="../_assets/ai-feature/AI-DecisionLog_2.png" width="70%" alt="AI Decision Log dialog step 2" />
@@ -100,7 +100,7 @@ Click the `Import Meeting Notes` button in the Editor toolbar (or press `Ctrl+En
 
 - Decisions tab: one checkbox per decision detected; click "Show draft" to preview the structured `decision_log` draft; uncheck any decision to skip it
 - Focus tab: diff-based view of the AI-generated update to `current_focus.md`; the LLM rewrites the full file integrating new items while preserving the existing structure and writing style
-- Tensions tab: preview of items to be appended to `tensions.md` (technical questions, tradeoffs, concerns)
+- Tensions tab: preview of items to be appended to `open_issues.md` (technical questions, tradeoffs, concerns)
 - Asana Tasks tab: list of action items proposed for Asana. Each task has its own controls:
   - Project ComboBox: defaults to the first entry in `personal_project_gids` (`asana_global.json`), or the workstream's mapped project if configured
   - Section ComboBox: auto-selected by matching `anken_aliases` (from `asana_config.json`) against the section name; falls back to `(none)`
@@ -120,7 +120,7 @@ Press `Ctrl+Shift+C` from anywhere on your desktop to open a lightweight capture
 | Category | Destination |
 |---|---|
 | `task` | Creates a task in Asana via API (requires confirmation before submitting) |
-| `tension` | Appends to the project's `tensions.md` |
+| `tension` | Appends to the project's `open_issues.md` |
 | `focus_update` | Opens Editor and triggers the Update Focus from Asana flow with your input as additional context |
 | `decision` | Opens Editor and launches the AI Decision Log flow |
 | `memo` | Appends a timestamped entry to `_config/capture_log.md` |

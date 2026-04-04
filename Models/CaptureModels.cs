@@ -5,7 +5,7 @@ namespace ProjectCurator.Models;
 public class CaptureClassification
 {
     [JsonPropertyName("category")]
-    public string Category { get; set; } = "memo";   // "task" | "tension" | "focus_update" | "decision" | "memo"
+    public string Category { get; set; } = "memo";   // "task" | "open_issue" | "focus_update" | "decision" | "memo"
 
     [JsonPropertyName("project")]
     public string ProjectName { get; set; } = "";

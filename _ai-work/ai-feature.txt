@@ -1,4 +1,4 @@
-  特におすすめ
+﻿  特におすすめ
 
   1. "Where Was I?" コンテキスト復帰ブリーフィング
 
@@ -50,7 +50,7 @@
 
   7. Tension Resolver / 課題解決アドバイザー
 
-  tensions.mdの項目を選択すると、project_summary + decision_log +
+  open_issues.mdの項目を選択すると、project_summary + decision_log +
   current_focusをコンテキストに、LLMが「選択肢A/B/C、それぞれのリスク、推奨」を構造的に提示。そのままDecision Log
   Generatorに繋げて記録できるワークフロー。
 
@@ -83,8 +83,8 @@
   B. グローバルキャプチャ + AI自動振り分け
 
   ホットキー一発でどこからでもフリーテキストを入力。AIが「これはタスク(Asana)か、意思決定(Decision
-  Log)か、テンション(tensions.md)か、フォーカス更新か」を自動判定してルーティング。ナビゲーションなし、ファイルを開かな
-  くていい。「〇〇の実装をやらなきゃ → Asana追加」「〇〇で迷ってる → tensions.md」「今日は〇〇に集中する →
+  Log)か、テンション(open_issues.md)か、フォーカス更新か」を自動判定してルーティング。ナビゲーションなし、ファイルを開かな
+  くていい。「〇〇の実装をやらなきゃ → Asana追加」「〇〇で迷ってる → open_issues.md」「今日は〇〇に集中する →
   focus更新の起点」などに繋がる。
 
   C. AI-to-AI コンテキストエクスポート
@@ -150,16 +150,16 @@
   ---
   2. Tension Synthesizer (テンション棚卸し)
 
-  tensions.md に溜まった項目を定期的に「まだ生きてる？もう解決した？」と棚卸しする機能。
+  open_issues.md に溜まった項目を定期的に「まだ生きてる？もう解決した？」と棚卸しする機能。
 
-  - トリガー: Editor で tensions.md を開いたとき、またはCommand Paletteから手動実行
-  - 入力データ: tensions.md 全項目 + 直近の decision_log/ + current_focus.md + focus_history/ diff
+  - トリガー: Editor で open_issues.md を開いたとき、またはCommand Paletteから手動実行
+  - 入力データ: open_issues.md 全項目 + 直近の decision_log/ + current_focus.md + focus_history/ diff
   - LLMの仕事:
     - 各tension に対し「Resolved(この決定で解消済み) / Active(まだ未解決) /
   Stale(3週間触れてない、エスカレーション推奨)」を判定
     - Resolved なものは該当 decision_log へのリンク付きで削除提案
     - 関連する tension をクラスタリングして「これらは同じ論点では？」と提示
-  - 出力: diff形式で確認 → 承認して tensions.md を更新
+  - 出力: diff形式で確認 → 承認して open_issues.md を更新
 
   Decision Logの「resolved_tension」機能の逆引き版。放置テンションの蓄積を防ぐ。
 
@@ -186,7 +186,7 @@
   過去の decision_log に書かれた「Revisit Trigger」や「Risk」が実際にどうなったかを追跡する機能。
 
   - トリガー: Command Palette、または decision_log が一定数(例: 10件)を超えたとき Dashboard に通知バッジ
-  - 入力データ: 過去の decision_log/ 全件(特に Risk, Revisit Trigger セクション) + 現在の current_focus.md + tensions.md
+  - 入力データ: 過去の decision_log/ 全件(特に Risk, Revisit Trigger セクション) + 現在の current_focus.md + open_issues.md
   - LLMの仕事:
     - 各 Revisit Trigger の条件を現在の状況と照合
     - 「この決定、見直し時期かも」をリスト化

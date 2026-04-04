@@ -114,7 +114,7 @@ public class CaptureService
 
         CaptureRouteResult result = classification.Category switch
         {
-            "tension" => await AppendToTensionsAsync(classification, project, ct),
+            "tension" => await AppendToOpenIssuesAsync(classification, project, ct),
             "memo" => await AppendToCaptureLogAsync(classification, originalInput, ct),
             "focus_update" => BuildFocusUpdateNavigation(classification, project),
             "decision" => BuildDecisionNavigation(classification, project),
@@ -452,88 +452,88 @@ public class CaptureService
     // Routing helpers
     // ─────────────────────────────────────────────────────────
 
-    private async Task<CaptureRouteResult> AppendToTensionsAsync(
+    private async Task<CaptureRouteResult> AppendToOpenIssuesAsync(
         CaptureClassification c,
         ProjectInfo? project,
         CancellationToken ct)
     {
         if (project == null)
-            return new CaptureRouteResult { Success = false, Message = "Project not found for tension routing." };
+            return new CaptureRouteResult { Success = false, Message = "Project not found for open issue routing." };
 
-        var tensionsPath = Path.Combine(project.AiContextContentPath, "tensions.md");
+        var openIssuesPath = Path.Combine(project.AiContextContentPath, "open_issues.md");
 
         try
         {
             string existingContent;
             string encoding;
 
-            if (File.Exists(tensionsPath))
+            if (File.Exists(openIssuesPath))
             {
-                (existingContent, encoding) = await _encoding.ReadFileAsync(tensionsPath, ct);
+                (existingContent, encoding) = await _encoding.ReadFileAsync(openIssuesPath, ct);
             }
             else
             {
-                var dir = Path.GetDirectoryName(tensionsPath);
+                var dir = Path.GetDirectoryName(openIssuesPath);
                 if (!string.IsNullOrWhiteSpace(dir))
                     Directory.CreateDirectory(dir);
-                existingContent = "# Tensions\n\n";
+                existingContent = "# Open Issues\n\n";
                 encoding = "utf-8";
             }
 
-            var newContent = BuildTensionAppend(existingContent, c);
-            await _encoding.WriteFileAsync(tensionsPath, newContent, encoding, ct);
+            var newContent = BuildOpenIssueAppend(existingContent, c);
+            await _encoding.WriteFileAsync(openIssuesPath, newContent, encoding, ct);
 
             return new CaptureRouteResult
             {
                 Success = true,
-                Message = $"Added to {project.Name}/tensions.md",
-                TargetFilePath = tensionsPath
+                Message = $"Added to {project.Name}/open_issues.md",
+                TargetFilePath = openIssuesPath
             };
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[CaptureService] AppendToTensionsAsync failed: {ex.Message}");
-            var memoResult = await AppendToCaptureLogAsync(c, $"[tension] {c.Summary}\n{c.Body}", ct);
+            Debug.WriteLine($"[CaptureService] AppendToOpenIssuesAsync failed: {ex.Message}");
+            var memoResult = await AppendToCaptureLogAsync(c, $"[open_issue] {c.Summary}\n{c.Body}", ct);
             return new CaptureRouteResult
             {
                 Success = false,
-                Message = $"Failed to write tensions.md ({ex.GetType().Name}). Saved as memo instead.",
+                Message = $"Failed to write open_issues.md ({ex.GetType().Name}). Saved as memo instead.",
                 TargetFilePath = memoResult.TargetFilePath
             };
         }
     }
 
     // ─────────────────────────────────────────────────────────
-    // Tensions proposal (AI review flow)
+    // Open Issues proposal (AI review flow)
     // ─────────────────────────────────────────────────────────
 
     /// <summary>
-    /// AI を使って tensions.md の更新提案を生成する。
+    /// AI を使って open_issues.md の更新提案を生成する。
     /// AI 有効時に CaptureWindow から呼び出し、差分確認ダイアログを経由して書き込む。
     /// </summary>
-    public async Task<(FileUpdateProposal proposal, string encoding)> GenerateTensionsProposalAsync(
+    public async Task<(FileUpdateProposal proposal, string encoding)> GenerateOpenIssuesProposalAsync(
         CaptureClassification c,
         ProjectInfo project,
         CancellationToken ct = default)
     {
-        var tensionsPath = Path.Combine(project.AiContextContentPath, "tensions.md");
+        var openIssuesPath = Path.Combine(project.AiContextContentPath, "open_issues.md");
 
         string existingContent;
         string enc;
-        if (File.Exists(tensionsPath))
+        if (File.Exists(openIssuesPath))
         {
-            (existingContent, enc) = await _encoding.ReadFileAsync(tensionsPath, ct);
+            (existingContent, enc) = await _encoding.ReadFileAsync(openIssuesPath, ct);
         }
         else
         {
-            var dir = Path.GetDirectoryName(tensionsPath);
+            var dir = Path.GetDirectoryName(openIssuesPath);
             if (!string.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
-            existingContent = "# Tensions\n\n";
+            existingContent = "# Open Issues\n\n";
             enc = "utf-8";
         }
 
-        var systemPrompt = BuildTensionsSystemPrompt();
-        var userPrompt   = BuildTensionsUserPrompt(existingContent, c);
+        var systemPrompt = BuildOpenIssuesSystemPrompt();
+        var userPrompt   = BuildOpenIssuesUserPrompt(existingContent, c);
         var proposed     = await _llm.ChatCompletionAsync(systemPrompt, userPrompt, ct);
 
         var proposal = new FileUpdateProposal
@@ -550,13 +550,13 @@ public class CaptureService
     }
 
     /// <summary>
-    /// 差分確認後に tensions.md へ書き込む。
+    /// 差分確認後に open_issues.md へ書き込む。
     /// </summary>
-    public Task WriteTensionsAsync(string path, string content, string encoding, CancellationToken ct = default)
+    public Task WriteOpenIssuesAsync(string path, string content, string encoding, CancellationToken ct = default)
         => _encoding.WriteFileAsync(path, content, encoding, ct);
 
     /// <summary>
-    /// Tensions 提案のリファイン (FocusUpdateService.RefineAsync と同パターン)。
+    /// Open Issues 提案のリファイン (FocusUpdateService.RefineAsync と同パターン)。
     /// </summary>
     public async Task<string> RefineTensionsAsync(
         string initialUserPrompt,
@@ -577,7 +577,7 @@ public class CaptureService
         }
         messages.Add(("user", instructions));
 
-        var refined = await _llm.ChatWithHistoryAsync(BuildTensionsSystemPrompt(), messages, ct);
+        var refined = await _llm.ChatWithHistoryAsync(BuildOpenIssuesSystemPrompt(), messages, ct);
         return refined.Trim();
     }
 
@@ -587,7 +587,7 @@ public class CaptureService
     public Task AppendCaptureLogEntryAsync(string body, CancellationToken ct = default)
         => AppendToCaptureLogInternalAsync(body, ct);
 
-    private static string BuildTensionAppend(string existingContent, CaptureClassification c)
+    private static string BuildOpenIssueAppend(string existingContent, CaptureClassification c)
     {
         var entry = string.IsNullOrWhiteSpace(c.Body)
             ? $"- {c.Summary}"
@@ -595,36 +595,36 @@ public class CaptureService
         return existingContent.TrimEnd() + "\n" + entry + "\n";
     }
 
-    private static string BuildTensionsSystemPrompt() => """
-        You are an assistant that maintains a tensions.md file for a project management system.
-        A "tension" is an unresolved question, concern, trade-off, or risk — not yet a decision.
+    private static string BuildOpenIssuesSystemPrompt() => """
+        You are an assistant that maintains an open_issues.md file for a project management system.
+        An "open issue" is an unresolved question, concern, trade-off, or risk — not yet a decision.
 
         ## Output rules
-        - Output ONLY the full updated content of tensions.md. No explanations, no preamble, no markdown fences.
+        - Output ONLY the full updated content of open_issues.md. No explanations, no preamble, no markdown fences.
         - Never truncate. Always output the complete file from the first line to the last.
 
         ## Update rules
         1. PRESERVE the existing Markdown heading/section structure exactly (do not add, remove, or rename sections).
-        2. If the new tension is essentially the same as an existing item, merge them naturally rather than duplicating.
-        3. If the new tension is closely related to an existing item, insert it near that item with appropriate context.
-        4. If the new tension is distinct, insert it at the most semantically appropriate location — not necessarily at the end.
-        5. Rephrase the new tension to match the document's existing writing style and tone.
-        6. Do not fabricate or remove existing tensions. Only add the new tension.
+        2. If the new item is essentially the same as an existing item, merge them naturally rather than duplicating.
+        3. If the new item is closely related to an existing item, insert it near that item with appropriate context.
+        4. If the new item is distinct, insert it at the most semantically appropriate location — not necessarily at the end.
+        5. Rephrase the new item to match the document's existing writing style and tone.
+        6. Do not fabricate or remove existing items. Only add the new item.
         """;
 
-    private static string BuildTensionsUserPrompt(string existingContent, CaptureClassification c)
+    private static string BuildOpenIssuesUserPrompt(string existingContent, CaptureClassification c)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("## Current tensions.md");
+        sb.AppendLine("## Current open_issues.md");
         sb.AppendLine(existingContent);
         sb.AppendLine();
-        sb.AppendLine("## New tension to integrate");
+        sb.AppendLine("## New item to integrate");
         sb.AppendLine($"Summary: {c.Summary}");
         if (!string.IsNullOrWhiteSpace(c.Body))
             sb.AppendLine($"Detail: {c.Body}");
         sb.AppendLine();
         sb.AppendLine("## Instruction");
-        sb.AppendLine("Integrate the new tension into tensions.md following the update rules.");
+        sb.AppendLine("Integrate the new item into open_issues.md following the update rules.");
         sb.AppendLine("Output the full file content only. Do not include any explanation.");
         return sb.ToString();
     }
@@ -714,7 +714,7 @@ identify which project it belongs to, and generate a concise summary.
 
 ## Categories
 - "task": An actionable to-do item. Something that needs to be done.
-- "tension": An unresolved question, concern, trade-off, or risk. Not yet a decision.
+- "tension": An unresolved question, concern, trade-off, or risk. Not yet a decision. Will be saved to open_issues.md.
 - "focus_update": A shift in priorities or focus. The user wants to record a change in what they're working on.
 - "decision": A concluded choice. The user has decided something and wants to record it.
 - "memo": General note, idea, or thought that doesn't fit other categories.
@@ -745,7 +745,7 @@ identify which project it belongs to, and generate a concise summary.
 
 ## Body formatting rules
 - For "task": Write only the substantive task description for Asana notes. Strip all meta-instructions from the body: remove phrases like "Asanaに追加して", "タスク追加して", "create a task", "add to Asana", due date mentions ("期日: ...", "due: ..."), and project name prefixes. Write what actually needs to be DONE, not how the user asked to capture it. If the task is simple, a short one-line description is fine; leave body empty if the summary alone is sufficient.
-- For "tension": "- {question or concern, naturally phrased}"
+- For "tension": "- {question, trade-off, concern, or risk, naturally phrased}"
 - For "focus_update": the full input text, lightly edited for clarity
 - For "decision": the full input text, structured as "Decision: X. Reason: Y"
 - For "memo": the full input text as-is

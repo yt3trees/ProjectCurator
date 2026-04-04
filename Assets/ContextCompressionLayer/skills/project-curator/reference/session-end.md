@@ -1,4 +1,4 @@
-# Session End Detection
+﻿# Session End Detection
 
 AI behavioral guideline: detect natural session boundaries and propose
 updates to `current_focus.md`.
@@ -31,8 +31,8 @@ Update current_focus.md?
 ```
 
 4. If significant decisions were made, also propose a Decision Log entry (1 line)
-5. If new unresolved issues emerged, propose adding to `tensions.md`
-6. If existing `tensions.md` items were resolved, propose removing them
+5. If new unresolved issues emerged, propose adding to `open_issues.md`
+6. If existing `open_issues.md` items were resolved, propose removing them
 
 ## Rules
 

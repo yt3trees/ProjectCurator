@@ -1665,7 +1665,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         {
             var tensionCheckBox = new System.Windows.Controls.CheckBox
             {
-                Content = $"Remove resolved tension from tensions.md: \"{draft.ResolvedTension}\"",
+                Content = $"Remove resolved item from open_issues.md: \"{draft.ResolvedTension}\"",
                 IsChecked = false,
                 Foreground = subtext, FontSize = 11
             };
@@ -2097,8 +2097,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         };
         Grid.SetColumn(titleIcon, 0);
         var decisionCount   = analysisResult.Decisions.Count;
-        var tensionCount    = analysisResult.Tensions.TechnicalQuestions.Count
-                            + analysisResult.Tensions.Tradeoffs.Count
+        var tensionCount    = analysisResult.Tensions.OpenQuestions.Count
                             + analysisResult.Tensions.Concerns.Count;
         var asanaTaskCount  = analysisResult.AsanaTasks.Tasks.Count;
         var titleTextBlock = new System.Windows.Controls.TextBlock
@@ -2324,17 +2323,17 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
 
         focusTab.Content = focusRoot;
 
-        // ---- Tab 3: Tensions ----
+        // ---- Tab 3: Open Issues ----
         var tensionsTab = new System.Windows.Controls.TabItem
         {
-            Header = $"Tensions ({tensionCount})",
+            Header = $"Open Issues ({tensionCount})",
             Foreground = text, Background = surface1
         };
         var tensionsPanel = new StackPanel { Margin = new Thickness(12, 8, 12, 8) };
 
         var tensionsChk = new System.Windows.Controls.CheckBox
         {
-            Content = "Add to tensions.md",
+            Content = "Add to open_issues.md",
             IsChecked = analysisResult.Tensions.IsSelected && analysisResult.Tensions.HasItems,
             IsEnabled = analysisResult.Tensions.HasItems,
             Foreground = text, FontSize = 13,
@@ -2348,7 +2347,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         {
             tensionsPanel.Children.Add(new System.Windows.Controls.TextBlock
             {
-                Text = "No tensions detected.",
+                Text = "No open issues detected.",
                 Foreground = subtext, FontSize = 12
             });
         }
@@ -2376,14 +2375,14 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                 string.IsNullOrWhiteSpace(analysisResult.Tensions.CurrentContent)
                     ? "" : "")))
             {
-                // tensions.md が存在しない場合のヒント
+                // open_issues.md が存在しない場合のヒント
             }
 
             if (string.IsNullOrWhiteSpace(analysisResult.Tensions.CurrentContent))
             {
                 tensionsPanel.Children.Add(new System.Windows.Controls.TextBlock
                 {
-                    Text = "tensions.md not found — will be created",
+                    Text = "open_issues.md not found — will be created",
                     Foreground = accent, FontSize = 11, Margin = new Thickness(0, 4, 0, 0)
                 });
             }

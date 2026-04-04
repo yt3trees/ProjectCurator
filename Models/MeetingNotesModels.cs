@@ -45,13 +45,12 @@ public class MeetingFocusUpdate
 
 public class MeetingTensions
 {
-    public List<string> TechnicalQuestions { get; set; } = [];
-    public List<string> Tradeoffs          { get; set; } = [];
-    public List<string> Concerns           { get; set; } = [];
+    public List<string> OpenQuestions { get; set; } = [];
+    public List<string> Concerns      { get; set; } = [];
     public bool   IsSelected     { get; set; } = true;
     public string AppendContent  { get; set; } = "";
     public string CurrentContent { get; set; } = "";
-    public bool HasItems => TechnicalQuestions.Any() || Tradeoffs.Any() || Concerns.Any();
+    public bool HasItems => OpenQuestions.Any() || Concerns.Any();
 }
 
 public class MeetingAsanaTask

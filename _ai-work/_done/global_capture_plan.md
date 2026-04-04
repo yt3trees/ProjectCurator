@@ -1,4 +1,4 @@
-# Global Capture + AI Auto-Routing - 実装計画
+﻿# Global Capture + AI Auto-Routing - 実装計画
 
 グローバルホットキーでどこからでもフリーテキストを入力し、AIが「これはタスクか、テンションか、フォーカス更新か、意思決定か」を自動判定して適切なファイル/サービスにルーティングする機能。
 
@@ -19,7 +19,7 @@ AI が分類:
   プロジェクト: ProjectAlpha (「認証」「ミドルウェア」から推定)
   要約: 認証方式の再検討 - JWT vs セッションベース
   ↓
-ユーザーに確認 → tensions.md に追記
+ユーザーに確認 → open_issues.md に追記
 ```
 
 ## 方針
@@ -41,7 +41,7 @@ AI が分類:
 | カテゴリ | 振り分け先 | 書き込み方式 |
 |---|---|---|
 | task | Asana API (`POST /tasks`) | `projects` / `name` / `notes` / `due_on` / `assignee` を指定して直接起票。担当者は常に自分 (user_gid)。成功時のみ必要に応じて補助ログ更新 |
-| tension | プロジェクトの `tensions.md` | 末尾に箇条書きで追記 |
+| tension | プロジェクトの `open_issues.md` | 末尾に箇条書きで追記 |
 | focus_update | `EditorViewModel.UpdateFocusAsync()` | Editor に遷移 → current_focus.md を開く → `UpdateFocusAsync` を自動発火。キャプチャ入力内容を LLM プロンプトのコンテキストとして渡す |
 | decision | DecisionLogGeneratorService | Editor に遷移して AI Decision Log フローを起動 |
 | memo | `_config/capture_log.md` | タイムスタンプ付きで追記 (どこにも属さないメモ) |
@@ -121,7 +121,7 @@ AI が分類:
 │  Quick Capture                                     [×]   │
 ├──────────────────────────────────────────────────────────┤
 │                                                          │
-│  ✓ Added to ProjectAlpha/tensions.md                     │
+│  ✓ Added to ProjectAlpha/open_issues.md                     │
 │                                                          │
 │                              [Open File] [Close]         │
 │                                                          │
@@ -189,7 +189,7 @@ public class CaptureClassification
 public class CaptureRouteResult
 {
     public bool Success { get; set; }
-    public string Message { get; set; }           // "Added to ProjectAlpha/tensions.md"
+    public string Message { get; set; }           // "Added to ProjectAlpha/open_issues.md"
     public string? TargetFilePath { get; set; }   // 書き込み先のフルパス
     public string? AsanaTaskGid { get; set; }     // task の場合に設定
     public string? AsanaTaskUrl { get; set; }     // task の場合に設定
@@ -275,7 +275,7 @@ public class CaptureRouteResult
   - ファイル: `Services/CaptureService.cs`, `Models/AppConfig.cs`, `ViewModels/SettingsViewModel.cs`
 
 - [x] 3-4. AppendToTensionsAsync() を実装 (tension ルート)
-  - プロジェクトの tensions.md パスを解決 (AiContextContentPath 配下)
+  - プロジェクトの open_issues.md パスを解決 (AiContextContentPath 配下)
   - ファイル末尾に `- {summary}: {body の1行要約}` を追記
   - ファイルが存在しない場合: ヘッダー付きで新規作成
   - ファイル: `Services/CaptureService.cs`
@@ -748,7 +748,7 @@ flowchart TD
     T11 -->|"Retry"| T8
     T11 -->|"Save as memo"| M1
 
-    G -->|"tension"| N1["tensions.md 追記"]
+    G -->|"tension"| N1["open_issues.md 追記"]
     G -->|"memo"| M1["capture_log.md 追記"]
     G -->|"decision"| D1["Editor遷移 + Decision Logフロー開始"]
 
