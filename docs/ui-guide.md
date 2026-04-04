@@ -2,6 +2,19 @@
 
 [< Back to README](../README.md)
 
+## Table of Contents
+
+- [Dashboard](#dashboard)
+  - [AI Features on Dashboard](#ai-features-on-dashboard)
+- [Editor](#editor)
+  - [AI Features in Editor](#ai-features-in-editor)
+- [Timeline](#timeline)
+- [Git Repos](#git-repos)
+- [Asana Sync](#asana-sync)
+- [Agent Hub](#agent-hub)
+- [Setup - New Project](#setup---new-project)
+- [Setup - Workstreams](#setup---workstreams)
+
 ## Dashboard
 
 Overview of all projects with health indicators, update freshness, and Today Queue at the bottom.
@@ -96,48 +109,7 @@ Scans workspace roots and lists repositories with remote URLs, branches, and las
 
 Configure per-project Asana sync with scheduling, workstream mapping, and section filters.
 
-![](../_assets/AsanaSync.png)
-
-Use this only if your workflow includes Asana.
-
-Left panel (sync controls):
-
-- Auto Sync checkbox and interval setting (in hours)
-- Save Schedule to persist the schedule
-- Run Sync Now to execute a one-time sync immediately
-- Clear button to reset sync state
-- Last sync timestamp displayed for reference
-
-Right panel (per-project config):
-
-- Project selector dropdown (e.g. GenAi [Domain]) with Load button
-- Asana Project GIDs: one GID per line to specify which Asana projects to sync
-- Workstream Map: maps `gid` to `workstream-id` for routing tasks to the correct workstream folder
-- Workstream Field: the custom field name in Asana used to identify the workstream
-- Project Aliases: aliases used to match Asana custom field to this project (one per line)
-- Team View: optional section to enable the team task dashboard. Set `enabled: true` and list `project_gids` (Asana project GIDs whose assignees form the team). Use `workstream_project_gids` to specify different GID sets per workstream.
-- Save button to persist the per-project `asana_config.json`
-
-Setup steps:
-
-1. Enable Asana integration in `Settings` and save the required fields
-2. Open `Asana Sync` and choose the target project
-3. Run `Run Sync` once first
-   - On success, these files are updated:
-   - `_ai-context/obsidian_notes/asana-tasks.md`
-   - optionally `_ai-context/obsidian_notes/workstreams/<id>/asana-tasks.md`
-4. Go back to `Dashboard` and check Today Queue
-   - Today Queue reads tasks from the `asana-tasks.md` files above
-5. Only if you want automatic sync, turn on `Enable Schedule`
-6. Choose interval and click `Save Schedule`
-
-If tasks do not appear:
-- Confirm `asana-tasks.md` was updated after `Run Sync`
-- Refresh `Dashboard` to reload Today Queue
-
-Reference (you usually do not edit these directly):
-- Global Asana values are stored in the config directory (`%USERPROFILE%\.projectcurator\asana_global.json` by default)
-- Per-project advanced settings are stored in `{CloudSyncProject}\asana_config.json`
+See [Asana Setup](asana-setup.md) for full setup steps and page reference.
 
 ## Agent Hub
 
@@ -145,19 +117,7 @@ Manage reusable agent/rule definitions and deploy them per project and per CLI f
 
 ![](../_assets/AgentHub.png)
 
-- Left panel: master library (Agents / Context Rules) with preview and create/edit/delete actions; double-click an item to open the Edit dialog directly
-- Right panel: per-project deployment matrix with per-CLI toggles (Cl, Cx, Cp, Gm); each row has an All checkbox to toggle all CLI targets at once
-- Library import is ZIP-only (Markdown-only import is not supported); export also produces a ZIP
-- Supports target subfolder selection, status sync, and batch deploy
-- AI Builder (AI Features must be enabled) generates an Agent or Context Rule from a free-text prompt; select the type with the radio buttons, press Generate or Ctrl+Enter, and Name/Description are auto-filled by the AI
-
-<img src="../_assets/AgentHub-EditAgent.png" width="60%" alt="Agent Hub Edit Agent dialog" />
-
-Edit Agent dialog lets you update name, description, and content for each reusable sub-agent definition. Ctrl+Enter saves.
-
-<img src="../_assets/AgentHub-EditContextRule.png" width="60%" alt="Agent Hub Edit Context Rule dialog" />
-
-Edit Context Rule dialog provides the same workflow for reusable context rules. Ctrl+Enter saves.
+See [AI Agent Collaboration](ai-agent-collaboration.md#agent-hub-multi-cli-deployment) for full details on the library, deployment matrix, and AI Builder.
 
 ## Setup - New Project
 

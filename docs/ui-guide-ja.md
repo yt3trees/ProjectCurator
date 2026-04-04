@@ -2,6 +2,19 @@
 
 [< READMEに戻る](../README-ja.md)
 
+## 目次
+
+- [Dashboard](#dashboard)
+  - [DashboardのAI機能](#dashboardのai機能)
+- [Editor](#editor)
+  - [EditorのAI機能](#editorのai機能)
+- [Timeline](#timeline)
+- [Git Repos](#git-repos)
+- [Asana Sync](#asana-sync)
+- [Agent Hub](#agent-hub)
+- [Setup - New Project](#setup---new-project)
+- [Setup - Workstreams](#setup---workstreams)
+
 ## Dashboard
 
 全プロジェクトのヘルス状態、更新鮮度、Today Queueを一画面で確認できます。
@@ -96,48 +109,7 @@ Import Meeting Notes (AI) は会議メモを1回で分析し、Decisions / Focus
 
 プロジェクトごとにAsana同期のスケジュール、Workstreamマッピング、セクションフィルタを設定できます。
 
-![](../_assets/AsanaSync.png)
-
-Asanaを使う場合のみ設定します。
-
-左パネル(同期コントロール):
-
-- Auto Sync チェックボックスと同期間隔(時間単位)の設定
-- Save Schedule でスケジュールを保存
-- Run Sync Now で即座に1回同期を実行
-- Clear ボタンで同期状態をリセット
-- Last sync に前回の同期日時を表示
-
-右パネル(プロジェクト別設定):
-
-- プロジェクト選択ドロップダウン(例: GenAi [Domain])と Load ボタン
-- Asana Project GIDs: 同期対象の Asana プロジェクト GID を1行ずつ入力
-- Workstream Map: `gid` と `workstream-id` の対応を設定し、タスクを適切な Workstream フォルダに振り分け
-- Workstream Field: Workstream を識別する Asana カスタムフィールド名
-- Project Aliases: Asanaのカスタムフィールドとこのプロジェクトを紐づける別名(1行ずつ)
-- Team View: チームタスクダッシュボードの設定(任意)。`enabled: true` にし、チームを構成するAsanaプロジェクトのGIDを `project_gids` に列挙します。Workstreamごとに異なるGIDセットを使う場合は `workstream_project_gids` で指定します。
-- Save ボタンでプロジェクト別 `asana_config.json` を保存
-
-設定手順:
-
-1. `Settings` で Asana 連携を有効にし、必要項目を保存する
-2. `Asana Sync` タブを開き、同期対象プロジェクトを選ぶ
-3. まず `Run Sync` を1回実行する
-   - 成功すると、次のファイルが更新されます
-   - `_ai-context/obsidian_notes/asana-tasks.md`
-   - 必要に応じて `_ai-context/obsidian_notes/workstreams/<id>/asana-tasks.md`
-4. `Dashboard` に戻り、Today Queue を確認する
-   - Today Queue は上記 `asana-tasks.md` を読み取って表示します
-5. 定期同期したい場合だけ `Enable Schedule` を ON にする
-6. 同期間隔を選び、`Save Schedule` を押す
-
-うまく表示されないとき:
-- `Run Sync` 実行後に `asana-tasks.md` が更新されているか確認
-- `Dashboard` を再読み込みして Today Queue を更新
-
-補足(通常は直接編集不要):
-- Asana の設定値は設定ディレクトリ (`%USERPROFILE%\.projectcurator\asana_global.json` がデフォルト) に保存されます
-- プロジェクト単位の詳細設定は `{CloudSyncProject}\asana_config.json` に保存されます
+詳細な設定手順とページリファレンスは [Asana連携設定](asana-setup-ja.md) を参照してください。
 
 ## Agent Hub
 
@@ -145,19 +117,7 @@ Agent/Rule の定義を一元管理し、プロジェクト単位・CLI単位で
 
 ![](../_assets/AgentHub.png)
 
-- 左ペイン: マスターライブラリ (Agents / Context Rules) の一覧、プレビュー、作成/編集/削除。アイテムをダブルクリックすると Edit ダイアログが開きます
-- 右ペイン: プロジェクト単位の配備マトリクス。CLIごと (Cl, Cx, Cp, Gm) にON/OFF可能。各行に All チェックボックスがあり全CLIをまとめて切り替えられます
-- ライブラリのインポートは ZIP のみ対応(Markdownのみのインポートは非サポート)。エクスポートも ZIP 形式
-- ターゲットサブフォルダ指定、状態同期、一括配備に対応
-- AI Builder (AI機能が有効の場合のみ) で Agent または Context Rule を自由記述のプロンプトから生成。ラジオボタンで種別を選択し、Generate または Ctrl+Enter で実行。名前と説明はAIが自動補完します
-
-<img src="../_assets/AgentHub-EditAgent.png" width="60%" alt="Agent Hub Agent編集ダイアログ" />
-
-Edit Agent ダイアログで、再利用するサブエージェント定義の名前・説明・本文を編集できます。Ctrl+Enter で保存。
-
-<img src="../_assets/AgentHub-EditContextRule.png" width="60%" alt="Agent Hub Context Rule編集ダイアログ" />
-
-Edit Context Rule ダイアログで、再利用するルール定義を同様の手順で編集できます。Ctrl+Enter で保存。
+ライブラリ、配備マトリクス、AI Builder の詳細は [AIエージェント協業](ai-agent-collaboration-ja.md#agent-hub-multi-cli-deployment) を参照してください。
 
 ## Setup - New Project
 

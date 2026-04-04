@@ -8,7 +8,6 @@
 
 ```text
 %USERPROFILE%\.projectcurator\          <- デフォルト (新規インストール)
-  (既存ユーザーは %USERPROFILE%\Documents\Projects\_config\ を自動検出)
   (PROJECTCURATOR_CONFIG_DIR 環境変数で任意のパスに上書き可)
 ├── settings.json
 ├── hidden_projects.json

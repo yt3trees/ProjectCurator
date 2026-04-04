@@ -8,7 +8,6 @@
 
 ```text
 %USERPROFILE%\.projectcurator\          <- default (new installs)
-  (or %USERPROFILE%\Documents\Projects\_config\ for existing installs - detected automatically)
   (or override via PROJECTCURATOR_CONFIG_DIR environment variable)
 ├── settings.json
 ├── hidden_projects.json

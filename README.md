@@ -120,27 +120,7 @@ Required config files are created automatically when you save.
 
 ### 4. Optional: Set up Asana integration
 
-<details>
-<summary>Show Asana setup steps</summary>
-
-- Create/check your Asana token in Developer Console: `https://app.asana.com/0/my-apps`
-- Open `Settings` and enter global Asana values in `Asana Global Config`:
-  - `Asana Token`
-  - `Workspace GID`
-  - `User GID`
-- Open `Asana Sync` page
-- Enable schedule if needed and save
-- Run a manual sync once to fetch tasks
-
-To distribute personal project tasks across your local projects:
-
-- Add your personal Asana project GIDs to `Personal Project GIDs` in `Settings`
-  - These are Asana projects not tied to any specific local project (e.g. a personal GTD project), separate from per-project Asana settings configured in `Setup`
-- During sync, tasks from these personal projects are distributed using the task's `Project` custom field
-  - If the `Project` field matches a local project name → tasks appear in that project's Dashboard Today Queue
-  - If no match is found → tasks are output to a separate personal tasks Markdown file
-
-</details>
+See [Asana Setup](docs/asana-setup.md) for full instructions.
 
 ### 5. Optional: Set up LLM / AI features
 
@@ -180,6 +160,7 @@ Tech stack: .NET 9 + WPF, wpf-ui 3.x, AvalonEdit, CommunityToolkit.Mvvm
 - [AI Features](docs/ai-features.md) - LLM setup, What's Next, Decision Log, Meeting Notes import, Quick Capture
 - [AI Agent Collaboration](docs/ai-agent-collaboration.md) - Working with Claude Code / Codex CLI, Agent Hub, skill deployment
 - [UI Guide](docs/ui-guide.md) - Screenshots and detailed operation guide for every page
+- [Asana Setup](docs/asana-setup.md) - Asana credentials, sync configuration, and Asana Sync page reference
 - [Configuration](docs/configuration.md) - Config file reference and keyboard shortcuts
 
 ## Notes
