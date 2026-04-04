@@ -226,7 +226,8 @@ internal static class ProposalReviewDialog
         var skipButton = new Wpf.Ui.Controls.Button
         {
             Content = "Skip", Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
-            MinWidth = 80, Height = 32, Margin = new Thickness(0, 0, 8, 0)
+            MinWidth = 80, Height = 32, Margin = new Thickness(0, 0, 8, 0),
+            IsCancel = true
         };
         var debugButton = new Wpf.Ui.Controls.Button
         {
@@ -420,7 +421,8 @@ internal static class ProposalReviewDialog
             Content = "✕", Width = 34, Height = 26,
             Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
             Background = System.Windows.Media.Brushes.Transparent,
-            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
+            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13,
+            IsCancel = true
         };
         Grid.SetColumn(closeBtn, 1);
         titleBar.Children.Add(titleBlock);

@@ -75,7 +75,8 @@ internal static class TeamViewDialog
             Background = Brushes.Transparent,
             BorderThickness = new Thickness(0),
             Foreground = subtext,
-            FontSize = 13
+            FontSize = 13,
+            IsCancel = true
         };
         Grid.SetColumn(closeBtn, 3);
 
