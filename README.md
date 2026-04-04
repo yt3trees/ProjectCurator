@@ -41,7 +41,7 @@ flowchart TD
     
     Asana -.->|Sync tasks| F3
     
-    MD ==>|Read files as<br>project context| AI
+    MD <-->|【Write】 Autonomously update context after work<br>━━━━━━━━━━━━━━━━━━━━━━━━━<br>【Read】 Use files as project foundation| AI
     
     AI -->|Context-aware<br>autonomous work & edits| Workspace
 ```
