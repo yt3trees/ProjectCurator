@@ -499,7 +499,6 @@
                                                                 <ColumnDefinition Width="Auto"/>
                                                                 <ColumnDefinition Width="Auto"/>
                                                                 <ColumnDefinition Width="Auto"/>
-                                                                <ColumnDefinition Width="Auto"/>
                                                             </Grid.ColumnDefinitions>
 
                                                             <Button Grid.Column="0"
@@ -562,19 +561,16 @@
                                                                        Padding="8,3"
                                                                        Margin="0,0,4,0"
                                                                        Click="OnOpenWorkstreamWorkRootClick"
-                                                                       ToolTip="Open workstream _work root">
+                                                                       ToolTip="Open workstream _work root / Right-click: more options">
                                                                 <ui:SymbolIcon Symbol="FolderOpen20" FontSize="16"/>
+                                                                <ui:Button.ContextMenu>
+                                                                    <ContextMenu>
+                                                                        <MenuItem Header="Create Today Work Folder" Click="OnCreateWorkstreamTodayFolderClick"/>
+                                                                    </ContextMenu>
+                                                                </ui:Button.ContextMenu>
                                                             </ui:Button>
 
                                                             <ui:Button Grid.Column="2"
-                                                                       Padding="8,3"
-                                                                       Margin="0,0,4,0"
-                                                                       Click="OnCreateWorkstreamTodayFolderClick"
-                                                                       ToolTip="Create today folder in workstream _work">
-                                                                <ui:SymbolIcon Symbol="Add20" FontSize="16" Margin="1,0,0,0"/>
-                                                            </ui:Button>
-
-                                                            <ui:Button Grid.Column="3"
                                                                        Padding="8,3"
                                                                        Click="OnPinWorkstreamFolderClick"
                                                                        ToolTip="Pin a recent work folder / Right-click: specify full path">
@@ -586,7 +582,7 @@
                                                                 </ui:Button.ContextMenu>
                                                             </ui:Button>
 
-                                                            <ui:Button Grid.Column="4"
+                                                            <ui:Button Grid.Column="3"
                                                                        Padding="8,3"
                                                                        Margin="4,0,0,0"
                                                                        Tag="{Binding}"

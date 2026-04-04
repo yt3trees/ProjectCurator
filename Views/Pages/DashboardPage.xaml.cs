@@ -1036,7 +1036,12 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
 
     private async void OnCreateWorkstreamTodayFolderClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not FrameworkElement fe) return;
+        FrameworkElement? fe = sender as FrameworkElement;
+        if (sender is System.Windows.Controls.MenuItem mi
+            && mi.Parent is System.Windows.Controls.ContextMenu cm
+            && cm.PlacementTarget is FrameworkElement pt)
+            fe = pt;
+        if (fe is null) return;
         if (fe.DataContext is not WorkstreamCardItem ws) return;
         var card = FindAncestorDataContext<ProjectCardViewModel>(fe);
         if (card == null) return;
