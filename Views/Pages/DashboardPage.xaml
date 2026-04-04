@@ -280,10 +280,14 @@
                                                 </Style>
                                             </Ellipse.Style>
                                         </Ellipse>
-                                        <TextBlock FontSize="11" Foreground="{DynamicResource AppSubtext0}"
-                                                   VerticalAlignment="Center"
-                                                   ToolTip="Decision log count&#x0A;Number of decision log files recorded in this project"
-                                                   Text="{Binding DecisionLogCount, StringFormat=📝 {0}}"/>
+                                        <Button Background="Transparent" BorderThickness="0" Padding="0,0,8,0"
+                                                Cursor="Hand" ToolTip="Decision log count&#x0A;Click to view decisions"
+                                                Tag="{Binding}" Click="OnProjectDecisionLogClick"
+                                                VerticalAlignment="Center">
+                                            <TextBlock FontSize="11" Foreground="{DynamicResource AppSubtext0}"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding DecisionLogCount, StringFormat=📝 {0}}"/>
+                                        </Button>
                                         <StackPanel Margin="8,0,0,0"
                                                     Orientation="Horizontal"
                                                     VerticalAlignment="Center"
@@ -543,9 +547,13 @@
                                                                         <TextBlock Text="{Binding FocusAgeText}" FontSize="9"
                                                                                    Foreground="{DynamicResource AppSubtext0}"/>
                                                                     </Border>
-                                                                    <TextBlock Text="{Binding DecisionLogCount, StringFormat='📝{0}'}"
-                                                                               FontSize="10" Margin="4,0,0,0" VerticalAlignment="Center"
-                                                                               Foreground="{DynamicResource AppSubtext0}"/>
+                                                                    <Button Background="Transparent" BorderThickness="0" Padding="4,0,0,0"
+                                                                            Cursor="Hand" ToolTip="Decision log count&#x0A;Click to view decisions"
+                                                                            Tag="{Binding}" Click="OnWorkstreamDecisionLogClick">
+                                                                        <TextBlock Text="{Binding DecisionLogCount, StringFormat='📝{0}'}"
+                                                                                   FontSize="10" VerticalAlignment="Center"
+                                                                                   Foreground="{DynamicResource AppSubtext0}"/>
+                                                                    </Button>
                                                                 </StackPanel>
                                                             </Button>
 

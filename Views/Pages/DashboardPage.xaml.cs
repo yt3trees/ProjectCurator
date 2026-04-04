@@ -22,13 +22,15 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     private readonly LlmClientService _llmClientService;
     private readonly FileEncodingService _fileEncodingService;
     private readonly ConfigService _configService;
+    private readonly DecisionLogService _decisionLogService;
 
-    public DashboardPage(DashboardViewModel viewModel, LlmClientService llmClientService, FileEncodingService fileEncodingService, ConfigService configService)
+    public DashboardPage(DashboardViewModel viewModel, LlmClientService llmClientService, FileEncodingService fileEncodingService, ConfigService configService, DecisionLogService decisionLogService)
     {
         ViewModel = viewModel;
         _llmClientService = llmClientService;
         _fileEncodingService = fileEncodingService;
         _configService = configService;
+        _decisionLogService = decisionLogService;
         DataContext = ViewModel;
 
         ViewModel.OnOpenInEditor = project =>
@@ -195,6 +197,40 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     {
         if (sender is not FrameworkElement { DataContext: ProjectCardViewModel card }) return;
         await ShowUncommittedDetailsDialogAsync(card);
+    }
+
+    private async void OnProjectDecisionLogClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: ProjectCardViewModel card }) return;
+        var entries = await _decisionLogService.GetDecisionLogsAsync(card.Info.AiContextContentPath);
+        DecisionLogViewerDialog.ShowDialog(Window.GetWindow(this), card.Info.Name, entries, file =>
+        {
+            if (Window.GetWindow(this) is MainWindow mw)
+                mw.NavigateToEditorAndOpenFile(card.Info, file);
+        });
+    }
+
+    private async void OnWorkstreamDecisionLogClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe || fe.Tag is not WorkstreamCardItem ws) return;
+        
+        var itemsControl = FindVisualParent<ItemsControl>(fe);
+        if (itemsControl?.DataContext is not ProjectCardViewModel card) return;
+
+        var entries = await _decisionLogService.GetDecisionLogsAsync(card.Info.AiContextContentPath, ws.Id);
+        DecisionLogViewerDialog.ShowDialog(Window.GetWindow(this), $"{card.Info.Name} / {ws.Label}", entries, file =>
+        {
+            if (Window.GetWindow(this) is MainWindow mw)
+                mw.NavigateToEditorAndOpenFile(card.Info, file);
+        });
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject child) where T : DependencyObject
+    {
+        DependencyObject parentObject = VisualTreeHelper.GetParent(child);
+        if (parentObject == null) return null;
+        if (parentObject is T parent) return parent;
+        return FindVisualParent<T>(parentObject);
     }
 
     private sealed class RepoStatusDialogItem

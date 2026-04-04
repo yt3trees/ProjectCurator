@@ -81,6 +81,7 @@ public partial class App : WpfApplication
         services.AddSingleton<AsanaTaskParser>();
         services.AddSingleton<FocusUpdateService>();
         services.AddSingleton<DecisionLogGeneratorService>();
+        services.AddSingleton<DecisionLogService>();
         services.AddSingleton<CaptureService>();
         services.AddSingleton<MeetingNotesService>();
         services.AddSingleton<StateSnapshotService>();

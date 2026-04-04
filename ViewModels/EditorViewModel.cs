@@ -803,7 +803,38 @@ public partial class EditorViewModel : ObservableObject
         var fileName = $"{DateTime.Now:yyyy-MM-dd}_{logName.Trim()}.md";
         var filePath = Path.Combine(logDir, fileName);
 
-        var template = $"# {logName.Trim()}\n\nDate: {DateTime.Now:yyyy-MM-dd}\n\n## Decision\n\n\n## Rationale\n\n\n## Consequences\n\n";
+        var template = $"""
+# Decision: {logName.Trim()}
+
+> Date: {DateTime.Now:yyyy-MM-dd}
+> Status: Confirmed
+> Trigger: Solo decision
+
+## Context
+
+
+## Options
+
+### Option A: 
+- Pros:
+- Cons:
+
+### Option B: 
+- Pros:
+- Cons:
+
+## Chosen
+Option : 
+
+## Why
+
+
+## Risk
+-
+
+## Revisit Trigger
+-
+""";
         await _encodingService.WriteFileAsync(filePath, template, "UTF8");
 
         if (SelectedProject != null)
