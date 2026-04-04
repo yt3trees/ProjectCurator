@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,21 +9,6 @@ using ProjectCurator.Models;
 using ProjectCurator.Services;
 
 namespace ProjectCurator.ViewModels;
-
-internal class AsanaProjectConfig
-{
-    [JsonPropertyName("asana_project_gids")]
-    public List<string> AsanaProjectGids { get; set; } = [];
-
-    [JsonPropertyName("anken_aliases")]
-    public List<string> AnkenAliases { get; set; } = [];
-
-    [JsonPropertyName("workstream_project_map")]
-    public Dictionary<string, string> WorkstreamProjectMap { get; set; } = [];
-
-    [JsonPropertyName("workstream_field_name")]
-    public string WorkstreamFieldName { get; set; } = "workstream-id";
-}
 
 public partial class AsanaSyncViewModel : ObservableObject
 {
@@ -72,6 +56,16 @@ public partial class AsanaSyncViewModel : ObservableObject
 
     [ObservableProperty]
     private bool skipHiddenProjects = true;
+
+    // Team View 設定
+    [ObservableProperty]
+    private bool teamViewEnabled;
+
+    [ObservableProperty]
+    private string teamViewProjectGids = "";
+
+    [ObservableProperty]
+    private string teamViewWorkstreamGids = "";
 
     public AsanaSyncViewModel(
         ConfigService configService,
@@ -147,6 +141,9 @@ public partial class AsanaSyncViewModel : ObservableObject
             AsanaConfigAliases = "";
             AsanaConfigWorkstreamMap = "";
             AsanaConfigWorkstreamFieldName = "workstream-id";
+            TeamViewEnabled = false;
+            TeamViewProjectGids = "";
+            TeamViewWorkstreamGids = "";
             AsanaConfigStatus = "New file (not yet created)";
             return;
         }
@@ -164,6 +161,17 @@ public partial class AsanaSyncViewModel : ObservableObject
             AsanaConfigWorkstreamFieldName = string.IsNullOrWhiteSpace(config.WorkstreamFieldName)
                 ? "workstream-id"
                 : config.WorkstreamFieldName.Trim();
+
+            // Team View
+            var tv = config.TeamView;
+            TeamViewEnabled = tv?.Enabled == true;
+            TeamViewProjectGids = tv != null ? string.Join("\n", tv.ProjectGids) : "";
+            TeamViewWorkstreamGids = tv != null
+                ? string.Join("\n", tv.WorkstreamProjectGids
+                    .OrderBy(kv => kv.Key)
+                    .Select(kv => $"{kv.Key}={string.Join(",", kv.Value)}"))
+                : "";
+
             AsanaConfigStatus = "Loaded";
         }
         catch (Exception ex)
@@ -207,12 +215,44 @@ public partial class AsanaSyncViewModel : ObservableObject
                 ? "workstream-id"
                 : AsanaConfigWorkstreamFieldName.Trim();
 
+            // Team View
+            TeamViewConfig? teamView = null;
+            if (TeamViewEnabled || !string.IsNullOrWhiteSpace(TeamViewProjectGids) || !string.IsNullOrWhiteSpace(TeamViewWorkstreamGids))
+            {
+                var tvGids = TeamViewProjectGids
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+
+                var tvWsGids = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var line in TeamViewWorkstreamGids
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .Where(s => s.Length > 0))
+                {
+                    var eqIdx = line.IndexOf('=');
+                    if (eqIdx <= 0) continue;
+                    var wsId = line[..eqIdx].Trim();
+                    var wsGids = line[(eqIdx + 1)..].Split(',')
+                        .Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+                    if (wsId.Length > 0 && wsGids.Count > 0)
+                        tvWsGids[wsId] = wsGids;
+                }
+
+                teamView = new TeamViewConfig
+                {
+                    Enabled = TeamViewEnabled,
+                    ProjectGids = tvGids,
+                    WorkstreamProjectGids = tvWsGids
+                };
+            }
+
             var config = new AsanaProjectConfig
             {
                 AsanaProjectGids = gids,
                 AnkenAliases = aliases,
                 WorkstreamProjectMap = map,
-                WorkstreamFieldName = fieldName
+                WorkstreamFieldName = fieldName,
+                TeamView = teamView
             };
             var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(configPath, json, new UTF8Encoding(false));
@@ -302,16 +342,5 @@ public partial class AsanaSyncViewModel : ObservableObject
     }
 
     private string ResolveAsanaConfigPath(ProjectInfo project)
-    {
-        var paths = _configService.LoadSettings();
-        var syncRoot = paths.CloudSyncRoot.TrimEnd('\\', '/');
-
-        return project.Category == "domain"
-            ? project.Tier == "mini"
-                ? Path.Combine(syncRoot, "_domains", "_mini", project.Name, "asana_config.json")
-                : Path.Combine(syncRoot, "_domains", project.Name, "asana_config.json")
-            : project.Tier == "mini"
-                ? Path.Combine(syncRoot, "_mini", project.Name, "asana_config.json")
-                : Path.Combine(syncRoot, project.Name, "asana_config.json");
-    }
+        => _configService.ResolveAsanaConfigPath(project);
 }

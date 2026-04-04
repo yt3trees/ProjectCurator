@@ -260,6 +260,66 @@ public class ConfigService
         File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
+    // ---------- AsanaProjectConfig (per project) ----------
+
+    public Models.AsanaProjectConfig? LoadAsanaProjectConfig(Models.ProjectInfo project)
+    {
+        var configPath = ResolveAsanaConfigPath(project);
+        if (!File.Exists(configPath)) return null;
+        try
+        {
+            var (content, _) = Helpers.EncodingDetector.ReadFile(configPath);
+            return JsonSerializer.Deserialize<Models.AsanaProjectConfig>(content, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ConfigService] LoadAsanaProjectConfig error: {ex}");
+            return null;
+        }
+    }
+
+    public void SaveAsanaProjectConfig(Models.ProjectInfo project, Models.AsanaProjectConfig config)
+    {
+        var configPath = ResolveAsanaConfigPath(project);
+        var dir = Path.GetDirectoryName(configPath)!;
+        if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+        var json = JsonSerializer.Serialize(config, JsonOptions);
+        File.WriteAllText(configPath, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    public string ResolveAsanaConfigPath(Models.ProjectInfo project)
+    {
+        var settings = LoadSettings();
+        var syncRoot = settings.CloudSyncRoot.TrimEnd('\\', '/');
+        return project.Category == "domain"
+            ? project.Tier == "mini"
+                ? Path.Combine(syncRoot, "_domains", "_mini", project.Name, "asana_config.json")
+                : Path.Combine(syncRoot, "_domains", project.Name, "asana_config.json")
+            : project.Tier == "mini"
+                ? Path.Combine(syncRoot, "_mini", project.Name, "asana_config.json")
+                : Path.Combine(syncRoot, project.Name, "asana_config.json");
+    }
+
+    public string GetObsidianProjectPath(Models.ProjectInfo project)
+    {
+        var settings = LoadSettings();
+        var obsRoot = settings.ObsidianVaultRoot.TrimEnd('\\', '/');
+        var relPath = GetObsidianRelativePath(project);
+        return Path.Combine(obsRoot, relPath);
+    }
+
+    public static string GetObsidianRelativePath(Models.ProjectInfo project)
+    {
+        if (project.Name == "_INHOUSE") return "_INHOUSE";
+        return (project.Category, project.Tier) switch
+        {
+            ("domain", "mini") => Path.Combine("Projects", "_domains", "_mini", project.Name),
+            ("domain", _)      => Path.Combine("Projects", "_domains", project.Name),
+            (_, "mini")        => Path.Combine("Projects", "_mini", project.Name),
+            _                  => Path.Combine("Projects", project.Name)
+        };
+    }
+
     // ---------- private ----------
 
     private void EnsureConfigDir()

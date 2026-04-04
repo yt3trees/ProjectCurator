@@ -133,7 +133,10 @@
                           Background="{DynamicResource AppSurface1}"/>
 
             <!-- ===== 右: asana_config.json エディター ===== -->
-            <Grid Grid.Column="2" Background="{DynamicResource AppSurface0}">
+            <ScrollViewer Grid.Column="2"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+            <Grid Background="{DynamicResource AppSurface0}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <!-- ヘッダー -->
@@ -141,21 +144,34 @@
                     <!-- プロジェクト選択 -->
                     <RowDefinition Height="Auto"/>
                     <!-- GIDs ラベル -->
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="80"/>
                     <!-- GIDs テキストボックス -->
                     <RowDefinition Height="Auto"/>
                     <!-- Workstream map ラベル -->
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="80"/>
                     <!-- Workstream map テキストボックス -->
                     <RowDefinition Height="Auto"/>
                     <!-- Field 名 -->
                     <RowDefinition Height="Auto"/>
                     <!-- エイリアス ラベル -->
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="60"/>
                     <!-- エイリアス テキストボックス -->
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <!-- 保存 + ステータス -->
+                    <!-- Team View -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- セパレータ -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- Team View トグル -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- Team GIDs ラベル -->
+                    <RowDefinition Height="60"/>
+                    <!-- Team GIDs テキストボックス -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- Team Workstream GIDs ラベル -->
+                    <RowDefinition Height="60"/>
+                    <!-- Team Workstream GIDs テキストボックス -->
                 </Grid.RowDefinitions>
 
                 <!-- ヘッダー -->
@@ -281,7 +297,7 @@
                          BorderThickness="1"/>
 
                 <!-- 保存ボタン + ステータス -->
-                <Grid Grid.Row="9" Margin="8,6,8,8">
+                <Grid Grid.Row="9" Margin="8,6,8,4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
@@ -298,7 +314,81 @@
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"/>
                 </Grid>
+
+                <!-- Team View セパレータ -->
+                <Border Grid.Row="10"
+                        Background="{DynamicResource AppSurface2}"
+                        Height="1"
+                        Margin="8,4,8,0"/>
+
+                <!-- Team View トグル -->
+                <Grid Grid.Row="11" Margin="8,6,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Team View"
+                               Foreground="{DynamicResource AppText}"
+                               FontSize="12" FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
+                    <CheckBox Grid.Column="1"
+                              IsChecked="{Binding TeamViewEnabled}"
+                              Content="Enabled"
+                              Foreground="{DynamicResource AppText}"
+                              VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- Team View Project GIDs ラベル -->
+                <TextBlock Grid.Row="12"
+                           Text="Team GIDs — all workstreams (1 per line):"
+                           Foreground="{DynamicResource AppSubtext0}"
+                           FontSize="11"
+                           Margin="8,6,8,2"
+                           Visibility="{Binding TeamViewEnabled, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                <!-- Team View Project GIDs テキストボックス -->
+                <TextBox Grid.Row="13"
+                         Text="{Binding TeamViewProjectGids, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True"
+                         TextWrapping="NoWrap"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         FontFamily="Consolas, Courier New"
+                         FontSize="11"
+                         Margin="8,0,8,0"
+                         Padding="4"
+                         Background="{DynamicResource AppBase}"
+                         Foreground="{DynamicResource AppText}"
+                         BorderBrush="{DynamicResource AppSurface2}"
+                         BorderThickness="1"
+                         Visibility="{Binding TeamViewEnabled, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                <!-- Team View Workstream GIDs ラベル -->
+                <TextBlock Grid.Row="14"
+                           Text="Team GIDs — per workstream (ws-id=gid1,gid2):"
+                           Foreground="{DynamicResource AppSubtext0}"
+                           FontSize="11"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="8,4,8,2"
+                           Visibility="{Binding TeamViewEnabled, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                <!-- Team View Workstream GIDs テキストボックス -->
+                <TextBox Grid.Row="15"
+                         Text="{Binding TeamViewWorkstreamGids, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True"
+                         TextWrapping="NoWrap"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         FontFamily="Consolas, Courier New"
+                         FontSize="11"
+                         Margin="8,0,8,8"
+                         Padding="4"
+                         Background="{DynamicResource AppBase}"
+                         Foreground="{DynamicResource AppText}"
+                         BorderBrush="{DynamicResource AppSurface2}"
+                         BorderThickness="1"
+                         Visibility="{Binding TeamViewEnabled, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </Grid>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </UserControl>

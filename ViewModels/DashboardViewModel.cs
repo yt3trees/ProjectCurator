@@ -26,6 +26,8 @@ public class WorkstreamCardItem
     public string FocusAgeText { get; set; } = "–";
     public int DecisionLogCount { get; set; }
     public bool IsClosed { get; set; }
+    public bool HasTeamView { get; set; }
+    public Models.TeamViewConfig? WorkstreamTeamView { get; set; }
 }
 
 // プロジェクトカードのViewModel
@@ -69,6 +71,9 @@ public partial class ProjectCardViewModel : ObservableObject
     public bool HasClosedWorkstreams => _allWorkstreams.Any(w => w.IsClosed);
     public int ActiveWorkstreamCount => _allWorkstreams.Count(w => !w.IsClosed);
 
+    public bool HasTeamView { get; }
+    public string TeamTasksFilePath { get; }
+
     [ObservableProperty]
     private bool isWorkstreamExpanded = false;
 
@@ -84,9 +89,16 @@ public partial class ProjectCardViewModel : ObservableObject
         foreach (var w in src) Workstreams.Add(w);
     }
 
-    public ProjectCardViewModel(ProjectInfo info)
+    public ProjectCardViewModel(
+        ProjectInfo info,
+        bool hasTeamView = false,
+        string teamTasksFilePath = "",
+        Models.TeamViewConfig? teamViewConfig = null)
     {
         Info = info;
+        // project_gids がある場合のみプロジェクトカードに [Team] ボタンを表示
+        HasTeamView = hasTeamView && (teamViewConfig?.ProjectGids.Count > 0);
+        TeamTasksFilePath = teamTasksFilePath;
         var today = DateTime.Today;
         var activeDates = info.FocusHistoryDates
             .Concat(info.DecisionLogDates)
@@ -97,16 +109,34 @@ public partial class ProjectCardViewModel : ObservableObject
             days.Add(new ActivityDay { IsActive = activeDates.Contains(today.AddDays(-i)) });
         ActivityDays = days;
 
-        // Workstream カードを構築
-        _allWorkstreams = info.Workstreams.Select(ws => new WorkstreamCardItem
+        // Workstream カードを構築 (workstream 単位の TeamView 情報も設定)
+        var wsTeamGids = teamViewConfig?.WorkstreamProjectGids
+            ?? new Dictionary<string, List<string>>();
+        _allWorkstreams = info.Workstreams.Select(ws =>
         {
-            Id = ws.Id,
-            Label = ws.Label,
-            FocusFile = ws.FocusFile,
-            FocusFreshness = GetFreshness(ws.FocusAge),
-            FocusAgeText = ws.FocusAge.HasValue ? $"{ws.FocusAge}d" : "–",
-            DecisionLogCount = ws.DecisionLogCount,
-            IsClosed = ws.IsClosed,
+            wsTeamGids.TryGetValue(ws.Id, out var wsGids);
+            var hasWsTeamView = teamViewConfig?.Enabled == true
+                && wsGids?.Count > 0;
+            Models.TeamViewConfig? wsTeamView = hasWsTeamView
+                ? new Models.TeamViewConfig
+                {
+                    Enabled = true,
+                    ProjectGids = wsGids!,
+                    WorkstreamProjectGids = []
+                }
+                : null;
+            return new WorkstreamCardItem
+            {
+                Id = ws.Id,
+                Label = ws.Label,
+                FocusFile = ws.FocusFile,
+                FocusFreshness = GetFreshness(ws.FocusAge),
+                FocusAgeText = ws.FocusAge.HasValue ? $"{ws.FocusAge}d" : "–",
+                DecisionLogCount = ws.DecisionLogCount,
+                IsClosed = ws.IsClosed,
+                HasTeamView = hasWsTeamView,
+                WorkstreamTeamView = wsTeamView,
+            };
         }).ToList();
 
         // 初期表示はアクティブのみ
@@ -230,9 +260,18 @@ public partial class DashboardViewModel : ObservableObject
         try
         {
             var list = await _discoveryService.GetProjectInfoListAsync(force: force);
-            _allCards = list.Select(p => new ProjectCardViewModel(p)
+            _allCards = list.Select(p =>
             {
-                IsHidden = _hiddenKeys.Contains(p.HiddenKey)
+                var teamConfig = _configService.LoadAsanaProjectConfig(p);
+                var teamView = teamConfig?.TeamView;
+                var hasTeamView = teamView?.Enabled == true;
+                var teamTasksFile = hasTeamView
+                    ? System.IO.Path.Combine(_configService.GetObsidianProjectPath(p), "team-tasks.md")
+                    : "";
+                return new ProjectCardViewModel(p, hasTeamView, teamTasksFile, teamView)
+                {
+                    IsHidden = _hiddenKeys.Contains(p.HiddenKey)
+                };
             }).ToList();
             ApplyFilter();
             // Today Queue もキャッシュ済みリストで更新

@@ -240,7 +240,7 @@ public class AsanaSyncService
 
                 var configPath = Path.Combine(entry, "asana_config.json");
                 var hasConfigFile = File.Exists(configPath);
-                var cfg = hasConfigFile ? LoadAsanaProjectConfig(configPath) : new AsanaProjectConfig();
+                var cfg = hasConfigFile ? LoadAsanaProjectConfig(configPath) : new Models.AsanaProjectConfig();
 
                 var aliasesInfo = cfg.AnkenAliases.Count > 0
                     ? $", aliases: [{string.Join(", ", cfg.AnkenAliases)}]"
@@ -265,16 +265,16 @@ public class AsanaSyncService
         return projects;
     }
 
-    private static AsanaProjectConfig LoadAsanaProjectConfig(string path)
+    private static Models.AsanaProjectConfig LoadAsanaProjectConfig(string path)
     {
         try
         {
             var (content, _) = EncodingDetector.ReadFile(path);
-            return JsonSerializer.Deserialize<AsanaProjectConfig>(content, JsonOptions) ?? new AsanaProjectConfig();
+            return JsonSerializer.Deserialize<Models.AsanaProjectConfig>(content, JsonOptions) ?? new Models.AsanaProjectConfig();
         }
         catch
         {
-            return new AsanaProjectConfig();
+            return new Models.AsanaProjectConfig();
         }
     }
 
@@ -949,21 +949,6 @@ public class AsanaSyncService
         return (roleOrder, due);
     }
 
-    private sealed class AsanaProjectConfig
-    {
-        [JsonPropertyName("asana_project_gids")]
-        public List<string> AsanaProjectGids { get; set; } = [];
-
-        [JsonPropertyName("anken_aliases")]
-        public List<string> AnkenAliases { get; set; } = [];
-
-        [JsonPropertyName("workstream_project_map")]
-        public Dictionary<string, string> WorkstreamProjectMap { get; set; } = [];
-
-        [JsonPropertyName("workstream_field_name")]
-        public string WorkstreamFieldName { get; set; } = "workstream-id";
-    }
-
     private sealed class AsanaTask
     {
         [JsonPropertyName("gid")]
@@ -1004,6 +989,9 @@ public class AsanaSyncService
     {
         [JsonPropertyName("gid")]
         public string Gid { get; set; } = "";
+
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
     }
 
     private sealed class AsanaCustomField
@@ -1036,6 +1024,271 @@ public class AsanaSyncService
         Dictionary<string, string> WorkstreamProjectMap,
         string WorkstreamFieldName,
         bool HasAsanaConfigFile);
+    // ===== Team Sync =====
+
+    /// <summary>
+    /// Manager View 用チームタスク同期。team-tasks.md をプロジェクトディレクトリに出力する。
+    /// </summary>
+    public async Task RunTeamSyncAsync(
+        string obsidianProjectPath,
+        string projectName,
+        Models.TeamViewConfig teamView,
+        Action<string>? log = null,
+        CancellationToken ct = default)
+    {
+        void Log(string line) => log?.Invoke(line + Environment.NewLine);
+
+        var asanaGlobal = _configService.LoadAsanaGlobalConfig();
+
+        var token = Environment.GetEnvironmentVariable("ASANA_TOKEN");
+        if (string.IsNullOrWhiteSpace(token)) token = asanaGlobal.AsanaToken;
+        if (string.IsNullOrWhiteSpace(token))
+            throw new InvalidOperationException("ASANA_TOKEN required.");
+
+        var userGid = Environment.GetEnvironmentVariable("ASANA_USER_GID");
+        if (string.IsNullOrWhiteSpace(userGid)) userGid = asanaGlobal.UserGid;
+        if (string.IsNullOrWhiteSpace(userGid))
+            throw new InvalidOperationException("user_gid required in asana_global.json.");
+
+        // 全対象 GID を収集
+        var allGids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var g in teamView.ProjectGids.Where(g => !string.IsNullOrWhiteSpace(g))) allGids.Add(g);
+        foreach (var gids in teamView.WorkstreamProjectGids.Values)
+            foreach (var g in gids.Where(g => !string.IsNullOrWhiteSpace(g))) allGids.Add(g);
+
+        if (allGids.Count == 0)
+        {
+            Log("No team_view project GIDs configured.");
+            return;
+        }
+
+        // Membership チェック (キャッシュ付き)
+        Log("[1/3] Checking project memberships...");
+        var cachePath = Path.Combine(obsidianProjectPath, "team_membership_cache.json");
+        var (cache, cacheValid) = LoadMembershipCache(cachePath);
+        var accessible = new List<string>();
+        var cacheUpdated = false;
+        foreach (var gid in allGids)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (cacheValid && cache.TryGetValue(gid, out bool cached))
+            {
+                Log($"  {gid}: {(cached ? "member (cached)" : "not member (cached)")}");
+                if (cached) accessible.Add(gid);
+            }
+            else
+            {
+                var isMember = await CheckMembershipAsync(gid, userGid, token, Log, ct);
+                cache[gid] = isMember;
+                cacheUpdated = true;
+                Log($"  {gid}: {(isMember ? "member" : "not member")}");
+                if (isMember) accessible.Add(gid);
+            }
+        }
+        if (cacheUpdated)
+            SaveMembershipCache(cachePath, cache);
+
+        if (accessible.Count == 0)
+        {
+            Log("No accessible projects (membership check failed for all GIDs).");
+            return;
+        }
+
+        // タスク取得
+        Log($"[2/3] Fetching tasks from {accessible.Count} project(s)...");
+        var projectDataMap = new Dictionary<string, (string Name, List<AsanaTask> Tasks)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var gid in accessible)
+        {
+            ct.ThrowIfCancellationRequested();
+            var name = await FetchProjectNameAsync(gid, token, Log, ct);
+            Log($"  {name} ({gid})");
+            var tasks = await FetchIncompleteTeamTasksAsync(gid, token, Log, ct);
+            Log($"    -> {tasks.Count} incomplete tasks");
+            projectDataMap[gid] = (name, tasks);
+        }
+
+        // team-tasks.md 出力
+        Log("[3/3] Writing team-tasks.md...");
+        var outputPath = Path.Combine(obsidianProjectPath, "team-tasks.md");
+        Directory.CreateDirectory(obsidianProjectPath);
+        WriteTeamTasksFile(outputPath, projectName, projectDataMap, teamView, userGid);
+        Log($"  Output: {outputPath}");
+        Log("Team sync complete!");
+    }
+
+    private static async Task<bool> CheckMembershipAsync(
+        string projectGid,
+        string userGid,
+        string token,
+        Action<string> log,
+        CancellationToken ct)
+    {
+        try
+        {
+            var url = $"https://app.asana.com/api/1.0/projects/{projectGid}/project_memberships?opt_fields=user.gid&limit=100";
+            var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            using var resp = await Http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode) return false;
+            var raw = await resp.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(raw);
+            if (!doc.RootElement.TryGetProperty("data", out var data)) return false;
+            foreach (var member in data.EnumerateArray())
+            {
+                if (member.TryGetProperty("user", out var user) &&
+                    user.TryGetProperty("gid", out var gid) &&
+                    gid.GetString() == userGid)
+                    return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            log($"  WARNING: membership check failed for {projectGid}: {ex.Message}");
+        }
+        return false;
+    }
+
+    private sealed class MembershipCache
+    {
+        [JsonPropertyName("checked_at")]
+        public string CheckedAt { get; set; } = "";
+
+        [JsonPropertyName("memberships")]
+        public Dictionary<string, bool> Memberships { get; set; } = [];
+    }
+
+    private static (Dictionary<string, bool> cache, bool valid) LoadMembershipCache(string path)
+    {
+        if (!File.Exists(path)) return ([], false);
+        try
+        {
+            var content = File.ReadAllText(path, Encoding.UTF8);
+            var obj = JsonSerializer.Deserialize<MembershipCache>(content, JsonOptions);
+            if (obj == null) return ([], false);
+            if (!DateTime.TryParse(obj.CheckedAt, out var checkedAt)) return ([], false);
+            var valid = (DateTime.UtcNow - checkedAt.ToUniversalTime()).TotalHours < 24;
+            return (obj.Memberships, valid);
+        }
+        catch { return ([], false); }
+    }
+
+    private static void SaveMembershipCache(string path, Dictionary<string, bool> cache)
+    {
+        try
+        {
+            var obj = new MembershipCache
+            {
+                CheckedAt = DateTime.UtcNow.ToString("O"),
+                Memberships = cache
+            };
+            var dir = Path.GetDirectoryName(path)!;
+            if (!string.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
+            File.WriteAllText(path, JsonSerializer.Serialize(obj, JsonOptions), new UTF8Encoding(false));
+        }
+        catch { /* ignore cache write errors */ }
+    }
+
+    private static async Task<List<AsanaTask>> FetchIncompleteTeamTasksAsync(
+        string projectGid,
+        string token,
+        Action<string> log,
+        CancellationToken ct)
+    {
+        var query = new Dictionary<string, string>
+        {
+            ["project"] = projectGid,
+            ["opt_fields"] =
+                "name,completed,due_on,assignee,assignee.name,assignee.gid,gid," +
+                "projects,projects.name",
+            ["completed_since"] = "now"
+        };
+        return await FetchPagedTasksAsync("https://app.asana.com/api/1.0/tasks", query, token, log, ct);
+    }
+
+    private static void WriteTeamTasksFile(
+        string outputPath,
+        string projectName,
+        Dictionary<string, (string Name, List<AsanaTask> Tasks)> projectDataMap,
+        Models.TeamViewConfig teamView,
+        string selfUserGid)
+    {
+        var today = DateTime.Today.ToString("yyyy-MM-dd");
+
+        // 全タスクを担当者別にグループ化 (自分は除外)
+        var memberTasks = new Dictionary<string, List<(AsanaTask task, string projectName)>>(StringComparer.Ordinal);
+        var unassigned = new List<(AsanaTask task, string projectName)>();
+
+        foreach (var (gid, (projName, tasks)) in projectDataMap)
+        {
+            foreach (var task in tasks.Where(t => !t.Completed))
+            {
+                // 自分のタスクは除外
+                if (!string.IsNullOrWhiteSpace(selfUserGid) && task.Assignee?.Gid == selfUserGid)
+                    continue;
+
+                var assignee = task.Assignee?.Name;
+                if (string.IsNullOrWhiteSpace(assignee))
+                {
+                    unassigned.Add((task, projName));
+                }
+                else
+                {
+                    if (!memberTasks.TryGetValue(assignee, out var list))
+                    {
+                        list = [];
+                        memberTasks[assignee] = list;
+                    }
+                    list.Add((task, projName));
+                }
+            }
+        }
+
+        using var w = new StreamWriter(outputPath, false, new UTF8Encoding(false));
+        w.WriteLine($"# Team Tasks: {projectName}");
+        w.WriteLine($"Last Sync: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        w.WriteLine();
+
+        // 担当者をタスク数の多い順に並べる
+        var sortedMembers = memberTasks
+            .OrderByDescending(kv => kv.Value.Count)
+            .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (member, taskList) in sortedMembers)
+        {
+            w.WriteLine($"## {member}");
+            var sorted = taskList
+                .OrderBy(x => string.IsNullOrWhiteSpace(x.task.DueOn) ? "9999-99-99" : x.task.DueOn)
+                .ToList();
+            foreach (var (task, projName) in sorted)
+            {
+                WriteTeamTaskLine(w, task, projName, today);
+            }
+            w.WriteLine();
+        }
+
+        if (unassigned.Count > 0)
+        {
+            w.WriteLine("## Unassigned");
+            var sorted = unassigned
+                .OrderBy(x => string.IsNullOrWhiteSpace(x.task.DueOn) ? "9999-99-99" : x.task.DueOn)
+                .ToList();
+            foreach (var (task, projName) in sorted)
+            {
+                WriteTeamTaskLine(w, task, projName, today);
+            }
+            w.WriteLine();
+        }
+    }
+
+    private static void WriteTeamTaskLine(StreamWriter w, AsanaTask task, string projName, string today)
+    {
+        var gid = task.Gid;
+        var due = string.IsNullOrWhiteSpace(task.DueOn) ? "" : $" (Due: {task.DueOn})";
+        var overdue = !string.IsNullOrWhiteSpace(task.DueOn) && string.CompareOrdinal(task.DueOn, today) < 0
+            ? " ⚠" : "";
+        w.WriteLine($"- [ ] {task.Name}{due}{overdue} [{projName}] [[Asana](https://app.asana.com/0/0/{gid})]");
+    }
+
     private sealed record SplitResult(
         List<ProjectSection> RootSections,
         List<AsanaTask> RootPersonalTasks,

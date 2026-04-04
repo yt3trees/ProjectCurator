@@ -499,6 +499,7 @@
                                                                 <ColumnDefinition Width="Auto"/>
                                                                 <ColumnDefinition Width="Auto"/>
                                                                 <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
                                                             </Grid.ColumnDefinitions>
 
                                                             <Button Grid.Column="0"
@@ -584,6 +585,16 @@
                                                                     </ContextMenu>
                                                                 </ui:Button.ContextMenu>
                                                             </ui:Button>
+
+                                                            <ui:Button Grid.Column="4"
+                                                                       Padding="8,3"
+                                                                       Margin="4,0,0,0"
+                                                                       Tag="{Binding}"
+                                                                       Click="OnWorkstreamTeamViewClick"
+                                                                       ToolTip="Team View"
+                                                                       Visibility="{Binding HasTeamView, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                                <ui:SymbolIcon Symbol="People24" FontSize="16"/>
+                                                            </ui:Button>
                                                         </Grid>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
@@ -667,6 +678,14 @@
                                                    ToolTip="Context briefing (AI)"
                                                    Visibility="{Binding DataContext.IsAiEnabled, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
                                             <ui:SymbolIcon Symbol="Lightbulb24" FontSize="16"/>
+                                        </ui:Button>
+                                        <ui:Button Padding="8,3"
+                                                   Margin="4,0,0,0"
+                                                   Tag="{Binding}"
+                                                   Click="OnTeamViewClick"
+                                                   ToolTip="Team View"
+                                                   Visibility="{Binding HasTeamView, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <ui:SymbolIcon Symbol="People24" FontSize="16"/>
                                         </ui:Button>
                                     </StackPanel>
                                 </StackPanel>

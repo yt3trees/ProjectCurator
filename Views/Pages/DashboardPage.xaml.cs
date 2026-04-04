@@ -23,14 +23,25 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     private readonly FileEncodingService _fileEncodingService;
     private readonly ConfigService _configService;
     private readonly DecisionLogService _decisionLogService;
+    private readonly AsanaSyncService _asanaSyncService;
+    private readonly TeamTaskParser _teamTaskParser;
 
-    public DashboardPage(DashboardViewModel viewModel, LlmClientService llmClientService, FileEncodingService fileEncodingService, ConfigService configService, DecisionLogService decisionLogService)
+    public DashboardPage(
+        DashboardViewModel viewModel,
+        LlmClientService llmClientService,
+        FileEncodingService fileEncodingService,
+        ConfigService configService,
+        DecisionLogService decisionLogService,
+        AsanaSyncService asanaSyncService,
+        TeamTaskParser teamTaskParser)
     {
         ViewModel = viewModel;
         _llmClientService = llmClientService;
         _fileEncodingService = fileEncodingService;
         _configService = configService;
         _decisionLogService = decisionLogService;
+        _asanaSyncService = asanaSyncService;
+        _teamTaskParser = teamTaskParser;
         DataContext = ViewModel;
 
         ViewModel.OnOpenInEditor = project =>
@@ -208,6 +219,47 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             if (Window.GetWindow(this) is MainWindow mw)
                 mw.NavigateToEditorAndOpenFile(card.Info, file);
         });
+    }
+
+    private void OnTeamViewClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: ProjectCardViewModel card }) return;
+        if (!card.HasTeamView) return;
+
+        var asanaConfig = _configService.LoadAsanaProjectConfig(card.Info);
+        var teamView = asanaConfig?.TeamView;
+        if (teamView == null) return;
+
+        var obsPath = _configService.GetObsidianProjectPath(card.Info);
+        TeamViewDialog.ShowDialog(
+            owner: Window.GetWindow(this),
+            projectName: card.Info.Name,
+            obsidianProjectPath: obsPath,
+            teamView: teamView,
+            asanaSyncService: _asanaSyncService,
+            teamTaskParser: _teamTaskParser);
+    }
+
+    private void OnWorkstreamTeamViewClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: WorkstreamCardItem ws }) return;
+        if (!ws.HasTeamView || ws.WorkstreamTeamView == null) return;
+
+        // 親 ProjectCardViewModel を VisualTree から取得
+        var card = FindVisualParent<ItemsControl>(sender as DependencyObject)?
+            .DataContext as ProjectCardViewModel
+            ?? (FindVisualParent<Border>(sender as DependencyObject)?
+                .DataContext as ProjectCardViewModel);
+        if (card == null) return;
+
+        var obsPath = _configService.GetObsidianProjectPath(card.Info);
+        TeamViewDialog.ShowDialog(
+            owner: Window.GetWindow(this),
+            projectName: $"{card.Info.Name} / {ws.Label}",
+            obsidianProjectPath: obsPath,
+            teamView: ws.WorkstreamTeamView,
+            asanaSyncService: _asanaSyncService,
+            teamTaskParser: _teamTaskParser);
     }
 
     private async void OnWorkstreamDecisionLogClick(object sender, RoutedEventArgs e)
