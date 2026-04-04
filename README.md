@@ -20,6 +20,7 @@ flowchart TD
         subgraph MD ["📁 Context Files"]
             F1["🎯 current_focus.md<br>Current Focus"]
             F2["⚖️ decision_log<br>Decision Log"]
+            F4["📓 Obsidian Vault<br>Knowledge & Notes"]
             F3["📋 asana-tasks.md<br>Task Status"]
         end
         
@@ -35,8 +36,9 @@ flowchart TD
     Workspace("💻 Local Workspace<br>Project Files (Code, Docs, etc.)")
 
     %% Relations
-    User -->|Document context<br>& decisions| UI
     User -->|Instruct & Review| AI
+    User -->|Document context<br>& decisions| UI
+    
     Asana -.->|Sync tasks| F3
     
     MD ==>|Read files as<br>project context| AI

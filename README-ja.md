@@ -18,6 +18,7 @@ flowchart TD
         subgraph MD ["📁 Context Files"]
             F1["🎯 current_focus.md<br>現在の作業フォーカス"]
             F2["⚖️ decision_log<br>意思決定ログ"]
+            F4["📓 Obsidian Vault<br>ナレッジ・調査メモ"]
             F3["📋 asana-tasks.md<br>タスク状況"]
         end
         
@@ -33,8 +34,9 @@ flowchart TD
     Workspace("💻 Local Workspace<br>作業ファイル群 (ドキュメント・コード等)")
 
     %% ワークフロー
-    User -->|状況の言語化<br>方針の記録| UI
     User -->|タスクの実行指示<br>結果のレビュー| AI
+    User -->|状況の言語化<br>方針の記録| UI
+    
     Asana -.->|タスク同期| F3
     
     MD ==>|プロジェクトの前提知識として<br>ファイルを読み込み| AI
