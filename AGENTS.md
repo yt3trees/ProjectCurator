@@ -9,19 +9,43 @@ ProjectCurator is a Windows desktop app (WPF + .NET 9) for managing multiple par
 ## Build & Publish
 
 ```bash
-# Build
+# Quick type check after changes (recommended — faster than full publish)
+dotnet build ProjectCurator/ProjectCurator.csproj 2>&1 | tail -5
+
+# Full build
 dotnet build
 
 # Publish single-file executable to bin\Publish\
-publish.cmd
-# Equivalent: dotnet publish -p:PublishProfile=SingleFile
+# Always use this for final verification (not dotnet build alone)
+dotnet publish -p:PublishProfile=SingleFile
 ```
 
-For build verification in this app, always use `publish.cmd` as the validation command. Run it from the repository root (the directory containing `publish.cmd`) via `dotnet publish -p:PublishProfile=SingleFile` — the cmd file uses `pause` so invoke the dotnet command directly in non-interactive shells.
+Run the publish command from the repository root. The `publish.cmd` wrapper uses `pause`, so invoke dotnet directly in non-interactive shells.
 
 There are no automated tests in this repository.
 
+## Safety & Permissions
+
+Allowed without prompting:
+- Read any file in the repository
+- Edit source files (.cs, .xaml, .json, .md)
+- Run `dotnet build` or `dotnet publish -p:PublishProfile=SingleFile`
+
+Ask the user first:
+- Any `git` operation (commit, push, branch deletion, reset)
+- Installing or upgrading NuGet packages
+- Deleting files
+- Modifying files outside the repository root
+
 Requirements: Windows, .NET 9 SDK, Git CLI, PowerShell 7+. Python 3.10+ is optional (Asana sync).
+
+## Key Entry Points
+
+- `App.xaml.cs` — DI container registration; add new services/ViewModels/Pages here
+- `MainWindow.xaml.cs` — page navigation control and window visibility logic
+- `Views/Pages/` — DashboardPage, EditorPage, TimelinePage, SettingsPage
+- `Models/AppConfig.cs` — settings model; add new settings fields here
+- `_config/*.example` — config file templates
 
 ## Architecture
 
@@ -51,6 +75,14 @@ MVVM + Dependency Injection (`Microsoft.Extensions.DependencyInjection`). All se
 | LlmClientService | Sends chat completion requests to OpenAI or Azure OpenAI; reads provider/key/model/endpoint from settings; supports Test Connection |
 | AsanaTaskParser | Parses `asana-tasks.md` into structured task lists for use in LLM prompts |
 | FocusUpdateService | Orchestrates the "Update Focus from Asana" flow: loads context files, builds prompt, calls LlmClientService, saves backup to `focus_history/`, and returns proposed diff |
+| DecisionLogService | Reads and parses decision log Markdown files from `_ai-context/decision_log/` (and per-workstream subdirs) |
+| DecisionLogGeneratorService | AI-driven decision log generation: detects candidates from focus_history diff, generates draft, refines via LLM in three separate async steps |
+| CaptureService | Global Capture orchestration: AI-classifies freeform input, creates Asana tasks (with dedup guard), appends to project files |
+| MeetingNotesService | Parses meeting notes and propagates extracted decisions/actions to decision_log, current_focus.md, open_issues.md via LLM |
+| TeamTaskParser | Parses `team-tasks.md` into `TeamMemberCard` list (per-member task rows with due dates, project tags, Asana GIDs) |
+| AgentHubService | Manages agent definitions, rules, and skills in `agent_hub/` under the config dir; extracts built-in skills from the assembly on first run |
+| AgentDeploymentService | Deploys/undeploys agent definition files to project or global target directories for Claude Code and other CLI tools |
+| StateSnapshotService | Exports current project and task state to `curator_state.json` in the config dir for external consumption |
 
 ### WPF-Specific Patterns
 
@@ -104,6 +136,21 @@ WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
 - `LlmClientService` throws `InvalidOperationException` if the API key is not configured — callers do not need to re-check the key themselves.
 - Services orchestrating LLM workflows (e.g., `FocusUpdateService`) must accept a `CancellationToken` and pass it through to `LlmClientService`.
 
+```csharp
+// Single-turn (system + user)
+string result = await _llmClient.ChatCompletionAsync(systemPrompt, userPrompt, cancellationToken);
+
+// Multi-turn with conversation history
+var messages = new List<ChatMessage>
+{
+    new(ChatRole.System, systemPrompt),
+    new(ChatRole.User, userTurn1),
+    new(ChatRole.Assistant, assistantTurn1),
+    new(ChatRole.User, userTurn2),
+};
+string result = await _llmClient.ChatWithHistoryAsync(messages, cancellationToken);
+```
+
 ### Settings
 
 - `AiEnabled` can only be set to `true` after a successful `TestLlmConnectionAsync`. Enforce this by binding the toggle's `IsEnabled` to `AiToggleCanEnable` (see `SettingsViewModel` pattern).
@@ -112,6 +159,12 @@ WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
 ## Popup / Dialog Windows
 
 When adding modal dialogs, follow the patterns in `DashboardPage.xaml.cs` (canonical reference). See `.codex/skills/projectcurator-popup-window/SKILL.md` for detailed guidelines: theme resources, dark-mode support, WPF control conventions, and Win32 interop guardrails. Use English-only text in UI elements.
+
+Existing dialog/window implementations for reference:
+- `Views\ProposalReviewDialog.cs` - diff review with Accept/Reject (used by FocusUpdateService flow)
+- `Views\CaptureWindow.cs` - frameless floating capture input window
+- `Views\DecisionLogViewerDialog.cs` - scrollable decision log list/detail dialog
+- `Views\TeamViewDialog.cs` - team member task cards dialog
 
 ### WPF Control Best Practices
 
