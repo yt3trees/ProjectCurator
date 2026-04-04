@@ -391,11 +391,13 @@
                                                         <ui:Button.Style>
                                                             <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
                                                                 <Setter Property="Content" Value="Close"/>
-                                                                <Setter Property="Appearance" Value="Danger"/>
+                                                                <Setter Property="Appearance" Value="Secondary"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource AppRed}"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsClosed}" Value="True">
                                                                         <Setter Property="Content" Value="Reopen"/>
-                                                                        <Setter Property="Appearance" Value="Primary"/>
+                                                                        <Setter Property="Appearance" Value="Secondary"/>
+                                                                        <Setter Property="Foreground" Value="{DynamicResource AppBlue}"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
