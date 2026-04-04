@@ -106,31 +106,19 @@ internal static class TeamViewDialog
         };
         scrollView.Content = membersPanel;
 
-        // ===== 凡例 =====
-        var legendText = new TextBlock
-        {
-            Text = "⚠ = overdue",
-            Foreground = subtext,
-            FontSize = 10,
-            Margin = new Thickness(12, 0, 12, 6)
-        };
-
         // ===== ルートレイアウト =====
         var root = new Grid { Background = surface };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // titleBar
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // statusText
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // scrollView
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // legend
 
         Grid.SetRow(titleBar, 0);
         Grid.SetRow(statusText, 1);
         Grid.SetRow(scrollView, 2);
-        Grid.SetRow(legendText, 3);
 
         root.Children.Add(titleBar);
         root.Children.Add(statusText);
         root.Children.Add(scrollView);
-        root.Children.Add(legendText);
 
         // ===== ダイアログウィンドウ =====
         dialogWindow = new Window
