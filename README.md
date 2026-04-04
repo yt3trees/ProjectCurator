@@ -10,41 +10,38 @@
 A Windows desktop app for streamlining project management and context switching.
 
 ```mermaid
-flowchart LR
-    %% Actors & External Systems
+flowchart TD
     User("👤 User")
-    Asana("Asana API")
 
     %% Core Application
-    subgraph PC ["ProjectCurator"]
-        direction TB
-        UI["Dashboard / Editor<br>(UI Layer)"]
+    subgraph PC ["✨ ProjectCurator"]
+        UI["🖥️ Dashboard / Editor<br>(UI Layer)"]
         
-        subgraph MD ["Context Files"]
-            direction TB
-            F1["current_focus.md<br>Current Focus"]
-            F2["decision_log<br>Decision Log"]
-            F3["asana-tasks.md<br>Task Status"]
+        subgraph MD ["📁 Context Files"]
+            F1["🎯 current_focus.md<br>Current Focus"]
+            F2["⚖️ decision_log<br>Decision Log"]
+            F3["📋 asana-tasks.md<br>Task Status"]
         end
         
         UI -->|Manage & Update| MD
     end
 
     %% AI Agents & Target
-    subgraph AI ["AI Agents"]
-        AgentList["Claude Code / Codex CLI, etc."]
+    subgraph AI ["🤖 AI Agents"]
+        AgentList["💬 Claude Code / Codex CLI, etc."]
     end
 
+    Asana("🌐 Asana API")
     Workspace("💻 Local Workspace<br>Project Files (Code, Docs, etc.)")
 
     %% Relations
     User -->|Document context<br>& decisions| UI
+    User -->|Instruct & Review| AI
     Asana -.->|Sync tasks| F3
     
     MD ==>|Read files as<br>project context| AI
     
     AI -->|Context-aware<br>autonomous work & edits| Workspace
-    Workspace -.->|Review| User
 ```
 
 ![Dashboard screenshot](_assets/Dashboard.png)
