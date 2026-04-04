@@ -7,6 +7,44 @@
 
 プロジェクトの横断管理や複雑なコンテキストの維持を支援する、Windows向けデスクトップアプリです。
 
+```mermaid
+flowchart LR
+    %% ユーザーと外部システム
+    User("👤 ユーザー")
+    Asana("Asana API")
+
+    %% ProjectCurator (コンテキスト管理)
+    subgraph PC ["ProjectCurator"]
+        direction TB
+        UI["Dashboard / Editor<br>(UI層)"]
+        
+        subgraph MD ["Context Files"]
+            direction TB
+            F1["current_focus.md<br>現在の作業フォーカス"]
+            F2["decision_log<br>意思決定ログ"]
+            F3["asana-tasks.md<br>タスク状況"]
+        end
+        
+        UI -->|管理・更新| MD
+    end
+
+    %% AIエージェントと対象ワークスペース
+    subgraph AI ["AI Agents"]
+        AgentList["Claude Code / Codex CLI 等"]
+    end
+
+    Workspace("💻 Local Workspace<br>作業ファイル群 (ドキュメント・コード等)")
+
+    %% ワークフロー
+    User -->|状況の言語化<br>方針の記録| UI
+    Asana -.->|タスク同期| F3
+    
+    MD ==>|プロジェクトの前提知識として<br>ファイルを読み込み| AI
+    
+    AI -->|コンテキストを維持した<br>自律的なファイル変更・作業| Workspace
+    Workspace -.->|レビュー| User
+```
+
 ![Dashboard screenshot](_assets/Dashboard.png)
 
 ## このアプリで何が便利になるか
