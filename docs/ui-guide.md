@@ -18,7 +18,8 @@ This is the standard project card view with health signals, repository status, a
 - `Focus` and `Summary` show how old each file is (in days), and the background color changes as files get older.
 - The 30-day mini activity bar is clickable and opens Timeline.
 - Card buttons help you move straight into work: open folder, open terminal (or launch Claude/Gemini/Codex), open Editor, and pin work folders.
-- Workstreams can be expanded per project. From each row, you can open `current_focus.md`, open the workstream `_work` folder, create today's work folder, or pin a recent folder.
+- Workstreams can be expanded per project. From each row, you can open `current_focus.md`, open the workstream `_work` folder (right-click to create today's work folder), or pin a recent folder. A Team View button appears on workstream rows (and on the project card) when Team View is configured; clicking it opens the Team View dialog.
+- Team View dialog shows each team member's Asana tasks grouped by project, with due dates and overdue indicators (⚠). A Sync button fetches the latest tasks from Asana and updates `team-tasks.md`.
 - `Pinned Folders` appears when you pin at least one folder. You can open, unpin, drag to reorder, or clear all pins.
 - `Today Queue` reads unchecked tasks from `asana-tasks.md` files and shows them by urgency (Overdue, Today, In Nd, No due).
 - In each Today Queue row, you can open the task in Asana, snooze it until tomorrow, or mark it done in Asana.
@@ -114,6 +115,7 @@ Right panel (per-project config):
 - Workstream Map: maps `gid` to `workstream-id` for routing tasks to the correct workstream folder
 - Workstream Field: the custom field name in Asana used to identify the workstream
 - Project Aliases: aliases used to match Asana custom field to this project (one per line)
+- Team View: optional section to enable the team task dashboard. Set `enabled: true` and list `project_gids` (Asana project GIDs whose assignees form the team). Use `workstream_project_gids` to specify different GID sets per workstream.
 - Save button to persist the per-project `asana_config.json`
 
 Setup steps:

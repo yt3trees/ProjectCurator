@@ -18,7 +18,8 @@
 - `Focus` / `Summary` は「最終更新から何日経ったか」を表示し、古くなるほど背景色が変わります。
 - 30日分のアクティビティバーはクリックすると Timeline に移動します。
 - カード下部のボタンから、フォルダを開く、ターミナル起動(Claude/Gemini/Codex起動含む)、Editorへ移動、作業フォルダのPinができます。
-- Workstreamはカードごとに展開できます。各行で `current_focus.md` を開く、workstream `_work` を開く、当日作業フォルダ作成、最近フォルダのPinができます。
+- Workstreamはカードごとに展開できます。各行で `current_focus.md` を開く、workstream `_work` を開く(右クリックで当日作業フォルダ作成)、最近フォルダのPinができます。Team Viewが設定済みの場合はWorkstream行(およびプロジェクトカード)にTeam Viewボタンが表示され、クリックするとTeam Viewダイアログが開きます。
+- Team Viewダイアログでは、チームメンバーのAsanaタスクをプロジェクト別にグループ化して表示し、期日と期限超過(⚠)を確認できます。Syncボタンでアサナから最新タスクを取得し `team-tasks.md` を更新します。
 - `Pinned Folders` は1件以上Pinすると表示されます。開く、解除、ドラッグ並び替え、Clear一括解除に対応しています。
 - `Today Queue` は `asana-tasks.md` の未完了タスクを読み込み、Overdue / Today / In Nd / No due で表示します。
 - Today Queueの各行では、Asanaで開く、翌日までsnooze、Asanaで完了化ができます。
@@ -114,6 +115,7 @@ Asanaを使う場合のみ設定します。
 - Workstream Map: `gid` と `workstream-id` の対応を設定し、タスクを適切な Workstream フォルダに振り分け
 - Workstream Field: Workstream を識別する Asana カスタムフィールド名
 - Project Aliases: Asanaのカスタムフィールドとこのプロジェクトを紐づける別名(1行ずつ)
+- Team View: チームタスクダッシュボードの設定(任意)。`enabled: true` にし、チームを構成するAsanaプロジェクトのGIDを `project_gids` に列挙します。Workstreamごとに異なるGIDセットを使う場合は `workstream_project_gids` で指定します。
 - Save ボタンでプロジェクト別 `asana_config.json` を保存
 
 設定手順:
