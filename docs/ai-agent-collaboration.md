@@ -50,6 +50,29 @@ flowchart TD
 
 The `Agent Hub` page is a control center for deploying sub-agent and context-rule definitions to each project with per-CLI toggles (`Cl` / `Cx` / `Cp` / `Gm`).
 
+```mermaid
+flowchart LR
+    %% Master Library
+    subgraph Library ["Master Library (Reusable Prompt Assets)"]
+        direction TB
+        A["🤖 Sub-Agents<br>e.g. 'UI Expert', 'Testing Specialist'"]
+        R["📜 Context Rules<br>e.g. 'Use C# 12 syntax', 'No magic numbers'"]
+    end
+
+    %% Agent Hub UI
+    Hub{"Agent Hub UI<br>(Just check the boxes<br>for the tools you use)"}
+
+    %% Auto Deployment
+    subgraph Deploy ["Target Project Folder"]
+        direction TB
+        Cl["For Claude Code<br>→ Appends rules to 'CLAUDE.md'<br>→ Deploys to '.claude/agents/'"]
+        Cp["For GitHub Copilot, etc.<br>→ Appends rules to 'copilot-instructions.md'<br>→ Deploys to '.github/agents/'"]
+    end
+
+    Library -->|Write prompts once,<br>reuse them across all projects| Hub
+    Hub ==>|Automatically generates and updates standard files<br>tailored to each CLI's specific format| Deploy
+```
+
 ![](../_assets/AgentHub.png)
 
 - Master library files are stored under `{Cloud Sync Root}\_config\agent_hub\` (`agents/` and `rules/` as JSON + Markdown).

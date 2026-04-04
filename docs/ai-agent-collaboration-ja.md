@@ -50,6 +50,29 @@ flowchart TD
 
 `Agent Hub` ページは、サブエージェント定義とコンテキストルール定義をプロジェクトごと・CLIごと(`Cl` / `Cx` / `Cp` / `Gm`)に切り替えて配備するためのコントロールセンターです。
 
+```mermaid
+flowchart LR
+    %% マスターライブラリ
+    subgraph Library ["マスターライブラリ (再利用可能なプロンプト資産)"]
+        direction TB
+        A["🤖 サブエージェント<br>例: 『UI改善エキスパート』『テストコード職人』"]
+        R["📜 コンテキストルール<br>例: 『C#の最新記法を使う』『マジックナンバー禁止』"]
+    end
+
+    %% Agent Hub UI
+    Hub{"Agent Hub 画面<br>(使いたいツールに<br>チェックを入れるだけ)"}
+
+    %% 各エージェントへの自動配備
+    subgraph Deploy ["特定のプロジェクトフォルダ"]
+        direction TB
+        Cl["Claude Code 用<br>→ 'CLAUDE.md' にルールを自動追記<br>→ '.claude/agents/' に配備"]
+        Cp["GitHub Copilot 等用<br>→ 'copilot-instructions.md' にルールを自動追記<br>→ '.github/agents/' に配備"]
+    end
+
+    Library -->|一度プロンプトを作れば<br>全プロジェクトで使い回せる| Hub
+    Hub ==>|各CLI（Claude / Copilot / Gemini 等）の<br>専用仕様に合わせて実ファイルを自動で生成・追記| Deploy
+```
+
 ![](../_assets/AgentHub.png)
 
 - マスターライブラリは `{Cloud Sync Root}\_config\agent_hub\` 配下 (`agents/` と `rules/`) に JSON + Markdown で保存されます。

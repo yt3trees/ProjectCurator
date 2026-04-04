@@ -4,6 +4,40 @@
 
 すべての AI 機能は `Settings > LLM API` で `Enable AI Features` をオンにする必要があります。対応プロバイダー: OpenAI / Azure OpenAI。
 
+## AI機能の全体像
+
+ProjectCuratorのAI機能は、「どんなシチュエーションで使うか（把握・更新・メモ）」によって大きく3つに分類されています。
+
+```mermaid
+flowchart LR
+    %% Base
+    Profile>👤 User Profile<br>回答のトーンや前提を設定]
+
+    %% 分類
+    subgraph Dashboard ["📊 把握・計画 (Dashboard)"]
+        direction TB
+        WN["💡 What's Next<br>次やるべき事の提案"]
+        CB["📋 Context Briefing<br>再開前のおさらい"]
+        TP["📅 Today's Plan<br>1日の計画立て"]
+    end
+
+    subgraph Editor ["📝 更新・記録 (Editor)"]
+        direction TB
+        UF["🎯 Update Focus<br>Asana情報から方針更新"]
+        DL["⚖️ AI Decision Log<br>決定事項の構造化・記録"]
+        IM["👥 Import Meeting Notes<br>打合せメモの自動仕分け"]
+    end
+
+    subgraph Global ["⚡ 随時メモ (Global)"]
+        direction TB
+        QC["🪟 Quick Capture<br>Ctrl+Shift+C<br>AIによる自動ルーティング"]
+    end
+
+    Profile -.-> Dashboard
+    Profile -.-> Editor
+    Profile -.-> Global
+```
+
 ## 初期設定
 
 1. `Settings > LLM API` を開く

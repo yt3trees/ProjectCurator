@@ -4,6 +4,40 @@
 
 All AI features require `Enable AI Features` to be on (Settings > LLM API). Supported providers: OpenAI and Azure OpenAI.
 
+## AI Features Overview
+
+The AI features in ProjectCurator are categorized into three main situations: Planning (Dashboard), Updating/Logging (Editor), and Capturing thoughts (Global).
+
+```mermaid
+flowchart LR
+    %% Base
+    Profile>👤 User Profile<br>Sets tone & context everywhere]
+
+    %% Categories
+    subgraph Dashboard ["📊 Overviews & Planning (Dashboard)"]
+        direction TB
+        WN["💡 What's Next<br>Suggests next actions"]
+        CB["📋 Context Briefing<br>Resume work seamlessly"]
+        TP["📅 Today's Plan<br>Time-blocked day plan"]
+    end
+
+    subgraph Editor ["📝 Updating & Logging (Editor)"]
+        direction TB
+        UF["🎯 Update Focus<br>Sync focus from Asana status"]
+        DL["⚖️ AI Decision Log<br>Appends structured logs"]
+        IM["👥 Import Meeting Notes<br>Auto-extract tasks & decisions"]
+    end
+
+    subgraph Global ["⚡ Fleeting Thoughts (Global)"]
+        direction TB
+        QC["🪟 Quick Capture<br>Ctrl+Shift+C<br>AI-routed inbox"]
+    end
+
+    Profile -.-> Dashboard
+    Profile -.-> Editor
+    Profile -.-> Global
+```
+
 ## Setup
 
 1. Open `Settings > LLM API`
