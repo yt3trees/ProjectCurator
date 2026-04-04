@@ -166,11 +166,11 @@
                     <!-- Team View トグル -->
                     <RowDefinition Height="Auto"/>
                     <!-- Team GIDs ラベル -->
-                    <RowDefinition Height="60"/>
+                    <RowDefinition Height="Auto"/>
                     <!-- Team GIDs テキストボックス -->
                     <RowDefinition Height="Auto"/>
                     <!-- Team Workstream GIDs ラベル -->
-                    <RowDefinition Height="60"/>
+                    <RowDefinition Height="Auto"/>
                     <!-- Team Workstream GIDs テキストボックス -->
                 </Grid.RowDefinitions>
 
@@ -351,6 +351,7 @@
                 <TextBox Grid.Row="13"
                          Text="{Binding TeamViewProjectGids, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True"
+                         MinHeight="40"
                          TextWrapping="NoWrap"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          FontFamily="Consolas, Courier New"
@@ -376,6 +377,7 @@
                 <TextBox Grid.Row="15"
                          Text="{Binding TeamViewWorkstreamGids, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True"
+                         MinHeight="40"
                          TextWrapping="NoWrap"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          FontFamily="Consolas, Courier New"

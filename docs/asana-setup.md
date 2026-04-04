@@ -91,25 +91,71 @@ If tasks do not appear:
 
 ![](../_assets/AsanaSync.png)
 
-Left panel (sync controls):
+Left panel (Sync Controls):
 
-- Auto Sync checkbox and interval setting (in hours)
-- Save Schedule to persist the schedule
-- Run Sync Now to execute a one-time sync immediately
-- Clear button to reset sync state
-- Last sync timestamp displayed for reference
+- **Auto Sync**: If checked, the app performs background synchronization periodically while running. The interval is specified in hours.
+- **Save Schedule**: Saves the background sync schedule.
+- **Run Sync Now**: Executes a one-time synchronization immediately.
+- **Clear**: Resets the sync cache and status.
 
-Right panel (per-project config):
+Right panel (Per-Project Config):
 
-- Project selector dropdown (e.g. GenAi [Domain]) with Load button
-- Asana Project GIDs: one GID per line to specify which Asana projects to sync
-- Workstream Map: maps `gid` to `workstream-id` for routing tasks to the correct workstream folder
-- Workstream Field: the custom field name in Asana used to identify the workstream
-- Project Aliases: aliases used to match Asana custom field to this project (one per line)
-- Team View: optional section to enable the team task dashboard. Set `enabled: true` and list `project_gids` (Asana project GIDs whose assignees form the team). Use `workstream_project_gids` to specify different GID sets per workstream.
-- Save button to persist the per-project `asana_config.json`
+Configure the `asana_config.json` for each project.
+
+- **Asana Project GIDs**: Enter the GIDs of the Asana projects belonging to this local project, one per line.
+  - All tasks from these projects will be synced to the project's `asana-tasks.md`.
+- **Workstream Map**: Map Asana Project GIDs to Workstream IDs.
+  - Format: `gid=workstream-id` (e.g., `123456789=development`)
+  - Separators such as `=`, `:`, and `->` are supported.
+  - This allows tasks from specific Asana projects to be routed to `workstreams/<id>/asana-tasks.md` instead of the project root.
+- **Workstream Field**: The name of the Asana custom field used to specify a Workstream ID directly on each task.
+  - Default is `workstream-id`.
+  - **This takes precedence over Workstream Map.** If a task has this custom field set, its value is used as the Workstream ID.
+- **Project Aliases**: Aliases used to "distribute" tasks from personal projects to this project.
+  - This is used when fetching tasks from `Personal Project GIDs` configured in `Settings`.
+  - If the value of the `Project` (or `案件`) custom field in Asana matches the local project name or any alias listed here, the task is imported as a task for this project.
+- **Team View**: Configuration for generating `team-tasks.md`, which visualizes the task status of team members.
+  - `enabled: true`: Enables the feature.
+  - `project_gids`: A list of Asana Project GIDs from which team tasks are collected.
+  - `workstream_project_gids`: Used when you want to collect tasks from different projects for each workstream (keyed by Workstream ID).
+  - When synced, a list of incomplete tasks for each member (excluding yourself) is output to `team-tasks.md`.
+- **Save**: Saves the configuration to the project directory's `asana_config.json`.
+
+## Configuration File Example (asana_config.json)
+
+The actual file saved by the UI looks like this:
+
+```json
+{
+  "asana_project_gids": [
+    "1200000000000001"
+  ],
+  "anken_aliases": [
+    "MyProj",
+    "ShortName"
+  ],
+  "workstream_project_map": {
+    "1200000000000002": "design",
+    "1200000000000003": "api"
+  },
+  "workstream_field_name": "ws-id",
+  "team_view": {
+    "enabled": true,
+    "project_gids": [
+      "1200000000000004"
+    ]
+  }
+}
+```
 
 ## Config File Locations
 
 Global Asana values are stored in the config directory (`%USERPROFILE%\.projectcurator\asana_global.json` by default).
-Per-project advanced settings are stored in `{CloudSyncProject}\asana_config.json`.
+Per-project advanced settings are stored in `asana_config.json` within each project directory under the Cloud Sync Root.
+
+Depending on the project type, the path is as follows (where `{CloudSyncRoot}` is the path configured in Settings):
+
+- Standard Project: `{CloudSyncRoot}/{ProjectName}/asana_config.json`
+- Mini Project: `{CloudSyncRoot}/_mini/{ProjectName}/asana_config.json`
+- Domain Project: `{CloudSyncRoot}/_domains/{ProjectName}/asana_config.json`
+- Domain Mini Project: `{CloudSyncRoot}/_domains/_mini/{ProjectName}/asana_config.json`
