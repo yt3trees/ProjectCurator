@@ -1,4 +1,4 @@
-namespace ProjectCurator.Models;
+namespace Curia.Models;
 
 /// <summary>
 /// Team View ダイアログで担当者ごとに表示するカード。

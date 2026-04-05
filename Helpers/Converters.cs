@@ -5,7 +5,7 @@ using System.Windows.Media;
 using MediaBrush = System.Windows.Media.Brush;
 using MediaColor = System.Windows.Media.Color;
 
-namespace ProjectCurator.Helpers;
+namespace Curia.Helpers;
 
 /// <summary>bool を反転するコンバーター。IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}" で使用。</summary>
 [ValueConversion(typeof(bool), typeof(bool))]

@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace ProjectCurator.Models;
+namespace Curia.Models;
 
 public class CaptureClassification
 {

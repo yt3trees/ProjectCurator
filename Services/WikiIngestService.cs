@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using ProjectCurator.Models;
+using Curia.Models;
 using Windows.Data.Pdf;
 using Windows.Foundation;
 using Windows.Graphics.Imaging;
@@ -14,7 +14,7 @@ using Windows.Media.Ocr;
 using Windows.Storage;
 using Windows.Storage.Streams;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 /// <summary>
 /// ソースファイルを Wiki に取り込む LLM パイプライン。
@@ -177,7 +177,7 @@ public class WikiIngestService
     {
         var isJapanese = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ja";
         return $$"""
-You are the Wiki maintainer for ProjectCurator.
+You are the Wiki maintainer for Curia.
 Follow the wiki-schema.md below exactly.
 
 {{schema}}

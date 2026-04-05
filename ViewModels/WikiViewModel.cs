@@ -9,11 +9,11 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
-using ProjectCurator.Views;
+using Curia.Models;
+using Curia.Services;
+using Curia.Views;
 
-namespace ProjectCurator.ViewModels;
+namespace Curia.ViewModels;
 
 public enum WikiTab { Pages, Query, Lint }
 

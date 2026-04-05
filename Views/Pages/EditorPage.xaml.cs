@@ -15,14 +15,14 @@ using DiffPlex;
 using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
 using Wpf.Ui.Controls;
-using ProjectCurator.ViewModels;
-using ProjectCurator.Views;
-using ProjectCurator.Services;
+using Curia.ViewModels;
+using Curia.Views;
+using Curia.Services;
 using WpfUserControl = System.Windows.Controls.UserControl;
 using WpfKeyEventHandler = System.Windows.Input.KeyEventHandler;
 using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
 
-namespace ProjectCurator.Views.Pages;
+namespace Curia.Views.Pages;
 
 public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel>
 {
@@ -996,7 +996,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     // -------------------------------------------------------------------------
     // Update Focus ダイアログ
     // -------------------------------------------------------------------------
-    private Task<(bool ok, string? wsId)> ShowWorkstreamSelectionDialogAsync(List<ProjectCurator.Models.WorkstreamInfo> workstreams)
+    private Task<(bool ok, string? wsId)> ShowWorkstreamSelectionDialogAsync(List<Curia.Models.WorkstreamInfo> workstreams)
     {
         var appResources = Application.Current.Resources;
         var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
@@ -1135,10 +1135,10 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     }
 
     private Task<(bool apply, string? content)> ShowFocusUpdateProposalDialogAsync(
-        ProjectCurator.Models.FocusUpdateResult proposal,
+        Curia.Models.FocusUpdateResult proposal,
         Func<string, string, Task<string>> refineFunc)
     {
-        var backupInfo = proposal.BackupStatus == ProjectCurator.Models.BackupStatus.Created
+        var backupInfo = proposal.BackupStatus == Curia.Models.BackupStatus.Created
             ? $"Backup created: {System.IO.Path.GetFileName(proposal.BackupPath)}"
             : "Backup already exists (skipped)";
 
@@ -1170,8 +1170,8 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     // -------------------------------------------------------------------------
     // AI Decision Log - 入力ダイアログ
     // -------------------------------------------------------------------------
-    private Task<ProjectCurator.Models.AiDecisionLogInputResult?> ShowAiDecisionLogInputDialogAsync(
-        List<ProjectCurator.Models.DetectedDecision> candidates, string? prefillText = null)
+    private Task<Curia.Models.AiDecisionLogInputResult?> ShowAiDecisionLogInputDialogAsync(
+        List<Curia.Models.DetectedDecision> candidates, string? prefillText = null)
     {
         var appResources = Application.Current.Resources;
         var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
@@ -1182,7 +1182,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         var accent   = appResources.Contains("AppBlue")
             ? (System.Windows.Media.Brush)appResources["AppBlue"] : text;
 
-        ProjectCurator.Models.AiDecisionLogInputResult? result = null;
+        Curia.Models.AiDecisionLogInputResult? result = null;
 
         // ---- タイトルバー ----
         var titleBar = new Grid { Background = surface1, Height = 38 };
@@ -1348,7 +1348,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
 
         // ---- Detected candidates セクション (候補がある場合のみ表示) ----
         var checkBoxItems = new List<(System.Windows.Controls.CheckBox chk,
-            ProjectCurator.Models.DetectedDecision candidate)>();
+            Curia.Models.DetectedDecision candidate)>();
 
         var candidatesSection = new StackPanel
         {
@@ -1473,7 +1473,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                 })
                 .ToList();
 
-            result = new ProjectCurator.Models.AiDecisionLogInputResult
+            result = new Curia.Models.AiDecisionLogInputResult
             {
                 UseBlankTemplate   = false,
                 UserInput          = inputBox.Text.Trim(),
@@ -1487,7 +1487,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
 
         blankButton.Click += (s, e) =>
         {
-            result = new ProjectCurator.Models.AiDecisionLogInputResult { UseBlankTemplate = true };
+            result = new Curia.Models.AiDecisionLogInputResult { UseBlankTemplate = true };
             dialog.DialogResult = true;
         };
 
@@ -1500,7 +1500,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     // -------------------------------------------------------------------------
     private async Task<(bool save, string? content, string? fileName, bool removeTension)>
         ShowDecisionLogPreviewDialogAsync(
-            ProjectCurator.Models.DecisionLogDraftResult draft,
+            Curia.Models.DecisionLogDraftResult draft,
             Func<string, string, Task<string>> refineFunc)
     {
         var tcs = new TaskCompletionSource<(bool save, string? content, string? fileName, bool removeTension)>();
@@ -1828,9 +1828,9 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     // -------------------------------------------------------------------------
     // Meeting Notes Import - 入力ダイアログ
     // -------------------------------------------------------------------------
-    private Task<ProjectCurator.Models.MeetingNotesInputResult?> ShowMeetingNotesInputDialogAsync(
-        ProjectCurator.Models.ProjectInfo project,
-        List<ProjectCurator.Models.WorkstreamInfo> workstreams)
+    private Task<Curia.Models.MeetingNotesInputResult?> ShowMeetingNotesInputDialogAsync(
+        Curia.Models.ProjectInfo project,
+        List<Curia.Models.WorkstreamInfo> workstreams)
     {
         var appResources = Application.Current.Resources;
         var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
@@ -1841,7 +1841,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         var accent   = appResources.Contains("AppBlue")
             ? (System.Windows.Media.Brush)appResources["AppBlue"] : text;
 
-        ProjectCurator.Models.MeetingNotesInputResult? result = null;
+        Curia.Models.MeetingNotesInputResult? result = null;
 
         // ---- タイトルバー ----
         var titleBar = new Grid { Background = surface1, Height = 38 };
@@ -2009,7 +2009,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             if (wsCombo != null && wsCombo.SelectedItem is System.Windows.Controls.ComboBoxItem item)
                 wsId = item.Tag as string;
 
-            result = new ProjectCurator.Models.MeetingNotesInputResult
+            result = new Curia.Models.MeetingNotesInputResult
             {
                 MeetingNotes = notesBox.Text.Trim(),
                 WorkstreamId = wsId,
@@ -2025,20 +2025,20 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     // Meeting Notes Import - プレビューダイアログ
     // -------------------------------------------------------------------------
     private async Task<bool> ShowMeetingNotesPreviewDialogAsync(
-        ProjectCurator.Models.MeetingAnalysisResult analysisResult,
-        ProjectCurator.Models.ProjectInfo project,
+        Curia.Models.MeetingAnalysisResult analysisResult,
+        Curia.Models.ProjectInfo project,
         string? workstreamId)
     {
         // Asana プロジェクト一覧を事前ロード
         var (gids, wsMap) = _captureService.LoadAsanaProjectGids(project);
-        var asanaProjectMetas = new List<ProjectCurator.Models.AsanaProjectMeta>();
+        var asanaProjectMetas = new List<Curia.Models.AsanaProjectMeta>();
         if (gids.Count > 0)
         {
             using var metaCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
             foreach (var gid in gids)
             {
                 var m = await _captureService.FetchProjectMetaAsync(gid, metaCts.Token)
-                        ?? new ProjectCurator.Models.AsanaProjectMeta { Gid = gid, Name = "" };
+                        ?? new Curia.Models.AsanaProjectMeta { Gid = gid, Name = "" };
                 asanaProjectMetas.Add(m);
             }
         }
@@ -2052,7 +2052,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             defaultProjectGid = wgid;
 
         // デフォルトプロジェクトのセクションを事前ロード
-        var sectionCache = new Dictionary<string, List<ProjectCurator.Models.AsanaSectionMeta>>();
+        var sectionCache = new Dictionary<string, List<Curia.Models.AsanaSectionMeta>>();
         if (defaultProjectGid != null)
         {
             using var secCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -2149,8 +2149,8 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             Foreground = text, Background = surface1
         };
         var decisionsPanel = new StackPanel { Margin = new Thickness(12, 8, 12, 8) };
-        var decisionCheckboxes = new List<(System.Windows.Controls.CheckBox chk, ProjectCurator.Models.MeetingDecision decision)>();
-        var decisionExpanders  = new Dictionary<ProjectCurator.Models.MeetingDecision, ICSharpCode.AvalonEdit.TextEditor>();
+        var decisionCheckboxes = new List<(System.Windows.Controls.CheckBox chk, Curia.Models.MeetingDecision decision)>();
+        var decisionExpanders  = new Dictionary<Curia.Models.MeetingDecision, ICSharpCode.AvalonEdit.TextEditor>();
 
         if (decisionCount == 0)
         {
@@ -2200,7 +2200,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                 AddBottomViewportPadding(draftViewer);
                 if (_markdownDefinition != null)
                     draftViewer.SyntaxHighlighting = _markdownDefinition;
-                draftViewer.Text = ProjectCurator.Services.MeetingNotesService.BuildDecisionLogContent(dec);
+                draftViewer.Text = Curia.Services.MeetingNotesService.BuildDecisionLogContent(dec);
 
                 var capturedViewer = draftViewer;
                 var capturedBtn    = expandBtn;
@@ -2419,7 +2419,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         // ---- タスクリスト (タスクごとのプロジェクト/セクション/期限設定) ----
 
         // セクションを async でロード・キャッシュするローカル関数
-        async Task<List<ProjectCurator.Models.AsanaSectionMeta>> LoadSectionsAsync(string projectGid)
+        async Task<List<Curia.Models.AsanaSectionMeta>> LoadSectionsAsync(string projectGid)
         {
             if (sectionCache.TryGetValue(projectGid, out var cached)) return cached;
             using var cts2 = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -2429,11 +2429,11 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         }
 
         void PopulateTaskSectionCombo(System.Windows.Controls.ComboBox secCb,
-                                      List<ProjectCurator.Models.AsanaSectionMeta> sections,
-                                      ProjectCurator.Models.MeetingAsanaTask t)
+                                      List<Curia.Models.AsanaSectionMeta> sections,
+                                      Curia.Models.MeetingAsanaTask t)
         {
             secCb.Items.Clear();
-            secCb.Items.Add(new ProjectCurator.Models.AsanaSectionMeta { Gid = "", Name = "(none)" });
+            secCb.Items.Add(new Curia.Models.AsanaSectionMeta { Gid = "", Name = "(none)" });
             foreach (var sec in sections) secCb.Items.Add(sec);
             secCb.IsEnabled = true;
 
@@ -2515,7 +2515,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                     Padding = new Thickness(6, 3, 4, 3),
                     Margin = new Thickness(0, 0, 8, 0)
                 };
-                taskProjectCombo.DisplayMemberPath = nameof(ProjectCurator.Models.AsanaProjectMeta.DisplayLabel);
+                taskProjectCombo.DisplayMemberPath = nameof(Curia.Models.AsanaProjectMeta.DisplayLabel);
                 Grid.SetColumn(taskProjectCombo, 0); Grid.SetRow(taskProjectCombo, 1);
 
                 // Section label + ComboBox
@@ -2533,7 +2533,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                     IsEnabled = false,
                     Margin = new Thickness(0, 0, 8, 0)
                 };
-                taskSectionCombo.DisplayMemberPath = nameof(ProjectCurator.Models.AsanaSectionMeta.DisplayLabel);
+                taskSectionCombo.DisplayMemberPath = nameof(Curia.Models.AsanaSectionMeta.DisplayLabel);
                 Grid.SetColumn(taskSectionCombo, 1); Grid.SetRow(taskSectionCombo, 1);
 
                 // Due Date label + DatePicker (Row 0-1, Col 2)
@@ -2614,7 +2614,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                 // Project ComboBox をプロジェクト一覧で初期化
                 if (asanaProjectMetas.Count == 0)
                 {
-                    taskProjectCombo.Items.Add(new ProjectCurator.Models.AsanaProjectMeta { Gid = "", Name = "No Asana config" });
+                    taskProjectCombo.Items.Add(new Curia.Models.AsanaProjectMeta { Gid = "", Name = "No Asana config" });
                     taskProjectCombo.SelectedIndex = 0;
                     taskProjectCombo.IsEnabled = false;
                 }
@@ -2625,11 +2625,11 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                     // プロジェクト選択変更 → セクションをロード
                     taskProjectCombo.SelectionChanged += async (s, e) =>
                     {
-                        var selProj = taskProjectCombo.SelectedItem as ProjectCurator.Models.AsanaProjectMeta;
+                        var selProj = taskProjectCombo.SelectedItem as Curia.Models.AsanaProjectMeta;
                         if (selProj == null || string.IsNullOrEmpty(selProj.Gid))
                         {
                             taskSectionCombo.Items.Clear();
-                            taskSectionCombo.Items.Add(new ProjectCurator.Models.AsanaSectionMeta { Gid = "", Name = "(none)" });
+                            taskSectionCombo.Items.Add(new Curia.Models.AsanaSectionMeta { Gid = "", Name = "(none)" });
                             taskSectionCombo.SelectedIndex = 0;
                             taskSectionCombo.IsEnabled = false;
                             capturedTask.ProjectGid  = "";
@@ -2643,7 +2643,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
 
                         taskSectionCombo.IsEnabled = false;
                         taskSectionCombo.Items.Clear();
-                        taskSectionCombo.Items.Add(new ProjectCurator.Models.AsanaSectionMeta { Gid = "", Name = "Loading..." });
+                        taskSectionCombo.Items.Add(new Curia.Models.AsanaSectionMeta { Gid = "", Name = "Loading..." });
                         taskSectionCombo.SelectedIndex = 0;
 
                         var sections = await LoadSectionsAsync(selProj.Gid);
@@ -2652,7 +2652,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
 
                     taskSectionCombo.SelectionChanged += (s, e) =>
                     {
-                        var sel = taskSectionCombo.SelectedItem as ProjectCurator.Models.AsanaSectionMeta;
+                        var sel = taskSectionCombo.SelectedItem as Curia.Models.AsanaSectionMeta;
                         capturedTask.SectionGid  = sel?.Gid ?? "";
                         capturedTask.SectionName = sel?.Name ?? "";
                     };

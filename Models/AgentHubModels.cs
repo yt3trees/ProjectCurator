@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace ProjectCurator.Models;
+namespace Curia.Models;
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum CliTarget

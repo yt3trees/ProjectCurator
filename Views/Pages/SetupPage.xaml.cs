@@ -1,10 +1,10 @@
 using System.ComponentModel;
 using System.Windows;
 using Wpf.Ui.Controls;
-using ProjectCurator.ViewModels;
+using Curia.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
-namespace ProjectCurator.Views.Pages;
+namespace Curia.Views.Pages;
 
 public partial class SetupPage : WpfUserControl, INavigableView<SetupViewModel>
 {

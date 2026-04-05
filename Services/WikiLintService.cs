@@ -5,9 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 /// <summary>
 /// Wiki の整合性チェック (静的 + LLM) を行う。

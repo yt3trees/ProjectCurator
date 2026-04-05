@@ -1,4 +1,4 @@
-namespace ProjectCurator.Models;
+namespace Curia.Models;
 
 /// <summary>
 /// LLM が生成したファイル更新提案。FocusUpdateResult および Tensions 更新で共用する。

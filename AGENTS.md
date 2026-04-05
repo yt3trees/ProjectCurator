@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ProjectCurator is a Windows desktop app (WPF + .NET 9) for managing multiple parallel projects from a system tray. Users toggle visibility with a global hotkey (Ctrl+Shift+P); normal window-close hides the app, Shift+Close exits it.
+Curia is a Windows desktop app (WPF + .NET 9) for managing multiple parallel projects from a system tray. Users toggle visibility with a global hotkey (Ctrl+Shift+P); normal window-close hides the app, Shift+Close exits it.
 
 ## Build & Publish
 
 ```bash
 # Quick type check after changes (recommended — faster than full publish)
-dotnet build ProjectCurator/ProjectCurator.csproj 2>&1 | tail -5
+dotnet build Curia.csproj 2>&1 | tail -5
 
 # Full build
 dotnet build
@@ -62,7 +62,7 @@ MVVM + Dependency Injection (`Microsoft.Extensions.DependencyInjection`). All se
 
 | Service | Responsibility |
 |---|---|
-| ConfigService | JSON config at `%USERPROFILE%\.projectcurator\` (new default) or `Documents\Projects\_config\` (legacy, auto-detected); override via `PROJECTCURATOR_CONFIG_DIR` env var. Files: settings.json, asana_global.json, hidden_projects.json, pinned_folders.json |
+| ConfigService | JSON config at `%USERPROFILE%\.curia\` (new default) or `Documents\Projects\_config\` (legacy, auto-detected); override via `CURIA_CONFIG_DIR` env var. Files: settings.json, asana_global.json, hidden_projects.json, pinned_folders.json |
 | ProjectDiscoveryService | Recursively scans Local and Box project roots; 5-minute TTL cache; detects junction status, focus age, decision log count, uncommitted git changes |
 | TodayQueueService | Reads/prioritizes tasks from `tasks.md` into overdue/today/soon/normal buckets |
 | AsanaSyncService | Syncs Asana API tasks to Markdown files; maps workstreams via asana_config.json per project |
@@ -94,7 +94,7 @@ MVVM + Dependency Injection (`Microsoft.Extensions.DependencyInjection`). All se
 
 ### Configuration
 
-Runtime config is loaded from `%USERPROFILE%\.projectcurator\` (new default) or `%USERPROFILE%\Documents\Projects\_config\` (legacy, auto-detected). See `_config/` directory for `.example` templates:
+Runtime config is loaded from `%USERPROFILE%\.curia\` (new default) or `%USERPROFILE%\Documents\Projects\_config\` (legacy, auto-detected). See `_config/` directory for `.example` templates:
 - `settings.json` - workspace roots, hotkey, auto-refresh, Asana sync settings, and LLM/AI settings (`LlmProvider`, `LlmApiKey`, `LlmModel`, `LlmEndpoint`, `LlmApiVersion`, `AiEnabled`)
 - `asana_global.json` - Asana token, workspace/user GIDs, personal project GIDs
 

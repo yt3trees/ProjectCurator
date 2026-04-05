@@ -2,10 +2,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Wpf.Ui.Controls;
-using ProjectCurator.ViewModels;
+using Curia.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
-namespace ProjectCurator.Views.Pages;
+namespace Curia.Views.Pages;
 
 public partial class TimelinePage : WpfUserControl, INavigableView<TimelineViewModel>
 {

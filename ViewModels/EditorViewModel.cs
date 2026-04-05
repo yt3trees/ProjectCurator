@@ -14,12 +14,12 @@ using CommunityToolkit.Mvvm.Messaging;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 using System.Threading;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
-using ProjectCurator.Views.Pages;
+using Curia.Models;
+using Curia.Services;
+using Curia.Views.Pages;
 using TextBlock = System.Windows.Controls.TextBlock;
 
-namespace ProjectCurator.ViewModels;
+namespace Curia.ViewModels;
 
 // ファイルツリーのノードモデル
 public partial class FileTreeNode : ObservableObject

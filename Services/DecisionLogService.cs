@@ -1,7 +1,7 @@
 using System.IO;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public class DecisionLogService
 {

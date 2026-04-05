@@ -148,7 +148,7 @@ UIで保存されるファイルの実体は以下のようになります。
 
 ## 設定ファイルの場所
 
-グローバルAsana設定は `%USERPROFILE%\.projectcurator\asana_global.json` に保存されます。
+グローバルAsana設定は `%USERPROFILE%\.curia\asana_global.json` に保存されます。
 プロジェクト別の詳細設定は、Cloud Sync Root 配下の各プロジェクトディレクトリ内にある `asana_config.json` に保存されます。
 
 具体的には、プロジェクトの種別に応じて以下のパスになります（`{CloudSyncRoot}` は設定画面で指定したパスです）:

@@ -150,7 +150,7 @@ The actual file saved by the UI looks like this:
 
 ## Config File Locations
 
-Global Asana values are stored in the config directory (`%USERPROFILE%\.projectcurator\asana_global.json` by default).
+Global Asana values are stored in the config directory (`%USERPROFILE%\.curia\asana_global.json` by default).
 Per-project advanced settings are stored in `asana_config.json` within each project directory under the Cloud Sync Root.
 
 Depending on the project type, the path is as follows (where `{CloudSyncRoot}` is the path configured in Settings):

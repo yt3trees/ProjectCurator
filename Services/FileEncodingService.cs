@@ -1,6 +1,6 @@
-using ProjectCurator.Helpers;
+using Curia.Helpers;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 /// <summary>
 /// EncodingDetector の非同期ラッパー。

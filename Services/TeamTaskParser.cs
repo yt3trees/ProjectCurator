@@ -1,9 +1,9 @@
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 /// <summary>
 /// team-tasks.md をパースして TeamMemberCard のリストを返すパーサー。

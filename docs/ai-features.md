@@ -7,7 +7,7 @@ All AI features require `Enable AI Features` to be on (Settings > LLM API). Supp
 <a id="ai-features-overview"></a>
 ## AI Features Overview
 
-The AI features in ProjectCurator are categorized into three main situations: Planning (Dashboard), Updating/Logging (Editor), and Capturing thoughts (Global).
+The AI features in Curia are categorized into three main situations: Planning (Dashboard), Updating/Logging (Editor), and Capturing thoughts (Global).
 
 ```mermaid
 flowchart LR

@@ -2,9 +2,9 @@ using System.IO;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 /// <summary>
 /// AI Decision Log 生成のオーケストレーション。

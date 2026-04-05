@@ -4,14 +4,14 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
+using Curia.Models;
+using Curia.Services;
 using WpfBrushes = System.Windows.Media.Brushes;
 using WpfCursors = System.Windows.Input.Cursors;
 using WpfHA = System.Windows.HorizontalAlignment;
 using WpfVA = System.Windows.VerticalAlignment;
 
-namespace ProjectCurator.Views;
+namespace Curia.Views;
 
 /// <summary>
 /// Global Capture ウィンドウ。どこからでもホットキーで起動する軽量入力 UI。

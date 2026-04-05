@@ -5,10 +5,10 @@ using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
+using Curia.Models;
+using Curia.Services;
 
-namespace ProjectCurator.ViewModels;
+namespace Curia.ViewModels;
 
 public partial class SettingsViewModel : ObservableObject
 {
@@ -362,7 +362,7 @@ public partial class SettingsViewModel : ObservableObject
     private static string GetStartupShortcutPath()
     {
         var startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
-        return Path.Combine(startupFolder, "ProjectCurator.lnk");
+        return Path.Combine(startupFolder, "Curia.lnk");
     }
 
     private static void CreateStartupShortcut(string shortcutPath)

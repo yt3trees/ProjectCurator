@@ -5,11 +5,11 @@ using System.IO;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using ProjectCurator.Helpers;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
+using Curia.Helpers;
+using Curia.Models;
+using Curia.Services;
 
-namespace ProjectCurator.ViewModels;
+namespace Curia.ViewModels;
 
 /// <summary>タイムラインの1エントリ (通常行 or ギャップ行)</summary>
 public class TimelineEntryItem

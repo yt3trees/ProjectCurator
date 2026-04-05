@@ -2,9 +2,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public class AgentDeploymentService
 {
@@ -576,7 +576,7 @@ public class AgentDeploymentService
         var trimmed = content.TrimStart();
         var requiredName = ToKebabCase(string.IsNullOrWhiteSpace(def.Id) ? def.Name : def.Id);
         var requiredDescription = string.IsNullOrWhiteSpace(def.Description)
-            ? "ProjectCurator managed sub-agent."
+            ? "Curia managed sub-agent."
             : def.Description.Trim();
         var extraFrontmatter = NormalizeFrontmatterLines(GetFrontmatterByCli(def, cli));
 
@@ -597,7 +597,7 @@ public class AgentDeploymentService
     {
         var name = ToKebabCase(string.IsNullOrWhiteSpace(def.Id) ? def.Name : def.Id);
         var description = string.IsNullOrWhiteSpace(def.Description)
-            ? "ProjectCurator managed sub-agent."
+            ? "Curia managed sub-agent."
             : def.Description.Trim();
         var extraLines = NormalizeTomlLines(GetFrontmatterByCli(def, CliTarget.Codex));
 

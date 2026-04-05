@@ -1,10 +1,10 @@
 ---
 name: project-curator
-description: Unified ProjectCurator skill. Use for cross-project status, today's tasks, decision logging, session-end focus updates, and Obsidian knowledge. Invoke explicitly for "update focus from Asana".
+description: Unified Curia skill. Use for cross-project status, today's tasks, decision logging, session-end focus updates, and Obsidian knowledge. Invoke explicitly for "update focus from Asana".
 allowed-tools: Read, Write, Glob, Grep, Bash
 ---
 
-# /ProjectCurator
+# /Curia
 
 ## Shell Execution Rules (IMPORTANT)
 
@@ -46,7 +46,7 @@ powershell.exe -Command "
 "
 ```
 
-- File missing → ask user to launch ProjectCurator
+- File missing → ask user to launch Curia
 - `$s.exportedAt` older than 1 hour → warn of stale data
 
 ---
@@ -145,7 +145,7 @@ These behaviors are active throughout the session once the skill is loaded.
 
 ## Action: Update Focus from Asana
 
-Explicit trigger: "update focus from Asana", "sync Asana to focus", or `/ProjectCurator update focus`.
+Explicit trigger: "update focus from Asana", "sync Asana to focus", or `/Curia update focus`.
 → Full procedure: [reference/update-focus.md](reference/update-focus.md)
 
 ---

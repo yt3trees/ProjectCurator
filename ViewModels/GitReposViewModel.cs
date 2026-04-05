@@ -7,10 +7,10 @@ using System.Text.Json.Serialization;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
+using Curia.Models;
+using Curia.Services;
 
-namespace ProjectCurator.ViewModels;
+namespace Curia.ViewModels;
 
 /// <summary>Git リポジトリ情報</summary>
 public class GitRepoItem

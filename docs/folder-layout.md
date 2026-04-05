@@ -48,7 +48,7 @@ In short:
 
 ## Template Folder Structure (What Setup Creates)
 
-When you run `Setup Project` with `Also run AI Context Setup` checked, ProjectCurator creates a standardized directory tree across three separate root locations. This section shows what gets created and why.
+When you run `Setup Project` with `Also run AI Context Setup` checked, Curia creates a standardized directory tree across three separate root locations. This section shows what gets created and why.
 
 ### Overview of the Three Roots
 

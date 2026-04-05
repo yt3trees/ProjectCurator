@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.Messaging.Messages;
 
-namespace ProjectCurator.Models;
+namespace Curia.Models;
 
 /// <summary>
 /// ステータスバーの表示内容を更新するためのメッセージ。

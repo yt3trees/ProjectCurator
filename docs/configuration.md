@@ -7,8 +7,8 @@
 `ConfigService` reads and writes:
 
 ```text
-%USERPROFILE%\.projectcurator\          <- default (new installs)
-  (or override via PROJECTCURATOR_CONFIG_DIR environment variable)
+%USERPROFILE%\.curia\          <- default (new installs)
+  (or override via CURIA_CONFIG_DIR environment variable)
 ├── settings.json
 ├── hidden_projects.json
 ├── asana_global.json

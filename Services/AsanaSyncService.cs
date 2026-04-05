@@ -5,10 +5,10 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using ProjectCurator.Helpers;
-using ProjectCurator.Models;
+using Curia.Helpers;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public class AsanaSyncService
 {

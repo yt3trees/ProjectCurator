@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace ProjectCurator.Helpers;
+namespace Curia.Helpers;
 
 internal static class Win32Interop
 {

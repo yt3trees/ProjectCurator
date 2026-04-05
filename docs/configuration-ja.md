@@ -7,8 +7,8 @@
 `ConfigService` は次のフォルダを利用します。
 
 ```text
-%USERPROFILE%\.projectcurator\          <- デフォルト (新規インストール)
-  (PROJECTCURATOR_CONFIG_DIR 環境変数で任意のパスに上書き可)
+%USERPROFILE%\.curia\          <- デフォルト (新規インストール)
+  (CURIA_CONFIG_DIR 環境変数で任意のパスに上書き可)
 ├── settings.json
 ├── hidden_projects.json
 ├── asana_global.json

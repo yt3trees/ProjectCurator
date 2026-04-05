@@ -8,10 +8,10 @@ using System.Windows.Media;
 using DiffPlex;
 using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
-using ProjectCurator.Models;
+using Curia.Models;
 using MediaColor = System.Windows.Media.Color;
 
-namespace ProjectCurator.Views;
+namespace Curia.Views;
 
 /// <summary>
 /// LLM 提案の差分確認ダイアログ。EditorPage と CaptureWindow で共用する。

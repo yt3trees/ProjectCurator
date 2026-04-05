@@ -3,10 +3,10 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using ProjectCurator.Helpers;
-using ProjectCurator.Models;
+using Curia.Helpers;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public class ConfigService
 {
@@ -40,12 +40,12 @@ public class ConfigService
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
         // 1. 環境変数オーバーライド
-        var envOverride = Environment.GetEnvironmentVariable("PROJECTCURATOR_CONFIG_DIR");
+        var envOverride = Environment.GetEnvironmentVariable("CURIA_CONFIG_DIR");
         if (!string.IsNullOrWhiteSpace(envOverride) && Directory.Exists(envOverride))
             return envOverride;
 
         // 2. 新標準パス
-        var newPath = Path.Combine(userProfile, ".projectcurator");
+        var newPath = Path.Combine(userProfile, ".curia");
         if (File.Exists(Path.Combine(newPath, "settings.json")))
             return newPath;
 

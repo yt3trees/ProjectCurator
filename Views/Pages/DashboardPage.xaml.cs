@@ -8,12 +8,12 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Wpf.Ui.Controls;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
-using ProjectCurator.ViewModels;
+using Curia.Models;
+using Curia.Services;
+using Curia.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
-namespace ProjectCurator.Views.Pages;
+namespace Curia.Views.Pages;
 
 public partial class DashboardPage : WpfUserControl, INavigableView<DashboardViewModel>
 {

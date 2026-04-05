@@ -6,10 +6,10 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using ProjectCurator.Helpers;
-using ProjectCurator.Models;
+using Curia.Helpers;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public class StandupGeneratorService : IDisposable
 {

@@ -1,6 +1,6 @@
 using Wpf.Ui;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 /// <summary>
 /// wpf-ui の IPageService を実装するサービス。

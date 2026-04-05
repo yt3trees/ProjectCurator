@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ProjectCurator.Models;
+namespace Curia.Models;
 
 public class MeetingAnalysisResult
 {

@@ -1,4 +1,4 @@
-# ProjectCurator
+# Curia
 
 [日本語版はこちら](README-ja.md)
 
@@ -14,7 +14,7 @@ flowchart TD
     User("👤 User")
 
     %% Core Application
-    subgraph PC ["✨ ProjectCurator"]
+    subgraph PC ["✨ Curia"]
         UI["🖥️ Dashboard / Editor<br>(UI Layer)"]
         
         subgraph MD ["📁 Context Files"]
@@ -51,14 +51,14 @@ flowchart TD
 
 ## Why This App Is Useful
 
-ProjectCurator reduces context switching and cognitive load for both you and your AI agents:
+Curia reduces context switching and cognitive load for both you and your AI agents:
 
 - Project visibility: see project health and today's task signals from one Dashboard
 - Context maintenance: quickly track "what I'm doing now" (`current_focus.md`) and "what was decided" (`decision_log`) in a focused editor
 - AI Agent readiness: the markdown files maintained here serve perfectly as ready-to-read context files for AI agents like Claude Code or Codex CLI
 - Optional Asana integration: sync tasks into Markdown so project status stays visible and searchable
 
-Whether you run many projects in parallel or manage a single complex one, ProjectCurator helps both you and your AI jump straight into the flow state without losing time trying to remember where you left off.
+Whether you run many projects in parallel or manage a single complex one, Curia helps both you and your AI jump straight into the flow state without losing time trying to remember where you left off.
 
 ## Who It Is For
 
@@ -100,13 +100,13 @@ See the [UI Guide](docs/ui-guide.md) for all pages and AI feature screenshots.
 
 ### 1. Download the app from GitHub Releases
 
-- Open the [latest GitHub Release](https://github.com/yt3trees/ProjectCurator/releases)
+- Open the [latest GitHub Release](https://github.com/yt3trees/Curia/releases)
 - Download the `.zip` file
-- Extract it to any folder you want (for example, `C:\Tools\ProjectCurator\`)
+- Extract it to any folder you want (for example, `C:\Tools\Curia\`)
 
-### 2. Launch `ProjectCurator.exe`
+### 2. Launch `Curia.exe`
 
-- Double-click `ProjectCurator.exe`
+- Double-click `Curia.exe`
 - If Windows SmartScreen appears, click `More info` -> `Run anyway`
 
 ### 3. Configure required paths

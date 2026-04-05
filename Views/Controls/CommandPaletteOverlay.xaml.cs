@@ -2,11 +2,11 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using ProjectCurator.ViewModels;
+using Curia.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
 using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
 
-namespace ProjectCurator.Views.Controls;
+namespace Curia.Views.Controls;
 
 public partial class CommandPaletteOverlay : WpfUserControl
 {

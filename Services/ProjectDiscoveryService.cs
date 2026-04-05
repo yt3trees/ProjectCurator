@@ -2,9 +2,9 @@ using System.IO;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public record BoxOnlyProjectCandidate(
     string Name,

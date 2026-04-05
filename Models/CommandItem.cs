@@ -1,6 +1,6 @@
 using System;
 
-namespace ProjectCurator.Models;
+namespace Curia.Models;
 
 public class CommandItem
 {

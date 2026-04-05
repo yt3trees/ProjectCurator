@@ -2,11 +2,11 @@
 
 [< READMEに戻る](../README-ja.md)
 
-ProjectCurator は Claude Code や Codex CLI などの AI コーディングエージェントとの協業を前提に設計されています。
+Curia は Claude Code や Codex CLI などの AI コーディングエージェントとの協業を前提に設計されています。
 
 ## 仕組み
 
-ProjectCurator で管理されるプロジェクトには、プロジェクトルートに `AGENTS.md` と `.claude/skills/`(および `.codex/skills/`)にスキル定義が配置されます。日付管理の作業フォルダ内でターミナルを開くと:
+Curia で管理されるプロジェクトには、プロジェクトルートに `AGENTS.md` と `.claude/skills/`(および `.codex/skills/`)にスキル定義が配置されます。日付管理の作業フォルダ内でターミナルを開くと:
 
 ```
 shared/_work/2026/202603/20260321_fix-login-bug/
@@ -90,7 +90,7 @@ flowchart LR
 
 ## スキルの配置
 
-ProjectCurator は Setup ページでプロジェクト作成・チェック時に `/project-curator` スキルを自動配置します:
+Curia は Setup ページでプロジェクト作成・チェック時に `/project-curator` スキルを自動配置します:
 
 - `.claude/skills/project-curator/` (Claude Code 用)
 - `.codex/skills/project-curator/` (Codex CLI 用)

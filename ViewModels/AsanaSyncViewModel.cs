@@ -5,10 +5,10 @@ using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
+using Curia.Models;
+using Curia.Services;
 
-namespace ProjectCurator.ViewModels;
+namespace Curia.ViewModels;
 
 public partial class AsanaSyncViewModel : ObservableObject
 {

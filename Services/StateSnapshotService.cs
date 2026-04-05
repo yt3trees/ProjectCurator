@@ -2,9 +2,9 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public class StateSnapshotService
 {

@@ -1,4 +1,4 @@
-<UserControl x:Class="ProjectCurator.Views.Pages.SettingsPage"
+<UserControl x:Class="Curia.Views.Pages.SettingsPage"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
@@ -490,7 +490,7 @@
                            VerticalAlignment="Center"
                            Margin="0,0,10,0"/>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="ProjectCurator" FontSize="13" FontWeight="SemiBold"
+                        <TextBlock Text="Curia" FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource AppText}"/>
                         <TextBlock Text="{Binding AppVersion}" FontSize="11"
                                    Foreground="{DynamicResource AppSubtext0}" Margin="0,2,0,0"/>

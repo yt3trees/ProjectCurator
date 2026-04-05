@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Wpf.Ui.Controls;
-using ProjectCurator.ViewModels;
+using Curia.ViewModels;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfBrushes = System.Windows.Media.Brushes;
 using WpfCursors = System.Windows.Input.Cursors;
@@ -10,7 +10,7 @@ using WpfFontFamily = System.Windows.Media.FontFamily;
 using WpfTextBlock = System.Windows.Controls.TextBlock;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
-namespace ProjectCurator.Views.Pages;
+namespace Curia.Views.Pages;
 
 public partial class GitReposPage : WpfUserControl, INavigableView<GitReposViewModel>
 {

@@ -5,10 +5,10 @@ using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
+using Curia.Models;
+using Curia.Services;
 
-namespace ProjectCurator.ViewModels;
+namespace Curia.ViewModels;
 
 // アクティビティバーの1日分
 public class ActivityDay

@@ -2,11 +2,11 @@
 
 [< Back to README](../README.md)
 
-ProjectCurator is designed to work alongside AI coding agents such as Claude Code and Codex CLI.
+Curia is designed to work alongside AI coding agents such as Claude Code and Codex CLI.
 
 ## How It Works
 
-Each project managed by ProjectCurator contains an `AGENTS.md` at the project root and a set of embedded skills under `.claude/skills/` (and `.codex/skills/`). When you open a terminal inside a date-based work folder like:
+Each project managed by Curia contains an `AGENTS.md` at the project root and a set of embedded skills under `.claude/skills/` (and `.codex/skills/`). When you open a terminal inside a date-based work folder like:
 
 ```
 shared/_work/2026/202603/20260321_fix-login-bug/
@@ -90,7 +90,7 @@ flowchart LR
 
 ## Skill Deployment
 
-ProjectCurator automatically deploys the `/project-curator` skill when creating or checking a project from the Setup page:
+Curia automatically deploys the `/project-curator` skill when creating or checking a project from the Setup page:
 
 - `.claude/skills/project-curator/` for Claude Code
 - `.codex/skills/project-curator/` for Codex CLI

@@ -1,8 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.ViewModels;
+namespace Curia.ViewModels;
 
 public partial class MainWindowViewModel : ObservableObject, IRecipient<StatusUpdateMessage>
 {

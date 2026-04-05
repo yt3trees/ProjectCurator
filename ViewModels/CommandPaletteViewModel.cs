@@ -12,12 +12,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
-using ProjectCurator.Views.Pages;
+using Curia.Models;
+using Curia.Services;
+using Curia.Views.Pages;
 using TextBlock = System.Windows.Controls.TextBlock;
 
-namespace ProjectCurator.ViewModels;
+namespace Curia.ViewModels;
 
 public partial class CommandPaletteViewModel : ObservableObject
 {

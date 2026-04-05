@@ -1,4 +1,4 @@
-namespace ProjectCurator.Models;
+namespace Curia.Models;
 
 public class EditorState
 {

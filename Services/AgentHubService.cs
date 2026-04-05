@@ -6,9 +6,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public class AgentHubService
 {
@@ -290,7 +290,7 @@ public class AgentHubService
             meta.ContentDirectory = skillDir;
             meta.UpdatedAt = DateTimeOffset.Now;
             if (string.IsNullOrWhiteSpace(meta.Description))
-                meta.Description = "Built-in skill provided by ProjectCurator.";
+                meta.Description = "Built-in skill provided by Curia.";
 
             File.WriteAllText(metaPath,
                 JsonSerializer.Serialize(meta, JsonOptions), new UTF8Encoding(false));

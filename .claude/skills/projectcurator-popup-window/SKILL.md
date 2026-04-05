@@ -1,11 +1,11 @@
 ---
 name: projectdesk-popup-window
-description: Implement and refine ProjectCurator-specific WPF popup windows in this repository. Use when adding or updating modal dialogs from Dashboard/Editor/Timeline pages, especially when users request dark-mode popups, list/detail dialogs, folder-open actions, or visual consistency with existing DashboardPage code-behind popups (for example the Pin Work Folder picker).
+description: Implement and refine Curia-specific WPF popup windows in this repository. Use when adding or updating modal dialogs from Dashboard/Editor/Timeline pages, especially when users request dark-mode popups, list/detail dialogs, folder-open actions, or visual consistency with existing DashboardPage code-behind popups (for example the Pin Work Folder picker).
 ---
 
-# ProjectCurator Popup Window
+# Curia Popup Window
 
-ProjectCurator (WPF + wpf-ui) has an established popup implementation style in `Views/Pages/DashboardPage.xaml.cs`.
+Curia (WPF + wpf-ui) has an established popup implementation style in `Views/Pages/DashboardPage.xaml.cs`.
 
 Use this skill to keep popup UI consistent, avoid common compile issues, and keep behavior aligned with existing dialogs.
 

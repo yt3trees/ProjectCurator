@@ -6,7 +6,7 @@ using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using WinForms = System.Windows.Forms;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public class TrayService : IDisposable
 {
@@ -27,7 +27,7 @@ public class TrayService : IDisposable
         _notifyIcon = new WinForms.NotifyIcon
         {
             Icon = icon,
-            Text = "ProjectCurator",
+            Text = "Curia",
             Visible = true,
         };
 

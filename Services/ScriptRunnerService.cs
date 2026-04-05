@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using WpfApplication = System.Windows.Application;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public class ScriptRunnerService
 {

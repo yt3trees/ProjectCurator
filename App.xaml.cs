@@ -2,18 +2,18 @@ using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Wpf.Ui;
 using Wpf.Ui.Appearance;
-using ProjectCurator.Services;
-using ProjectCurator.ViewModels;
-using ProjectCurator.Views;
-using ProjectCurator.Views.Pages;
-using AppPageService = ProjectCurator.Services.PageService;
+using Curia.Services;
+using Curia.ViewModels;
+using Curia.Views;
+using Curia.Views.Pages;
+using AppPageService = Curia.Services.PageService;
 using WpfApplication = System.Windows.Application;
 
-namespace ProjectCurator;
+namespace Curia;
 
 public partial class App : WpfApplication
 {
-    private const string MutexName = "Global\\ProjectCurator_SingleInstance";
+    private const string MutexName = "Global\\Curia_SingleInstance";
     private Mutex? _mutex;
     private IServiceProvider? _serviceProvider;
 
@@ -32,8 +32,8 @@ public partial class App : WpfApplication
         if (!createdNew)
         {
             System.Windows.MessageBox.Show(
-                "ProjectCurator is already running.",
-                "ProjectCurator",
+                "Curia is already running.",
+                "Curia",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Information);
             Shutdown();

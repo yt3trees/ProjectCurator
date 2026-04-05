@@ -1,4 +1,4 @@
-# ProjectCurator
+# Curia
 
 ![.NET 9](https://img.shields.io/badge/.NET-9-512BD4?logo=dotnet)
 ![wpf-ui](https://img.shields.io/badge/wpf--ui-3.x-0078D4)
@@ -11,8 +11,8 @@
 flowchart TD
     User("👤 ユーザー")
 
-    %% ProjectCurator (コンテキスト管理)
-    subgraph PC ["✨ ProjectCurator"]
+    %% Curia (コンテキスト管理)
+    subgraph PC ["✨ Curia"]
         UI["🖥️ Dashboard / Editor<br>(UI層)"]
         
         subgraph MD ["📁 Context Files"]
@@ -49,7 +49,7 @@ flowchart TD
 
 ## このアプリで何が便利になるか
 
-ProjectCurator は、人間とAI両方にとっての「面倒な行き来」を減らします。
+Curia は、人間とAI両方にとっての「面倒な行き来」を減らします。
 
 - プロジェクトの状態確認: フォルダを開き回らなくても、Dashboardで全体の鮮度とタスクを一望
 - コンテキスト維持: 「今何に取り組んでいるか(`current_focus.md`)」「何をどう決めたか(`decision_log`)」といったプロジェクト全体の記憶を、専用Editorで手軽に更新
@@ -98,13 +98,13 @@ ProjectCurator は、人間とAI両方にとっての「面倒な行き来」を
 
 ### 1. GitHub Releases からアプリをダウンロード
 
-- [最新の GitHub Release](https://github.com/yt3trees/ProjectCurator/releases) を開く
+- [最新の GitHub Release](https://github.com/yt3trees/Curia/releases) を開く
 - `.zip` ファイルをダウンロード
-- 任意のフォルダに展開(例: `C:\Tools\ProjectCurator\`)
+- 任意のフォルダに展開(例: `C:\Tools\Curia\`)
 
-### 2. `ProjectCurator.exe` を起動
+### 2. `Curia.exe` を起動
 
-- `ProjectCurator.exe` をダブルクリック
+- `Curia.exe` をダブルクリック
 - Windows SmartScreen が出る場合は `詳細情報` -> `実行`
 
 ### 3. 最初に設定する場所

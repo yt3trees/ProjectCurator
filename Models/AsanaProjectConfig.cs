@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace ProjectCurator.Models;
+namespace Curia.Models;
 
 /// <summary>
 /// プロジェクトディレクトリ内の asana_config.json に対応するモデル。

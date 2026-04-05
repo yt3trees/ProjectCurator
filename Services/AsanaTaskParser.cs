@@ -1,8 +1,8 @@
 using System.IO;
 using System.Text.RegularExpressions;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 /// <summary>
 /// tasks.md をルールベースで解析し、進行中/完了/未着手/コラボタスクに分類する。

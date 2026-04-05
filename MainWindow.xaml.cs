@@ -4,11 +4,11 @@ using System.Windows.Interop;
 using Microsoft.Extensions.DependencyInjection;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
-using ProjectCurator.ViewModels;
-using ProjectCurator.Views;
-using ProjectCurator.Views.Pages;
+using Curia.Models;
+using Curia.Services;
+using Curia.ViewModels;
+using Curia.Views;
+using Curia.Views.Pages;
 using System.Windows.Input;
 using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
 using WpfModifierKeys = System.Windows.Input.ModifierKeys;
@@ -16,7 +16,7 @@ using WpfKey = System.Windows.Input.Key;
 using WpfKeyboard = System.Windows.Input.Keyboard;
 using WpfApplication = System.Windows.Application;
 
-namespace ProjectCurator;
+namespace Curia;
 
 public partial class MainWindow : FluentWindow
 {

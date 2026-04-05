@@ -1,9 +1,9 @@
 using System.Windows;
 using System.Windows.Interop;
-using ProjectCurator.Helpers;
-using ProjectCurator.Models;
+using Curia.Helpers;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 public interface IHotkeyService
 {

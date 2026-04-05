@@ -10,12 +10,12 @@ using MediaBrush = System.Windows.Media.Brush;
 using MediaBrushes = System.Windows.Media.Brushes;
 using Win32OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using Win32SaveFileDialog = Microsoft.Win32.SaveFileDialog;
-using ProjectCurator.Models;
-using ProjectCurator.Services;
-using ProjectCurator.ViewModels;
+using Curia.Models;
+using Curia.Services;
+using Curia.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
 
-namespace ProjectCurator.Views.Pages;
+namespace Curia.Views.Pages;
 
 public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewModel>
 {
@@ -53,19 +53,19 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
 
     private void OnAgentsTabClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.SelectedLibraryTab = ProjectCurator.ViewModels.LibraryTab.Agents;
+        ViewModel.SelectedLibraryTab = Curia.ViewModels.LibraryTab.Agents;
         UpdateTabButtonStyles();
     }
 
     private void OnRulesTabClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.SelectedLibraryTab = ProjectCurator.ViewModels.LibraryTab.Rules;
+        ViewModel.SelectedLibraryTab = Curia.ViewModels.LibraryTab.Rules;
         UpdateTabButtonStyles();
     }
 
     private void OnSkillsTabClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.SelectedLibraryTab = ProjectCurator.ViewModels.LibraryTab.Skills;
+        ViewModel.SelectedLibraryTab = Curia.ViewModels.LibraryTab.Skills;
         UpdateTabButtonStyles();
     }
 
@@ -142,13 +142,13 @@ public partial class AgentHubPage : WpfUserControl, INavigableView<AgentHubViewM
     {
         switch (ViewModel.SelectedLibraryTab)
         {
-            case ProjectCurator.ViewModels.LibraryTab.Agents:
+            case Curia.ViewModels.LibraryTab.Agents:
                 OnNewAgentClick(sender, e);
                 break;
-            case ProjectCurator.ViewModels.LibraryTab.Rules:
+            case Curia.ViewModels.LibraryTab.Rules:
                 OnNewRuleClick(sender, e);
                 break;
-            case ProjectCurator.ViewModels.LibraryTab.Skills:
+            case Curia.ViewModels.LibraryTab.Skills:
                 OnNewSkillClick(sender, e);
                 break;
         }

@@ -1,9 +1,9 @@
 using System.IO;
 using System.Text;
 using System.Threading;
-using ProjectCurator.Models;
+using Curia.Models;
 
-namespace ProjectCurator.Services;
+namespace Curia.Services;
 
 /// <summary>
 /// Asana タスクを解析して current_focus.md の更新提案を生成する。

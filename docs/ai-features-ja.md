@@ -7,7 +7,7 @@
 <a id="ai-features-overview-ja"></a>
 ## AI機能の全体像
 
-ProjectCuratorのAI機能は、「どんなシチュエーションで使うか（把握・更新・メモ）」によって大きく3つに分類されています。
+CuriaのAI機能は、「どんなシチュエーションで使うか（把握・更新・メモ）」によって大きく3つに分類されています。
 
 ```mermaid
 flowchart LR

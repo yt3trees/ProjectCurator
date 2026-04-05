@@ -50,5 +50,5 @@ If the current directory is `Local Projects Root/<project>` or directly under
 
 For cross-project status, today's task priorities, or project-spanning queries,
 invoke `/project-curator`. It reads `curator_state.json` maintained by the
-ProjectCurator app and provides up-to-date paths and metadata for all projects.
+Curia app and provides up-to-date paths and metadata for all projects.
 ```

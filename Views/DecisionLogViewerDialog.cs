@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Input;
-using ProjectCurator.Models;
+using Curia.Models;
 
 using Button = System.Windows.Controls.Button;
 using Brush = System.Windows.Media.Brush;
@@ -10,7 +10,7 @@ using Brushes = System.Windows.Media.Brushes;
 using Cursors = System.Windows.Input.Cursors;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 
-namespace ProjectCurator.Views;
+namespace Curia.Views;
 
 internal static class DecisionLogViewerDialog
 {

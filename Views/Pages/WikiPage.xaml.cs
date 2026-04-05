@@ -12,8 +12,8 @@ using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using System.Text.RegularExpressions;
 using Wpf.Ui.Controls;
-using ProjectCurator.Services;
-using ProjectCurator.ViewModels;
+using Curia.Services;
+using Curia.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
 using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
 using WpfKey = System.Windows.Input.Key;
@@ -25,7 +25,7 @@ using WpfDataFormats = System.Windows.DataFormats;
 using Win32OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using MediaColor = System.Windows.Media.Color;
 
-namespace ProjectCurator.Views.Pages;
+namespace Curia.Views.Pages;
 
 public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
 {

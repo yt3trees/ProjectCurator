@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text;
 
-namespace ProjectCurator.Helpers;
+namespace Curia.Helpers;
 
 public static class EncodingDetector
 {
