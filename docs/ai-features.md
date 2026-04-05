@@ -68,15 +68,36 @@ Prefer concise bullet points. Flag overloaded days rather than packing in tasks.
 Language: respond in Japanese unless the document is already in English.
 ```
 
+<a id="global"></a>
+## Global
+
+<a id="quick-capture-global-hotkey"></a>
+### Quick Capture (Global Hotkey)
+
+Press `Ctrl+Shift+C` from anywhere on your desktop to open a lightweight capture window. Type a free-text note and press Enter. If AI Features is enabled, an LLM classifies the input and routes it automatically:
+
+| Category | Destination |
+|---|---|
+| `task` | Creates a task in Asana via API (requires confirmation before submitting) |
+| `tension` | Appends to the project's `open_issues.md` |
+| `focus_update` | Opens Editor and triggers the Update Focus from Asana flow with your input as additional context |
+| `decision` | Opens Editor and launches the AI Decision Log flow |
+| `memo` | Appends a timestamped entry to `_config/capture_log.md` |
+
+When AI Features is disabled, you can still use Quick Capture by selecting the category and project manually.
+
+<a id="dashboard"></a>
+## Dashboard
+
 <a id="whats-next-dashboard"></a>
-## What's Next (Dashboard)
+### What's Next
 
 Click the lightbulb icon in the Dashboard toolbar to get 3-5 AI-prioritized action suggestions across all projects. The model analyzes overdue tasks, stale focus files, uncommitted changes, and unrecorded decisions, then ranks actions by urgency. Each suggestion has an Open button to navigate directly to the relevant file.
 
 <img src="../_assets/ai-feature/WhatsNext.png" width="70%" alt="What's Next dialog" />
 
 <a id="context-briefing-dashboard-card"></a>
-## Context Briefing (Dashboard Card)
+### Context Briefing (Dashboard Card)
 
 Click the lightbulb icon on a project card to generate a project-specific resume briefing. The model reads `current_focus.md`, recent `decision_log` entries, `open_issues.md`, active/completed Asana tasks, and uncommitted repo signals, then outputs:
 
@@ -89,21 +110,24 @@ The dialog supports `Copy`, `Open in Editor`, and `View Debug` (prompt/response 
 <img src="../_assets/ai-feature/ContextBriefing.png" width="70%" alt="Context Briefing dialog" />
 
 <a id="todays-plan-dashboard"></a>
-## Today's Plan (Dashboard)
+### Today's Plan
 
 Today's Plan dialog provides a time-blocked day plan (for example, Morning / Afternoon), with `Open`, `Copy`, `Save`, and `View Debug` actions.
 
 <img src="../_assets/ai-feature/TodaysPlan.png" width="70%" alt="Today's Plan dialog" />
 
+<a id="editor"></a>
+## Editor
+
 <a id="update-focus-from-asana-editor"></a>
-## Update Focus from Asana (Editor)
+### Update Focus from Asana
 
 Click the `Update Focus from Asana` button in the Editor toolbar to generate a diff-based update proposal for the open `current_focus.md`. The model reads Asana task data and the existing file, then proposes changes while preserving your heading structure and writing style. A backup is saved to `focus_history/` automatically. Supports workstream filtering, natural-language refinement, and a debug view.
 
 <img src="../_assets/ai-feature/UpdateFocusFromAsana.png" width="70%" alt="Update Focus from Asana dialog" />
 
 <a id="ai-decision-log-editor"></a>
-## AI Decision Log (Editor)
+### AI Decision Log
 
 Click `Dec Log` in the Editor toolbar (AI mode) to open the decision log assistant. Describe what was decided; the model generates a structured draft with Options / Why / Risk / Revisit Trigger sections. Supports natural-language refinement and optionally removes the resolved item from `open_issues.md`. Saves as `decision_log/YYYY-MM-DD_{topic}.md`.
 
@@ -111,7 +135,7 @@ Click `Dec Log` in the Editor toolbar (AI mode) to open the decision log assista
 <img src="../_assets/ai-feature/AI-DecisionLog_2.png" width="70%" alt="AI Decision Log dialog step 2" />
 
 <a id="import-meeting-notes-editor"></a>
-## Import Meeting Notes (Editor)
+### Import Meeting Notes
 
 Click the `Import Meeting Notes` button in the Editor toolbar (or press `Ctrl+Enter` in the notes input dialog) to paste raw meeting notes and have the LLM analyze them in a single pass. The model produces four types of output, each shown in a separate tab of the preview dialog:
 
@@ -129,21 +153,6 @@ Select which items to apply and click `Apply Selected`. A `View Debug` button in
 
 <img src="../_assets/ai-feature/ImportMeetingNotes_1.png" width="70%" alt="Import Meeting Notes dialog step 1" />
 <img src="../_assets/ai-feature/ImportMeetingNotes_2.png" width="70%" alt="Import Meeting Notes dialog step 2" />
-
-<a id="quick-capture-global-hotkey"></a>
-## Quick Capture (Global Hotkey)
-
-Press `Ctrl+Shift+C` from anywhere on your desktop to open a lightweight capture window. Type a free-text note and press Enter. If AI Features is enabled, an LLM classifies the input and routes it automatically:
-
-| Category | Destination |
-|---|---|
-| `task` | Creates a task in Asana via API (requires confirmation before submitting) |
-| `tension` | Appends to the project's `open_issues.md` |
-| `focus_update` | Opens Editor and triggers the Update Focus from Asana flow with your input as additional context |
-| `decision` | Opens Editor and launches the AI Decision Log flow |
-| `memo` | Appends a timestamped entry to `_config/capture_log.md` |
-
-When AI Features is disabled, you can still use Quick Capture by selecting the category and project manually.
 
 <a id="wiki"></a>
 ## Wiki
