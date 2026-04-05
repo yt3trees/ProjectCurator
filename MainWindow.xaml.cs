@@ -365,22 +365,26 @@ public partial class MainWindow : FluentWindow
                     e.Handled = true;
                     break;
                 case WpfKey.D4:
-                    RootNavigation.Navigate(typeof(GitReposPage));
+                    RootNavigation.Navigate(typeof(WikiPage));
                     e.Handled = true;
                     break;
                 case WpfKey.D5:
-                    RootNavigation.Navigate(typeof(AsanaSyncPage));
+                    RootNavigation.Navigate(typeof(GitReposPage));
                     e.Handled = true;
                     break;
                 case WpfKey.D6:
-                    RootNavigation.Navigate(typeof(AgentHubPage));
+                    RootNavigation.Navigate(typeof(AsanaSyncPage));
                     e.Handled = true;
                     break;
                 case WpfKey.D7:
-                    RootNavigation.Navigate(typeof(SetupPage));
+                    RootNavigation.Navigate(typeof(AgentHubPage));
                     e.Handled = true;
                     break;
                 case WpfKey.D8:
+                    RootNavigation.Navigate(typeof(SetupPage));
+                    e.Handled = true;
+                    break;
+                case WpfKey.D9:
                     RootNavigation.Navigate(typeof(SettingsPage));
                     e.Handled = true;
                     break;
