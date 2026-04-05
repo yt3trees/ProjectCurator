@@ -164,6 +164,7 @@ When AI Features is disabled, you can still use Quick Capture by selecting the c
 ## Wiki
 
 The Wiki tab lets the LLM incrementally build and maintain a project-specific knowledge base from your source files.
+Unless otherwise noted, paths below are relative to `wiki/<domain>/`.
 
 ### Page Categories
 
@@ -171,7 +172,7 @@ Pages generated during Import are organized into four categories. The LLM assign
 
 | Category | Location | Contents |
 |---|---|---|
-| Wiki Files | `wiki/` root | `index.md` (page list) and `log.md` (operation log). Management files auto-updated by the LLM |
+| Wiki Files | `wiki/<domain>/` root | `index.md` (page list) and `log.md` (operation log). Management files updated by the app during Import/Query/Lint |
 | sources | `pages/sources/` | One summary page per imported source file |
 | entities | `pages/entities/` | Concrete "things" in the project: tables, screens, APIs, reports, user roles, etc. |
 | concepts | `pages/concepts/` | Design philosophy and business rules: approval flows, workflows, technical policies, decision criteria, etc. |
@@ -190,7 +191,8 @@ Click "+ Import Source" or drag and drop a file onto the Wiki tab. The LLM prepa
 - Creates or updates related `pages/entities/` and `pages/concepts/` pages
 - Proposed updates for `index.md` and `log.md`
 
-Supported formats: `.md` / `.txt` (PDF / Word require text conversion first).
+Supported formats: `.md` / `.txt` / `.pdf` / `.docx`.
+Note: `.pdf` / `.docx` can be selected, but body text extraction is not implemented yet. For practical use, convert them to `.md` / `.txt` first.
 
 Before saving, each proposed page change is shown as a diff:
 - New pages: diff against empty content
