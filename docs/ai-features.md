@@ -4,21 +4,6 @@
 
 All AI features require `Enable AI Features` to be on (Settings > LLM API). Supported providers: OpenAI and Azure OpenAI.
 
-## Table of Contents
-
- - [AI Features Overview](#ai-features-overview)
- - [Setup](#setup)
- - [User Profile](#user-profile)
- - [What's Next (Dashboard)](#whats-next-dashboard)
- - [Context Briefing (Dashboard Card)](#context-briefing-dashboard-card)
- - [Today's Plan (Dashboard)](#todays-plan-dashboard)
- - [Update Focus from Asana (Editor)](#update-focus-from-asana-editor)
- - [AI Decision Log (Editor)](#ai-decision-log-editor)
- - [Import Meeting Notes (Editor)](#import-meeting-notes-editor)
- - [Quick Capture (Global Hotkey)](#quick-capture-global-hotkey)
- - [Wiki](#wiki)
- - [Lint](#lint)
-
 <a id="ai-features-overview"></a>
 ## AI Features Overview
 
@@ -192,7 +177,10 @@ Click "+ Import Source" or drag and drop a file onto the Wiki tab. The LLM prepa
 - Proposed updates for `index.md` and `log.md`
 
 Supported formats: `.md` / `.txt` / `.pdf` / `.docx`.
-Note: `.pdf` / `.docx` can be selected, but body text extraction is not implemented yet. For practical use, convert them to `.md` / `.txt` first.
+Notes:
+- `.pdf` is ingested with Windows OCR text extraction (up to 20 pages).
+- If the OCR engine is unavailable or no text is recognized, ingestion continues with an extraction-failure note.
+- `.docx` body text extraction is not implemented yet; convert to `.md` / `.txt` first.
 
 Before saving, each proposed page change is shown as a diff:
 - New pages: diff against empty content

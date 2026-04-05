@@ -7,6 +7,12 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using ProjectCurator.Models;
+using Windows.Data.Pdf;
+using Windows.Foundation;
+using Windows.Graphics.Imaging;
+using Windows.Media.Ocr;
+using Windows.Storage;
+using Windows.Storage.Streams;
 
 namespace ProjectCurator.Services;
 
@@ -18,6 +24,7 @@ public class WikiIngestService
     private readonly LlmClientService _llm;
     private readonly WikiService _wiki;
     private const int MaxUpdateCandidates = 8;
+    private const int MaxPdfOcrPages = 20;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -58,7 +65,7 @@ public class WikiIngestService
 
             // 2. ソース内容を読み取り
             progress?.Report("Reading source content...");
-            var sourceContent = await ReadSourceContent(sourceFilePath);
+            var sourceContent = await ReadSourceContent(sourceFilePath, cancellationToken);
             if (string.IsNullOrWhiteSpace(sourceContent))
                 return Fail("Source file is empty or could not be read.");
 
@@ -342,15 +349,90 @@ Select up to {MaxUpdateCandidates} existing pages that most likely need updates.
 
     // ---- ソース読み取り ----
 
-    private static async Task<string> ReadSourceContent(string filePath)
+    private static async Task<string> ReadSourceContent(string filePath, CancellationToken cancellationToken)
     {
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         return ext switch
         {
-            ".md" or ".txt" => await File.ReadAllTextAsync(filePath, Encoding.UTF8),
-            ".pdf"          => $"[PDF file: {Path.GetFileName(filePath)} — text extraction not yet supported. Please convert to .md or .txt first.]",
+            ".md" or ".txt" => await File.ReadAllTextAsync(filePath, Encoding.UTF8, cancellationToken),
+            ".pdf"          => await ReadPdfWithOcr(filePath, cancellationToken),
             ".docx"         => $"[DOCX file: {Path.GetFileName(filePath)} — text extraction not yet supported. Please convert to .md or .txt first.]",
-            _               => await File.ReadAllTextAsync(filePath, Encoding.UTF8)
+            _               => await File.ReadAllTextAsync(filePath, Encoding.UTF8, cancellationToken)
+        };
+    }
+
+    private static async Task<string> ReadPdfWithOcr(string filePath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var storageFile = await StorageFile.GetFileFromPathAsync(filePath);
+            var pdf = await PdfDocument.LoadFromFileAsync(storageFile);
+            if (pdf.PageCount == 0)
+                return $"[PDF file: {Path.GetFileName(filePath)} — no pages found.]";
+
+            var engine = OcrEngine.TryCreateFromUserProfileLanguages()
+                         ?? OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en-US"));
+            if (engine == null)
+                return $"[PDF file: {Path.GetFileName(filePath)} — OCR engine is unavailable on this Windows environment. Please convert to .md or .txt first.]";
+
+            var pageLimit = (uint)Math.Min((int)pdf.PageCount, MaxPdfOcrPages);
+            var sb = new StringBuilder();
+            sb.AppendLine($"# OCR Extracted Text ({Path.GetFileName(filePath)})");
+            sb.AppendLine();
+
+            for (uint i = 0; i < pageLimit; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                using var page = pdf.GetPage(i);
+                using var renderStream = new InMemoryRandomAccessStream();
+                var renderOptions = BuildRenderOptions(page.Size);
+                await page.RenderToStreamAsync(renderStream, renderOptions);
+                renderStream.Seek(0);
+
+                var decoder = await BitmapDecoder.CreateAsync(renderStream);
+                var bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+                var result = await engine.RecognizeAsync(bitmap);
+                var text = (result?.Text ?? string.Empty).Trim();
+
+                sb.AppendLine($"## Page {i + 1}");
+                if (string.IsNullOrWhiteSpace(text))
+                    sb.AppendLine("(no text recognized)");
+                else
+                    sb.AppendLine(text);
+                sb.AppendLine();
+            }
+
+            if (pdf.PageCount > pageLimit)
+            {
+                sb.AppendLine($"[Truncated: OCR processed first {pageLimit} pages out of {pdf.PageCount}.]");
+            }
+
+            var extracted = sb.ToString().Trim();
+            if (string.IsNullOrWhiteSpace(extracted))
+                return $"[PDF file: {Path.GetFileName(filePath)} — OCR completed but no text was recognized.]";
+
+            return extracted;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return $"[PDF file: {Path.GetFileName(filePath)} — OCR failed: {ex.Message}. Please convert to .md or .txt first.]";
+        }
+    }
+
+    private static PdfPageRenderOptions BuildRenderOptions(Windows.Foundation.Size pageSize)
+    {
+        const double scale = 2.0;
+        var width = (uint)Math.Max(1, Math.Round(pageSize.Width * scale));
+        var height = (uint)Math.Max(1, Math.Round(pageSize.Height * scale));
+        return new PdfPageRenderOptions
+        {
+            DestinationWidth = width,
+            DestinationHeight = height
         };
     }
 

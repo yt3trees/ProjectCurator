@@ -4,21 +4,6 @@
 
 すべての AI 機能は `Settings > LLM API` で `Enable AI Features` をオンにする必要があります。対応プロバイダー: OpenAI / Azure OpenAI。
 
-## 目次
-
- - [AI機能の全体像](#ai-features-overview-ja)
- - [初期設定](#setup-ja)
- - [ユーザープロフィール](#user-profile-ja)
- - [What's Next (Dashboard)](#whats-next-dashboard-ja)
- - [Context Briefing (Dashboardカード)](#context-briefing-dashboard-card-ja)
- - [Today's Plan (Dashboard)](#todays-plan-dashboard-ja)
- - [Update Focus from Asana (Editor)](#update-focus-from-asana-editor-ja)
- - [AI Decision Log (Editor)](#ai-decision-log-editor-ja)
- - [Import Meeting Notes (Editor)](#import-meeting-notes-editor-ja)
- - [Quick Capture (グローバルホットキー)](#quick-capture-global-hotkey-ja)
- - [Wiki](#wiki-ja)
- - [Lint](#lint-ja)
-
 <a id="ai-features-overview-ja"></a>
 ## AI機能の全体像
 
@@ -191,8 +176,11 @@ entities と concepts の違いの目安: 「それは何か(名詞)」→ entit
 - 関連する `pages/entities/` と `pages/concepts/` ページを作成・更新
 - `index.md` / `log.md` の更新案を生成
 
-対応形式: `.md` / `.txt` / `.pdf` / `.docx`  
-注: `.pdf` / `.docx` は選択可能ですが本文テキスト抽出は未対応のため、実運用では事前に `.md` / `.txt` へ変換が必要です。
+対応形式: `.md` / `.txt` / `.pdf` / `.docx`
+注:
+- `.pdf` は Windows OCR で本文抽出して取り込みます (最大 20 ページ)。
+- OCR エンジンが利用できない環境、または認識結果が得られない場合は抽出失敗メッセージを埋め込んで処理継続します。
+- `.docx` の本文抽出は未対応のため、事前に `.md` / `.txt` へ変換してください。
 
 保存前に、生成された各ページ変更は差分でレビューされます:
 - 新規ページ: 空内容との差分
