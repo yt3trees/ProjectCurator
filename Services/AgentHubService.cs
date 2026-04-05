@@ -19,7 +19,7 @@ public class AgentHubService
         Converters = { new JsonStringEnumConverter() }
     };
 
-    private static readonly string[] BuiltInSkillNames = ["project-curator"];
+    private static readonly string[] BuiltInSkillNames = ["project-context"];
     private static readonly Assembly _assembly = typeof(AgentHubService).Assembly;
 
     private readonly ConfigService _configService;

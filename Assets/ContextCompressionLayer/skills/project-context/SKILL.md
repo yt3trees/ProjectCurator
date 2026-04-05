@@ -1,5 +1,5 @@
 ---
-name: project-curator
+name: project-context
 description: Unified Curia skill. Use for cross-project status, today's tasks, decision logging, session-end focus updates, and Obsidian knowledge. Invoke explicitly for "update focus from Asana".
 allowed-tools: Read, Write, Glob, Grep, Bash
 ---

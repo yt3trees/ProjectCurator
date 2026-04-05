@@ -13,7 +13,7 @@ public class ContextCompressionLayerService
     private static readonly UTF8Encoding Utf8NoBom = new(false);
     private static readonly string SkillRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "ContextCompressionLayer", "skills");
     private static readonly Assembly Assembly = typeof(ContextCompressionLayerService).Assembly;
-    private static readonly string[] EmbeddedSkillNames = ["project-curator"];
+    private static readonly string[] EmbeddedSkillNames = ["project-context"];
     private readonly ConfigService _configService;
 
     public ContextCompressionLayerService(ConfigService configService)
@@ -850,7 +850,7 @@ If any context file is oversized, suggest archiving to `focus_history/`.
 ### Active Behaviors
 
 Decision logging, session-end focus updates, Obsidian knowledge integration,
-and Asana focus sync are handled by the `/project-curator` skill.
-Invoke `/project-curator` at the start of a session to activate these behaviors.
+and Asana focus sync are handled by the `/project-context` skill.
+Invoke `/project-context` at the start of a session to activate these behaviors.
 """;
 }
