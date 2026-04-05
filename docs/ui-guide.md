@@ -154,7 +154,7 @@ When AI Features is enabled, the LLM prepares:
 
 Before saving, each new/updated page is shown in a diff review dialog. Changes are saved only after approval.
 
-For prompt details and the document-to-LLM update flow, see [AI Features](ai-features.md#wiki).
+For prompt details and the document-to-LLM update flow, see [Wiki Features](wiki-features.md).
 
 ### Query (requires AI Features)
 
@@ -232,3 +232,4 @@ Manage workstreams within a project: create, rename labels, and close/reopen.
 - Close button marks a workstream as Closed; Reopen restores it to Active
 - Save Labels persists any label changes
 - Output area shows the log of operations performed
+
