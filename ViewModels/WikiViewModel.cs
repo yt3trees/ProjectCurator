@@ -5,11 +5,13 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using ProjectCurator.Models;
 using ProjectCurator.Services;
+using ProjectCurator.Views;
 
 namespace ProjectCurator.ViewModels;
 
@@ -393,14 +395,24 @@ public partial class WikiViewModel : ObservableObject
             {
                 count++;
                 StatusText = $"Ingesting ({count}/{files.Count}): {Path.GetFileName(file)}...";
-                
-                var result = await _ingestService.IngestSource(WikiRoot, file, progress, _cts.Token);
+
+                var result = await _ingestService.GenerateIngestProposal(WikiRoot, file, progress, _cts.Token);
                 if (!result.Success)
                 {
                     StatusText = $"Error on {Path.GetFileName(file)}: {result.ErrorMessage}";
                     // 1つ失敗しても次へ進む（必要に応じて break しても良い）
                     await Task.Delay(2000); // エラーメッセージを見せるため少し待機
+                    continue;
                 }
+
+                if (!await ReviewIngestChangesAsync(file, result, _cts.Token))
+                {
+                    StatusText = $"Skipped: {Path.GetFileName(file)} (no changes saved)";
+                    continue;
+                }
+
+                await _ingestService.ApplyIngestResult(WikiRoot, result, progress, _cts.Token);
+                StatusText = $"Saved: {Path.GetFileName(file)}";
             }
 
             StatusText = $"Ingest complete. Processed {files.Count} files.";
@@ -412,6 +424,106 @@ public partial class WikiViewModel : ObservableObject
         }
         finally { IsLoading = false; }
     }
+
+    private async Task<bool> ReviewIngestChangesAsync(string sourceFilePath, IngestResult result, CancellationToken cancellationToken)
+    {
+        var reviewItems = BuildIngestReviewItems(result);
+        if (reviewItems.Count == 0)
+            return true;
+
+        var owner = Application.Current?.MainWindow;
+        if (owner == null)
+            throw new InvalidOperationException("Main window is not available for review dialog.");
+
+        for (int i = 0; i < reviewItems.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var item = reviewItems[i];
+            var proposal = new FileUpdateProposal
+            {
+                CurrentContent = item.CurrentContent,
+                ProposedContent = item.ProposedContent,
+                Summary = item.Summary,
+                DebugSystemPrompt = result.DebugSystemPrompt,
+                DebugUserPrompt = result.DebugUserPrompt,
+                DebugResponse = result.DebugResponse
+            };
+
+            var indexLabel = $"{i + 1}/{reviewItems.Count}";
+            var extraInfo = $"Source: {Path.GetFileName(sourceFilePath)}\nPath: {item.Path}\nType: {(item.IsNew ? "New page" : "Update page")}";
+            var dialogTitle = item.IsNew
+                ? $"Review New Wiki Page ({indexLabel})"
+                : $"Review Updated Wiki Page ({indexLabel})";
+
+            var dialogTask = await owner.Dispatcher.InvokeAsync(() =>
+                ProposalReviewDialog.ShowAsync(
+                    owner,
+                    proposal,
+                    dialogTitle,
+                    titleIcon: item.IsNew ? "＋" : "⟳",
+                    extraInfo: extraInfo));
+            var (apply, _) = await dialogTask;
+
+            if (!apply)
+                return false;
+        }
+
+        return true;
+    }
+
+    private List<(string Path, bool IsNew, string CurrentContent, string ProposedContent, string Summary)> BuildIngestReviewItems(IngestResult result)
+    {
+        var items = new List<(string Path, bool IsNew, string CurrentContent, string ProposedContent, string Summary)>();
+
+        foreach (var p in result.NewPages.Where(p => !string.IsNullOrWhiteSpace(p.Path)))
+        {
+            var path = NormalizeWikiPath(p.Path);
+            var current = ReadWikiFileContent(path);
+            var summary = string.IsNullOrWhiteSpace(result.Summary)
+                ? $"Create new page: {path}"
+                : result.Summary;
+            items.Add((path, true, current, p.Content ?? "", summary));
+        }
+
+        foreach (var u in result.UpdatedPages.Where(u => !string.IsNullOrWhiteSpace(u.Path)))
+        {
+            var path = NormalizeWikiPath(u.Path);
+            var current = ReadWikiFileContent(path);
+            var summary = string.IsNullOrWhiteSpace(result.Summary)
+                ? $"Update existing page: {path}"
+                : result.Summary;
+            items.Add((path, false, current, u.Diff ?? "", summary));
+        }
+
+        return items
+            .GroupBy(x => x.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.Last())
+            .OrderBy(x => x.IsNew ? 0 : 1)
+            .ThenBy(x => x.Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private string ReadWikiFileContent(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return "";
+
+        var fullPath = Path.Combine(WikiRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(fullPath))
+            return "";
+
+        try
+        {
+            return File.ReadAllText(fullPath);
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private static string NormalizeWikiPath(string path)
+        => path.Replace('\\', '/').Trim();
 
     // Wiki 初期化
     [RelayCommand]

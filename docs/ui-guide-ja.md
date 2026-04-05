@@ -146,11 +146,15 @@ entities と concepts の違いの目安: 「それは何か(名詞)」→ entit
 
 下部の「+ Import Source」をクリックするか、Wiki タブにファイルをドラッグ＆ドロップします。対応形式: `.md` / `.txt` (PDF / Word は現在テキスト変換要)。
 
-AI 機能が有効なとき、LLM が以下を自動実行します:
+AI 機能が有効なとき、LLM は以下の更新案を生成します:
 - `wiki/raw/` にソースを保存 (不変コピー)
 - `pages/sources/` に要約ページを作成
 - 関連する `pages/entities/` と `pages/concepts/` ページを作成・更新
-- `index.md` と `log.md` を更新
+- `index.md` と `log.md` の更新案を生成
+
+保存前に、新規/更新ページごとの差分レビューを表示し、承認後に保存されます。
+
+プロンプト詳細と「ドキュメントをLLMに渡して更新するフロー」は [AI機能ドキュメント](ai-features-ja.md#wiki) を参照してください。
 
 ### Query (AI機能が必要)
 

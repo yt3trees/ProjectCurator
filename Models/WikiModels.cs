@@ -120,6 +120,9 @@ public class IngestResult
     public List<IngestUpdatedPageResult> UpdatedPages { get; set; } = [];
     public string IndexUpdate { get; set; } = "";
     public string LogEntry { get; set; } = "";
+    public string DebugSystemPrompt { get; set; } = "";
+    public string DebugUserPrompt { get; set; } = "";
+    public string DebugResponse { get; set; } = "";
 }
 
 // --- LLM Response (Ingest) ---

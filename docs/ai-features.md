@@ -155,20 +155,70 @@ A helpful rule of thumb: "What is it (noun)?" → entities; "How does it work or
 
 ### Import (Ingest a Source)
 
-Click "+ Import Source" or drag and drop a file onto the Wiki tab. The LLM automatically:
+Click "+ Import Source" or drag and drop a file onto the Wiki tab. The LLM prepares:
 
 - Saves the source to `wiki/raw/` (immutable copy)
 - Creates a summary page in `pages/sources/`
 - Creates or updates related `pages/entities/` and `pages/concepts/` pages
-- Updates `index.md` and `log.md`
+- Proposed updates for `index.md` and `log.md`
 
 Supported formats: `.md` / `.txt` (PDF / Word require text conversion first).
 
-LLM responses are received as JSON; the count of created and updated pages is shown in the status bar.
+Before saving, each proposed page change is shown as a diff:
+- New pages: diff against empty content
+- Updated pages: diff against the current file
+
+You approve each item in sequence. If you skip any item, the ingest result is not saved for that source file (all-or-nothing) to avoid index/page mismatch.
+
+#### LLM Update Flow During Import
+
+```mermaid
+flowchart TD
+    A["User imports a source document"]
+    B["Save immutable copy under raw/"]
+    C["Read source content"]
+    D["Load wiki-schema.md and index.md"]
+    E["LLM selects update candidate paths"]
+    F["Load full content of selected pages"]
+    G["Build ingest prompt with selected page contents"]
+    H["Send ingest request to LLM"]
+    I{"Can response JSON be parsed?"}
+    J["Show per-file diff review"]
+    K{"All items approved?"}
+    L["Write newPages to files"]
+    M["Write updatedPages as full replacements"]
+    N["Update index.md"]
+    O["Append log.md entry"]
+    P["Update .wiki-meta.json stats"]
+    Q["Done"]
+    R["Skip save for this source"]
+    S["Fail with ingest error"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I -->|"Yes"| J
+    J --> K
+    K -->|"Yes"| L
+    L --> M
+    M --> N
+    N --> O
+    O --> P
+    P --> Q
+    K -->|"No"| R
+    I -->|"No"| S
+```
 
 #### Import Prompt Structure
 
-The LLM call is a single `ChatCompletionAsync` (system + user).
+Import now uses 2 LLM calls:
+- Call 1: select existing page paths likely to need updates
+- Call 2: generate final ingest output using full content of those selected pages
 
 System prompt:
 - Full text of `wiki-schema.md` (acts as the LLM's operating instructions for the wiki)
@@ -176,11 +226,23 @@ System prompt:
 - Response format directive: JSON only (no code fences)
 - Instruction to include YAML frontmatter (`title` / `created` / `updated` / `sources` / `tags`) in each page
 - Instruction to use `[[PageName]]` wikilink format for cross-references
+- Instruction to reuse existing tags and avoid near-duplicate variants
 
 User prompt includes:
 - Full text of the current `index.md` (list of existing pages)
 - Source file name and full body text
+- Full content of selected update-candidate pages (existing pages only, max 8 pages)
+- Existing tag vocabulary collected from current wiki pages
 - Instructions: create a sources/ summary page, update existing pages with full content, create new entity/concept pages, generate the full updated index.md, generate a log.md entry
+
+Call 1 (candidate selection) prompt:
+- Input: existing page path list + full `index.md` + source body
+- Output JSON: `{"updateCandidates": ["pages/...md"]}` (existing pages only, max 8)
+
+After LLM response parsing, tags are normalized to reduce drift:
+- lowercase/kebab-case normalization
+- simple singular/plural key matching
+- reuse of existing wiki tag vocabulary when keys match
 
 LLM response JSON schema:
 

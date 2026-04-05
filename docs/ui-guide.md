@@ -146,11 +146,15 @@ A helpful rule of thumb: "What is it (noun)?" → entities; "How does it work or
 
 Click "+ Import Source" at the bottom or drag and drop a file onto the Wiki tab. Supported formats: `.md` / `.txt` (PDF / Word require text conversion first).
 
-When AI Features is enabled, the LLM automatically:
+When AI Features is enabled, the LLM prepares:
 - Saves the source to `wiki/raw/` (immutable copy)
 - Creates a summary page in `pages/sources/`
 - Creates or updates related `pages/entities/` and `pages/concepts/` pages
-- Updates `index.md` and `log.md`
+- Updates to `index.md` and `log.md`
+
+Before saving, each new/updated page is shown in a diff review dialog. Changes are saved only after approval.
+
+For prompt details and the document-to-LLM update flow, see [AI Features](ai-features.md#wiki).
 
 ### Query (requires AI Features)
 
