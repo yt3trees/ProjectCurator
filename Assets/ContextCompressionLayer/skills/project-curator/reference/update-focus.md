@@ -17,7 +17,7 @@ Focus file selection:
 
 ## Step 2: File Existence Check
 
-- `asana-tasks.md` missing → tell user to run Asana sync first, abort
+- `tasks.md` missing → tell user to run Asana sync first, abort
 - `current_focus.md` missing → tell user to run CCL setup first, abort
 
 ## Step 3: Backup
@@ -30,7 +30,7 @@ If it already exists: skip and notify. Backup happens before user approval.
 
 ## Step 4: Parse Asana Tasks
 
-Read `asana-tasks.md` and extract:
+Read `tasks.md` and extract:
 - In-progress: unchecked `- [ ]` items
 - Completed: checked `- [x]` items
 
@@ -75,6 +75,6 @@ Then ask:
 - Backup before approval
 - Preserve human-written lines
 - Propose [Done] marks for completed tasks, do not auto-delete
-- Never edit `asana-tasks.md` directly (it is auto-generated)
+- Never edit `tasks.md` directly (it is auto-generated)
 - Never write `current_focus.md` without approval
 - Create `focus_history/` directory if it does not exist

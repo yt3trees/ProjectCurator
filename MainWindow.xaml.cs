@@ -538,6 +538,29 @@ public partial class MainWindow : FluentWindow
     }
 
     /// <summary>
+    /// task 固定モードで CaptureWindow を開く (Dashboard の Add Task ボタン用)。
+    /// </summary>
+    public void ShowCaptureWindowForTask()
+    {
+        var discoveryService = _serviceProvider.GetRequiredService<ProjectDiscoveryService>();
+        var captureWindow = new CaptureWindow(_captureService, discoveryService, _configService, fixedCategory: "task");
+        captureWindow.Owner = this;
+
+        captureWindow.OnNavigateToFile = (projectName, filePath) =>
+        {
+            var project = ResolveProject(projectName);
+            if (project != null)
+                NavigateToEditorAndOpenFile(project, filePath);
+            MoveOnScreen();
+        };
+
+        captureWindow.ShowDialog();
+        // task 追加後に Today Queue をリフレッシュ
+        var dashboardPage = _serviceProvider.GetRequiredService<DashboardPage>();
+        _ = dashboardPage.ViewModel.LoadTodayQueueAsync();
+    }
+
+    /// <summary>
     /// プロジェクト名でプロジェクトを解決する。
     /// EditorViewModel が未ロードの場合は ProjectDiscoveryService のキャッシュから取得する。
     /// </summary>

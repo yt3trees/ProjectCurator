@@ -96,7 +96,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="Append to asana-tasks.md on task creation" FontSize="13" FontWeight="SemiBold"
+                            <TextBlock Text="Append to tasks.md on task creation" FontSize="13" FontWeight="SemiBold"
                                        Foreground="{DynamicResource AppText}"/>
                             <TextBlock Text="Immediately log new tasks; Asana Sync remains the source of truth" FontSize="11"
                                        Foreground="{DynamicResource AppSubtext0}" Margin="0,2,0,0"/>

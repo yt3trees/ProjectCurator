@@ -34,7 +34,7 @@
 - Workstreamはカードごとに展開できます。各行で `current_focus.md` を開く、workstream `_work` を開く(右クリックで当日作業フォルダ作成)、最近フォルダのPinができます。Team Viewが設定済みの場合はWorkstream行(およびプロジェクトカード)にTeam Viewボタンが表示され、クリックするとTeam Viewダイアログが開きます。
 - Team Viewダイアログでは、チームメンバーのAsanaタスクをプロジェクト別にグループ化して表示し、期日と期限超過(⚠)を確認できます。Syncボタンでアサナから最新タスクを取得し `team-tasks.md` を更新します。
 - `Pinned Folders` は1件以上Pinすると表示されます。開く、解除、ドラッグ並び替え、Clear一括解除に対応しています。
-- `Today Queue` は `asana-tasks.md` の未完了タスクを読み込み、Overdue / Today / In Nd / No due で表示します。
+- `Today Queue` は `tasks.md` の未完了タスクを読み込み、Overdue / Today / In Nd / No due で表示します。
 - Today Queueの各行では、Asanaで開く、翌日までsnooze、Asanaで完了化ができます。
 - Today Queueヘッダーでは、プロジェクト/Workstreamフィルタ、Show All(Top 10 と最大100件)、snooze一括解除、手動更新、高さ固定/可変の切り替えができます。
 
@@ -69,7 +69,7 @@ AI コンテキストファイル(`current_focus.md`、`decision_log` など)を
 
 <img src="../_assets/ai-feature/UpdateFocusFromAsana.png" width="60%" alt="Update Focus from Asana ダイアログ" />
 
-Update Focus from Asana (AI) は `asana-tasks.md` を読み込み、設定済み LLM に文脈を渡して差分提案ダイアログを表示します。Workstream 絞り込み、自然言語での再指示、`View Debug` に対応し、`focus_history/` へバックアップを保存します。
+Update Focus from Asana (AI) は `tasks.md` を読み込み、設定済み LLM に文脈を渡して差分提案ダイアログを表示します。Workstream 絞り込み、自然言語での再指示、`View Debug` に対応し、`focus_history/` へバックアップを保存します。
 
 <img src="../_assets/ai-feature/AI-DecisionLog_1.png" width="60%" alt="AI Decision Log ダイアログ 1" />
 <img src="../_assets/ai-feature/AI-DecisionLog_2.png" width="60%" alt="AI Decision Log ダイアログ 2" />

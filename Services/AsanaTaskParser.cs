@@ -5,7 +5,7 @@ using ProjectCurator.Models;
 namespace ProjectCurator.Services;
 
 /// <summary>
-/// asana-tasks.md をルールベースで解析し、進行中/完了/未着手/コラボタスクに分類する。
+/// tasks.md をルールベースで解析し、進行中/完了/未着手/コラボタスクに分類する。
 /// </summary>
 public class AsanaTaskParser
 {
@@ -128,7 +128,7 @@ public class AsanaTaskParser
     public AsanaTaskParseResult ParseFile(string filePath)
     {
         if (!File.Exists(filePath))
-            throw new FileNotFoundException($"asana-tasks.md not found: {filePath}");
+            throw new FileNotFoundException($"tasks.md not found: {filePath}");
 
         var content = File.ReadAllText(filePath, System.Text.Encoding.UTF8);
         return Parse(content, filePath);

@@ -19,7 +19,7 @@ flowchart TD
             F1["🎯 current_focus.md<br>現在の作業フォーカス"]
             F2["⚖️ decision_log<br>意思決定ログ"]
             F4["📓 Obsidian Vault<br>ナレッジ・調査メモ"]
-            F3["📋 asana-tasks.md<br>タスク状況"]
+            F3["📋 tasks.md<br>タスク状況"]
         end
         
         UI -->|管理・更新| MD
@@ -38,6 +38,7 @@ flowchart TD
     User -->|状況の言語化<br>方針の記録| UI
     
     Asana -.->|タスク同期| F3
+    UI -.->|"タスク追加 (Asana未使用時)"| F3
     
     MD <-->|【更新】 作業の区切りでフォーカスやコンテキストを自律更新<br>━━━━━━━━━━━━━━━━━━━━━━━━━<br>【読込】 プロジェクトの前提知識としてファイル群を読み込み| AI
     

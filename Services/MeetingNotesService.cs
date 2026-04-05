@@ -211,7 +211,7 @@ public class MeetingNotesService
     }
 
     // =========================================================================
-    // 5. Asana API 起票 + asana-tasks.md 追記
+    // 5. Asana API 起票 + tasks.md 追記
     // =========================================================================
     public async Task<MeetingAsanaApplyResult> ApplyAsanaTasksAsync(
         MeetingAnalysisResult result,
@@ -224,7 +224,7 @@ public class MeetingNotesService
         var selected = result.AsanaTasks.Tasks.Where(t => t.IsSelected).ToList();
         if (selected.Count == 0) return applyResult;
 
-        // asana-tasks.md の読み込み
+        // tasks.md の読み込み
         var asanaPath = ResolveAsanaTasksPath(project, workstreamId);
         string existing = "";
         string enc      = "utf-8";
@@ -277,7 +277,7 @@ public class MeetingNotesService
                 }
             }
 
-            // asana-tasks.md への追記 (ID 付きで記録)
+            // tasks.md への追記 (ID 付きで記録)
             var idTag  = !string.IsNullOrWhiteSpace(createdGid) ? $" [id:{createdGid}]" : "";
             var dueTag = !string.IsNullOrWhiteSpace(task.DueOn)
                 ? $" (Due: {task.DueOn}{(!string.IsNullOrWhiteSpace(task.DueTime) ? " " + task.DueTime : "")})" : "";
@@ -322,10 +322,10 @@ public class MeetingNotesService
         var obsidianNotes = Path.Combine(project.AiContextPath, "obsidian_notes");
         if (!string.IsNullOrWhiteSpace(workstreamId))
         {
-            var wsPath = Path.Combine(obsidianNotes, "workstreams", workstreamId, "asana-tasks.md");
+            var wsPath = Path.Combine(obsidianNotes, "workstreams", workstreamId, "tasks.md");
             if (File.Exists(wsPath)) return wsPath;
         }
-        return Path.Combine(obsidianNotes, "asana-tasks.md");
+        return Path.Combine(obsidianNotes, "tasks.md");
     }
 
     private static string ResolveDecisionLogDir(ProjectInfo project, string? workstreamId)

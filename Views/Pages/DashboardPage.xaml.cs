@@ -976,12 +976,21 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         }
     }
 
+    private void OnAddTaskClick(object sender, RoutedEventArgs e)
+    {
+        if (Window.GetWindow(this) is MainWindow mw)
+            mw.ShowCaptureWindowForTask();
+    }
+
     private async void OnTodayQueueDoneClick(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: TodayQueueTask task }) return;
 
+        var confirmMsg = task.IsLocalOnly
+            ? $"Mark as done?\n[{task.ProjectShortName}] {task.Title}"
+            : $"Mark as done in Asana?\n[{task.ProjectShortName}] {task.Title}";
         var confirm = System.Windows.MessageBox.Show(
-            $"Mark as done in Asana?\n[{task.ProjectShortName}] {task.Title}",
+            confirmMsg,
             "Confirm Done",
             System.Windows.MessageBoxButton.YesNo,
             System.Windows.MessageBoxImage.Question);
@@ -2156,7 +2165,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             }
         }
 
-        var asanaRootPath = Path.Combine(project.AiContextPath, "obsidian_notes", "asana-tasks.md");
+        var asanaRootPath = Path.Combine(project.AiContextPath, "obsidian_notes", "tasks.md");
         if (File.Exists(asanaRootPath))
             await CollectAsanaTaskContextAsync(asanaRootPath, data, ct);
 
@@ -2166,7 +2175,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             foreach (var ws in project.Workstreams.Where(w => !w.IsClosed))
             {
                 ct.ThrowIfCancellationRequested();
-                var wsAsana = Path.Combine(workstreamsAsanaRoot, ws.Id, "asana-tasks.md");
+                var wsAsana = Path.Combine(workstreamsAsanaRoot, ws.Id, "tasks.md");
                 if (File.Exists(wsAsana))
                     await CollectAsanaTaskContextAsync(wsAsana, data, ct);
             }

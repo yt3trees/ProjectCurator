@@ -63,7 +63,11 @@ public class TodayQueueTask
         ? $"{ProjectShortName} / {WorkstreamLabel}"
         : ProjectShortName;
     public string? AsanaFilePath { get; set; }
-    public bool CanComplete => !string.IsNullOrWhiteSpace(AsanaTaskGid);
+    // ローカルタスク (GID なし) もファイルパスがあれば完了可能
+    public bool CanComplete => !string.IsNullOrWhiteSpace(AsanaTaskGid)
+                            || !string.IsNullOrWhiteSpace(AsanaFilePath);
+    // ローカル専用かどうか (API 不要で完了可能)
+    public bool IsLocalOnly => string.IsNullOrWhiteSpace(AsanaTaskGid);
     public bool HasAsanaUrl => !string.IsNullOrWhiteSpace(AsanaUrl);
 
     // Snooze の識別キー: Asana GID があればそれを使い、なければ "ProjectShortName|Title"
@@ -127,14 +131,14 @@ public class TodayQueueService
     }
 
     /// <summary>
-    /// 指定プロジェクトの asana-tasks.md から未完了タスクを抽出する。
+    /// 指定プロジェクトの tasks.md から未完了タスクを抽出する。
     /// PS1: Get-TodayQueueTasksFromProject 相当。
     /// </summary>
     public List<TodayQueueTask> ParseTasksFromProject(ProjectInfo info)
     {
         var tasks = new List<TodayQueueTask>();
 
-        var rootAsanaPath = Path.Combine(info.AiContextPath, "obsidian_notes", "asana-tasks.md");
+        var rootAsanaPath = Path.Combine(info.AiContextPath, "obsidian_notes", "tasks.md");
         tasks.AddRange(ParseTasksFromAsanaFile(rootAsanaPath, info.DisplayName));
 
         var workstreamsAsanaRoot = Path.Combine(info.AiContextPath, "obsidian_notes", "workstreams");
@@ -161,7 +165,7 @@ public class TodayQueueService
                 if (closedIds.Contains(wsId)) continue;
 
                 var wsLabel = labelById.TryGetValue(wsId, out var mappedLabel) ? mappedLabel : wsId;
-                var wsAsanaPath = Path.Combine(wsDir, "asana-tasks.md");
+                var wsAsanaPath = Path.Combine(wsDir, "tasks.md");
                 tasks.AddRange(ParseTasksFromAsanaFile(wsAsanaPath, info.DisplayName, wsId, wsLabel));
             }
         }
@@ -404,7 +408,7 @@ public class TodayQueueService
     }
 
     /// <summary>
-    /// asana-tasks.md 内の該当タスク行のチェックボックスを [ ] から [x] に更新する。
+    /// tasks.md 内の該当タスク行のチェックボックスを [ ] から [x] に更新する。
     /// </summary>
     public void MarkTaskCompletedInFile(TodayQueueTask task)
     {
@@ -425,6 +429,31 @@ public class TodayQueueService
         catch (Exception ex)
         {
             Debug.WriteLine($"[TodayQueue] MarkTaskCompletedInFile error: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// ローカルタスク (GID なし) のチェックボックスを [ ] → [x] に更新する。
+    /// タイトルの完全一致で対象行を特定する。
+    /// </summary>
+    public void MarkLocalTaskCompletedInFile(TodayQueueTask task)
+    {
+        if (string.IsNullOrWhiteSpace(task.AsanaFilePath) || !File.Exists(task.AsanaFilePath))
+            return;
+
+        try
+        {
+            var (content, encoding) = _fileEncodingService.ReadFile(task.AsanaFilePath);
+            var escapedTitle = Regex.Escape(task.Title.Trim());
+            var pattern = @"(?m)^([ \t]*-\s+)\[ \](\s+" + escapedTitle + @"\s*(?:\([^)]*\))?\s*)$";
+            var updated = Regex.Replace(content, pattern, "$1[x]$2",
+                RegexOptions.None, TimeSpan.FromSeconds(5));
+            if (updated != content)
+                _fileEncodingService.WriteFile(task.AsanaFilePath, updated, encoding);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[TodayQueue] MarkLocalTaskCompletedInFile error: {ex}");
         }
     }
 

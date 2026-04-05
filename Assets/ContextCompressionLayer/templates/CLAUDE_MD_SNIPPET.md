@@ -19,7 +19,7 @@ Before responding to the first message, read in order:
    workstream is known; fall back to the root `current_focus.md`)
 2. `_ai-context/context/project_summary.md`
 3. `_ai-context/context/open_issues.md` (if it exists)
-4. `_ai-context/obsidian_notes/asana-tasks.md` (if it exists)
+4. `_ai-context/obsidian_notes/tasks.md` (if it exists)
 5. Other files on demand only.
 
 After reading, present a 1-2 line summary of open items (factor in any tensions).

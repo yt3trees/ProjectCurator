@@ -76,7 +76,7 @@ public class StateSnapshotService
         var decisionLogPath = Path.Combine(contentPath, "decision_log");
         var focusHistoryPath = Path.Combine(contentPath, "focus_history");
         var obsidianNotesPath = Path.Combine(aiContextPath, "obsidian_notes");
-        var asanaTasksPath = Path.Combine(obsidianNotesPath, "asana-tasks.md");
+        var asanaTasksPath = Path.Combine(obsidianNotesPath, "tasks.md");
 
         var paths = new CuratorProjectPaths
         {
@@ -126,7 +126,7 @@ public class StateSnapshotService
     {
         var decisionLogPath = Path.Combine(ws.Path, "decision_log");
         var focusHistoryPath = Path.Combine(ws.Path, "focus_history");
-        var tasksPath = Path.Combine(ws.Path, "asana-tasks.md");
+        var tasksPath = Path.Combine(ws.Path, "tasks.md");
 
         return new CuratorWorkstreamEntry
         {

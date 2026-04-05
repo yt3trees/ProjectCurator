@@ -24,6 +24,22 @@ flowchart TD
     G --> H["Update Focus from Asana(任意、AI)"]
 ```
 
+## タスク管理
+
+`tasks.md` は各プロジェクトの統一タスクファイルです。Asana連携の有無によって、ファイルの更新方法が変わります。
+
+### Asana未設定時 (ローカルタスクモード)
+
+Asanaトークンが設定されていない場合、アプリ内で直接タスクを管理できます。
+
+- Dashboard Today Queue の `[+]` ボタン - タスク作成フォームが開きます。タスク名・プロジェクト・任意の期日を入力して Create をクリック。
+- Today Queue の `Done` ボタン - `tasks.md` 内のチェックボックスを `[ ]` から `[x]` に変更して完了済みにします。
+- Editor で `tasks.md` を直接編集することも可能です。`## In Progress` / `## Completed` セクション配下に標準的なMarkdownチェックボックス形式で記述します。
+
+### Asana設定済み時
+
+Asanaトークンが設定されている場合、`tasks.md` は `Asana Sync` によって生成されます。Today Queue の `Done` ボタンはAsana上でタスクを完了にします。Dashboard の `[+]` ボタンは Quick Capture 経由でAsanaタスク作成フローを開きます。
+
 ## プロジェクトを支える主要ファイル
 
 本アプリでは、以下のMarkdownファイルを育てていくことでプロジェクトのコンテキストを維持します。
@@ -41,7 +57,7 @@ flowchart TD
     ED -->|"更新"| CTX["🧠 current_focus.md / decision_log"]
 
     U -->|"タスク同期(任意)"| AS["🔄 Asana Sync"]
-    AS -->|"書き出す"| TASKS["✅ asana-tasks.md"]
+    AS -->|"書き出す"| TASKS["✅ tasks.md"]
     DB -->|"読み取る"| TASKS
     TASKS -->|"Feed to LLM"| LLM["🤖 LLM (OpenAI / Azure)"]
     DB -->|"What's Next (AI)"| LLM

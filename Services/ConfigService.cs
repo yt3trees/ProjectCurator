@@ -84,6 +84,16 @@ public class ConfigService
         File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
+    // ---------- Asana モード判定 ----------
+
+    public bool IsAsanaConfigured()
+    {
+        var envToken = Environment.GetEnvironmentVariable("ASANA_TOKEN");
+        if (!string.IsNullOrWhiteSpace(envToken)) return true;
+        var global = LoadAsanaGlobalConfig();
+        return !string.IsNullOrWhiteSpace(global.AsanaToken);
+    }
+
     // ---------- AsanaGlobalConfig ----------
 
     public AsanaGlobalConfig LoadAsanaGlobalConfig()

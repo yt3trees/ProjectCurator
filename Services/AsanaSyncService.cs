@@ -179,7 +179,7 @@ public class AsanaSyncService
                 ? Path.Combine(obsidianRoot, "_INHOUSE")
                 : Path.Combine(obsidianRoot, proj.RelativePath);
 
-            var outputPath = Path.Combine(obsidianPath, "asana-tasks.md");
+            var outputPath = Path.Combine(obsidianPath, "tasks.md");
             var hasTasks = projData.Sections.Count > 0 || projData.PersonalTasks.Count > 0;
             var hasConfig = proj.HasAsanaConfigFile;
             var fileExists = File.Exists(outputPath);
@@ -193,7 +193,7 @@ public class AsanaSyncService
 
             foreach (var (workstreamId, wsTasks) in split.WorkstreamTasks.OrderBy(kv => kv.Key))
             {
-                var wsOutput = Path.Combine(obsidianPath, "workstreams", workstreamId, "asana-tasks.md");
+                var wsOutput = Path.Combine(obsidianPath, "workstreams", workstreamId, "tasks.md");
                 WriteWorkstreamFile(wsOutput, proj.Name, workstreamId, wsTasks, userGid);
                 Log($"  Output: {wsOutput}");
             }
@@ -762,7 +762,7 @@ public class AsanaSyncService
         w.WriteLine("# Asana Tasks View (All Projects)");
         w.WriteLine($"Last Sync: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         w.WriteLine("> このファイルは C# 実装により自動生成されます。");
-        w.WriteLine("> 各案件の詳細は個別の asana-tasks.md を参照してください。");
+        w.WriteLine("> 各案件の詳細は個別の tasks.md を参照してください。");
         w.WriteLine("> 'Memo area' 以下の記述は保持されます。");
         w.WriteLine();
 

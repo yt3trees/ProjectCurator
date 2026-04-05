@@ -25,13 +25,14 @@ public class CaptureWindow : Window
     private readonly ConfigService _configService;
 
     // ── 状態 ──────────────────────────────────────────────────────────────
-    private enum Screen { Input, Loading, Confirm, TaskApproval, Complete }
+    private enum Screen { Input, Loading, Confirm, TaskApproval, LocalTaskApproval, Complete }
     private Screen _currentScreen = Screen.Input;
     private CaptureClassification? _classification;
     private CancellationTokenSource? _cts;
     private List<ProjectInfo> _projects = [];
     private List<AsanaProjectMeta> _asanaProjects = [];
     private List<AsanaSectionMeta> _asanaSections = [];
+    private string? _fixedCategory;
 
     // ── テーマブラシ ──────────────────────────────────────────────────────
     private System.Windows.Media.Brush Surface0 => (System.Windows.Media.Brush)FindResource("AppSurface0");
@@ -77,6 +78,7 @@ public class CaptureWindow : Window
     private System.Windows.Controls.ComboBox _hourCombo = null!;
     private System.Windows.Controls.ComboBox _minuteCombo = null!;
     private System.Windows.Controls.TextBlock _confirmErrorText = null!;
+    private System.Windows.Controls.TextBlock _localTaskNoteText = null!;
 
     // ── Task Approval screen ──────────────────────────────────────────────
     private Grid _taskApprovalPanel = null!;
@@ -84,6 +86,14 @@ public class CaptureWindow : Window
     private System.Windows.Controls.Button _approveBtn = null!;
     private System.Windows.Controls.TextBlock _taskApprovalErrorText = null!;
     private System.Windows.Controls.Button _saveAsMemoBtn = null!;
+
+    // ── Local Task Approval screen ────────────────────────────────────────
+    private Grid _localTaskApprovalPanel = null!;
+    private System.Windows.Controls.ComboBox _localProjectCombo = null!;
+    private System.Windows.Controls.TextBox _localTaskNameBox = null!;
+    private System.Windows.Controls.TextBox _localDueDateBox = null!;
+    private System.Windows.Controls.TextBlock _localTaskErrorText = null!;
+    private System.Windows.Controls.Button _localCreateBtn = null!;
 
     // ── Complete screen ───────────────────────────────────────────────────
     private Grid _completePanel = null!;
@@ -100,11 +110,13 @@ public class CaptureWindow : Window
     public CaptureWindow(
         CaptureService captureService,
         ProjectDiscoveryService discoveryService,
-        ConfigService configService)
+        ConfigService configService,
+        string? fixedCategory = null)
     {
         _captureService = captureService;
         _discoveryService = discoveryService;
         _configService = configService;
+        _fixedCategory = fixedCategory;
 
         Width = 520;
         SizeToContent = SizeToContent.Height;
@@ -133,6 +145,7 @@ public class CaptureWindow : Window
         BuildLoadingPanel();
         BuildConfirmPanel();
         BuildTaskApprovalPanel();
+        BuildLocalTaskApprovalPanel();
         BuildCompletePanel();
 
         Content = _root;
@@ -480,7 +493,7 @@ public class CaptureWindow : Window
         Grid.SetRow(fields, 2);
         _confirmPanel.Children.Add(fields);
 
-        // エラーテキスト
+        // エラーテキスト / ローカルタスク注記 (task + Asana 未設定時)
         _confirmErrorText = new System.Windows.Controls.TextBlock
         {
             Foreground = new SolidColorBrush(Colors.OrangeRed),
@@ -489,8 +502,20 @@ public class CaptureWindow : Window
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 4)
         };
-        Grid.SetRow(_confirmErrorText, 3);
-        _confirmPanel.Children.Add(_confirmErrorText);
+        _localTaskNoteText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Asana is not configured. Task will be saved locally to tasks.md.",
+            Foreground = Subtext,
+            FontSize = 11,
+            Visibility = Visibility.Collapsed,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        var errorStack = new StackPanel();
+        errorStack.Children.Add(_localTaskNoteText);
+        errorStack.Children.Add(_confirmErrorText);
+        Grid.SetRow(errorStack, 3);
+        _confirmPanel.Children.Add(errorStack);
 
         // ボタン行
         var btnRow = new StackPanel
@@ -605,6 +630,178 @@ public class CaptureWindow : Window
         _root.Children.Add(_taskApprovalPanel);
     }
 
+    // ── Local Task Approval screen ────────────────────────────────────────
+    private void BuildLocalTaskApprovalPanel()
+    {
+        _localTaskApprovalPanel = new Grid
+        {
+            Background = Surface0,
+            Margin = new Thickness(12, 10, 12, 12),
+            Visibility = Visibility.Collapsed
+        };
+        _localTaskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // category label
+        _localTaskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // project row
+        _localTaskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // task name row
+        _localTaskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // due date row
+        _localTaskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // error text
+        _localTaskApprovalPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
+
+        var categoryLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Category:  Task (Local)",
+            Foreground = Subtext,
+            FontSize = 12,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+        Grid.SetRow(categoryLabel, 0);
+        _localTaskApprovalPanel.Children.Add(categoryLabel);
+
+        // Project row
+        var projectRow = BuildLabeledRow("Project:", out _localProjectCombo);
+        Grid.SetRow(projectRow, 1);
+        _localTaskApprovalPanel.Children.Add(projectRow);
+
+        // Task Name row
+        _localTaskNameBox = new System.Windows.Controls.TextBox
+        {
+            Background = Surface1,
+            Foreground = Text,
+            BorderBrush = Surface2,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(6, 4, 6, 4),
+            FontSize = 13,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        var taskNameLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Task Name:",
+            Foreground = Subtext,
+            FontSize = 12,
+            Margin = new Thickness(0, 0, 6, 8),
+            VerticalAlignment = WpfVA.Top,
+            MinWidth = 80
+        };
+        var taskNameRow = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+        taskNameRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        taskNameRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(taskNameLabel, 0);
+        Grid.SetColumn(_localTaskNameBox, 1);
+        taskNameRow.Children.Add(taskNameLabel);
+        taskNameRow.Children.Add(_localTaskNameBox);
+        Grid.SetRow(taskNameRow, 2);
+        _localTaskApprovalPanel.Children.Add(taskNameRow);
+
+        // Due Date row
+        _localDueDateBox = new System.Windows.Controls.TextBox
+        {
+            Background = Surface1,
+            Foreground = Text,
+            BorderBrush = Surface2,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(6, 4, 6, 4),
+            FontSize = 13,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        var dueDateLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "Due Date:",
+            Foreground = Subtext,
+            FontSize = 12,
+            Margin = new Thickness(0, 0, 6, 8),
+            VerticalAlignment = WpfVA.Center,
+            MinWidth = 80
+        };
+        var dueLabelSmall = new System.Windows.Controls.TextBlock
+        {
+            Text = "(YYYY-MM-DD, optional)",
+            Foreground = Subtext,
+            FontSize = 11,
+            Margin = new Thickness(6, 0, 0, 8),
+            VerticalAlignment = WpfVA.Center
+        };
+        var dueDateRow = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+        dueDateRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        dueDateRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        dueDateRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(dueDateLabel, 0);
+        Grid.SetColumn(_localDueDateBox, 1);
+        Grid.SetColumn(dueLabelSmall, 2);
+        dueDateRow.Children.Add(dueDateLabel);
+        dueDateRow.Children.Add(_localDueDateBox);
+        dueDateRow.Children.Add(dueLabelSmall);
+        Grid.SetRow(dueDateRow, 3);
+        _localTaskApprovalPanel.Children.Add(dueDateRow);
+
+        _localTaskErrorText = new System.Windows.Controls.TextBlock
+        {
+            Foreground = new SolidColorBrush(Colors.OrangeRed),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 0),
+            Visibility = Visibility.Collapsed
+        };
+        Grid.SetRow(_localTaskErrorText, 4);
+        _localTaskApprovalPanel.Children.Add(_localTaskErrorText);
+
+        var btnRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = WpfHA.Right,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        _localCreateBtn = BuildButton("Create", true);
+        _localCreateBtn.Click += OnLocalTaskCreateClick;
+        var backBtn = BuildButton("Back", false);
+        backBtn.Margin = new Thickness(6, 0, 0, 0);
+        backBtn.Click += (_, _) =>
+        {
+            _localTaskErrorText.Visibility = Visibility.Collapsed;
+            ShowScreen(Screen.Confirm);
+        };
+        var cancelBtn = BuildButton("Cancel", false);
+        cancelBtn.Margin = new Thickness(6, 0, 0, 0);
+        cancelBtn.Click += (_, _) => Close();
+        btnRow.Children.Add(_localCreateBtn);
+        btnRow.Children.Add(backBtn);
+        btnRow.Children.Add(cancelBtn);
+        Grid.SetRow(btnRow, 5);
+        _localTaskApprovalPanel.Children.Add(btnRow);
+
+        Grid.SetRow(_localTaskApprovalPanel, 1);
+        _root.Children.Add(_localTaskApprovalPanel);
+    }
+
+    // ラベル + ComboBox の行を生成するヘルパー
+    private Grid BuildLabeledRow(string labelText, out System.Windows.Controls.ComboBox combo)
+    {
+        var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var label = new System.Windows.Controls.TextBlock
+        {
+            Text = labelText,
+            Foreground = Subtext,
+            FontSize = 12,
+            VerticalAlignment = WpfVA.Center,
+            MinWidth = 80,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+        combo = new System.Windows.Controls.ComboBox
+        {
+            Background = Surface1,
+            Foreground = Text,
+            BorderBrush = Surface2,
+            Padding = new Thickness(6, 4, 4, 4)
+        };
+        Grid.SetColumn(label, 0);
+        Grid.SetColumn(combo, 1);
+        row.Children.Add(label);
+        row.Children.Add(combo);
+        return row;
+    }
+
     // ── Complete screen ───────────────────────────────────────────────────
     private void BuildCompletePanel()
     {
@@ -672,7 +869,16 @@ public class CaptureWindow : Window
         // await より前に完了させておかないとその間キーボード入力が効かない。
         PositionNearCursor();
         Activate();
-        _inputBox.Focus();
+
+        // fixedCategory モード: Loading 画面を先出しして Input 画面の誤操作を防ぐ
+        if (_fixedCategory != null)
+        {
+            ShowScreen(Screen.Loading);
+        }
+        else
+        {
+            _inputBox.Focus();
+        }
 
         // AI 有効かチェック (コンボ表示はプロジェクト読み込み前でも確定できる)
         var settings = _configService.LoadSettings();
@@ -691,6 +897,23 @@ public class CaptureWindow : Window
 
         // Project コンボを初期化 (取得完了後)
         PopulateProjectCombos();
+
+        // fixedCategory モード: AI 分類をスキップし直接タスク入力画面へ
+        if (_fixedCategory == "task")
+        {
+            var projectName = (_projects.Count > 0 ? _projects[0].Name : "");
+            _classification = _captureService.BuildManualClassification("", "task", projectName);
+            if (_configService.IsAsanaConfigured())
+                ShowConfirmScreen("");
+            else
+                ShowLocalTaskApprovalScreen();
+        }
+        else if (_fixedCategory != null)
+        {
+            // 他の fixedCategory は通常フローへ戻す
+            ShowScreen(Screen.Input);
+            _inputBox.Focus();
+        }
     }
 
     private void OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -716,6 +939,9 @@ public class CaptureWindow : Window
                     break;
                 case Screen.TaskApproval:
                     OnApproveClick(null, null!);
+                    break;
+                case Screen.LocalTaskApproval:
+                    OnLocalTaskCreateClick(null, null!);
                     break;
             }
             e.Handled = true;
@@ -793,8 +1019,15 @@ public class CaptureWindow : Window
 
         if (_classification.Category == "task")
         {
-            // task: 承認画面へ
-            await ShowTaskApprovalScreenAsync();
+            // task: Asana 設定済みなら Asana 承認画面、未設定ならローカル承認画面へ
+            if (_configService.IsAsanaConfigured())
+            {
+                await ShowTaskApprovalScreenAsync();
+            }
+            else
+            {
+                ShowLocalTaskApprovalScreen();
+            }
             return;
         }
 
@@ -1014,6 +1247,84 @@ public class CaptureWindow : Window
         ShowScreen(Screen.TaskApproval);
     }
 
+    private void ShowLocalTaskApprovalScreen()
+    {
+        if (_classification == null) return;
+
+        // プロジェクト選択コンボを初期化
+        _localProjectCombo.Items.Clear();
+        foreach (var p in _projects)
+            _localProjectCombo.Items.Add(p);
+        _localProjectCombo.DisplayMemberPath = "DisplayName";
+
+        var selectedProject = _projects.FirstOrDefault(p =>
+            string.Equals(p.Name, _classification.ProjectName, StringComparison.OrdinalIgnoreCase));
+        if (selectedProject != null)
+            _localProjectCombo.SelectedItem = selectedProject;
+        else if (_localProjectCombo.Items.Count > 0)
+            _localProjectCombo.SelectedIndex = 0;
+
+        _localTaskNameBox.Text = _classification.Summary;
+        _localDueDateBox.Text = _classification.DueOn;
+        _localTaskErrorText.Visibility = Visibility.Collapsed;
+
+        ShowScreen(Screen.LocalTaskApproval);
+    }
+
+    private async void OnLocalTaskCreateClick(object? sender, RoutedEventArgs e)
+    {
+        if (_classification == null) return;
+
+        var taskName = _localTaskNameBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(taskName))
+        {
+            _localTaskErrorText.Text = "Task name is required.";
+            _localTaskErrorText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        var selectedProject = _localProjectCombo.SelectedItem as ProjectInfo;
+        if (selectedProject == null)
+        {
+            _localTaskErrorText.Text = "Please select a project.";
+            _localTaskErrorText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        var dueDate = _localDueDateBox.Text.Trim();
+        if (!string.IsNullOrWhiteSpace(dueDate) &&
+            !System.Text.RegularExpressions.Regex.IsMatch(dueDate, @"^\d{4}-\d{2}-\d{2}$"))
+        {
+            _localTaskErrorText.Text = "Due date must be YYYY-MM-DD format.";
+            _localTaskErrorText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        _localCreateBtn.IsEnabled = false;
+        _localTaskErrorText.Visibility = Visibility.Collapsed;
+
+        _classification.Summary = taskName;
+        _classification.ProjectName = selectedProject.Name;
+        _classification.DueOn = dueDate;
+
+        _cts = new CancellationTokenSource();
+        CaptureRouteResult result;
+        try
+        {
+            result = await _captureService.CreateLocalTaskAsync(_classification, _inputBox.Text, _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            _localTaskErrorText.Text = $"Failed: {ex.Message}";
+            _localTaskErrorText.Visibility = Visibility.Visible;
+            _localCreateBtn.IsEnabled = true;
+            return;
+        }
+
+        _localCreateBtn.IsEnabled = true;
+        HandleRouteResult(result);
+    }
+
     private async void OnApproveClick(object? sender, RoutedEventArgs e)
     {
         if (_approveBtn.Tag is not AsanaTaskCreatePreview preview) return;
@@ -1074,12 +1385,15 @@ public class CaptureWindow : Window
         if (_classification == null) return;
         var cat = _confirmCategoryCombo.SelectedItem as string ?? "memo";
         var isTask = cat == "task";
-        _asanaProjectRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
-        _asanaSectionRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
+        var asanaConfigured = _configService.IsAsanaConfigured();
+        var showAsanaRows = isTask && asanaConfigured;
+        _asanaProjectRow.Visibility = showAsanaRows ? Visibility.Visible : Visibility.Collapsed;
+        _asanaSectionRow.Visibility = showAsanaRows ? Visibility.Visible : Visibility.Collapsed;
         _dueDateRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
         if (!isTask) _timePickerRow.Visibility = Visibility.Collapsed;
+        _localTaskNoteText.Visibility = isTask && !asanaConfigured ? Visibility.Visible : Visibility.Collapsed;
 
-        if (isTask)
+        if (showAsanaRows)
             _ = LoadAsanaProjectsForCurrentProjectAsync();
     }
 
@@ -1137,6 +1451,7 @@ public class CaptureWindow : Window
         _loadingPanel.Visibility = screen == Screen.Loading ? Visibility.Visible : Visibility.Collapsed;
         _confirmPanel.Visibility = screen == Screen.Confirm ? Visibility.Visible : Visibility.Collapsed;
         _taskApprovalPanel.Visibility = screen == Screen.TaskApproval ? Visibility.Visible : Visibility.Collapsed;
+        _localTaskApprovalPanel.Visibility = screen == Screen.LocalTaskApproval ? Visibility.Visible : Visibility.Collapsed;
         _completePanel.Visibility = screen == Screen.Complete ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -1166,10 +1481,14 @@ public class CaptureWindow : Window
 
         // task / asana rows
         var isTask = _classification.Category == "task";
-        _asanaProjectRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
-        _asanaSectionRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
+        var asanaConfigured = _configService.IsAsanaConfigured();
+        var showAsanaRows = isTask && asanaConfigured;
+        _asanaProjectRow.Visibility = showAsanaRows ? Visibility.Visible : Visibility.Collapsed;
+        _asanaSectionRow.Visibility = showAsanaRows ? Visibility.Visible : Visibility.Collapsed;
         _dueDateRow.Visibility = isTask ? Visibility.Visible : Visibility.Collapsed;
         _timePickerRow.Visibility = Visibility.Collapsed;
+        // Asana 未設定かつ task の場合は注記を表示
+        _localTaskNoteText.Visibility = isTask && !asanaConfigured ? Visibility.Visible : Visibility.Collapsed;
 
         // AI が提案した期限を初期値にセット
         if (isTask && !string.IsNullOrWhiteSpace(_classification.DueOn) &&
@@ -1187,7 +1506,7 @@ public class CaptureWindow : Window
 
         ShowScreen(Screen.Confirm);
 
-        if (isTask)
+        if (showAsanaRows)
             _ = LoadAsanaProjectsForCurrentProjectAsync();
     }
 

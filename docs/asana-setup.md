@@ -21,8 +21,8 @@ flowchart TD
     end
 
     subgraph OutputFiles ["📄 Output Files"]
-        ProjectTasks["asana-tasks.md<br/>(project-level)"]
-        WSTasks["workstreams/&lt;id&gt;/asana-tasks.md<br/>(per-workstream, optional)"]
+        ProjectTasks["tasks.md<br/>(project-level)"]
+        WSTasks["workstreams/&lt;id&gt;/tasks.md<br/>(per-workstream, optional)"]
         TeamTasks["team-tasks.md<br/>(Team View, optional)"]
         PersonalTasks["personal-tasks.md<br/>(unmatched personal tasks)"]
     end
@@ -74,12 +74,12 @@ If you want personal (non-project-specific) Asana tasks distributed to local pro
 3. Enter at least one Asana Project GID under `Asana Project GIDs`
 4. Click `Run Sync Now` to execute a one-time sync
    - On success, these files are updated:
-   - `_ai-context/obsidian_notes/asana-tasks.md`
-   - optionally `_ai-context/obsidian_notes/workstreams/<id>/asana-tasks.md`
+   - `_ai-context/obsidian_notes/tasks.md`
+   - optionally `_ai-context/obsidian_notes/workstreams/<id>/tasks.md`
 5. Go back to `Dashboard` and check Today Queue
 
 If tasks do not appear:
-- Confirm `asana-tasks.md` was updated after `Run Sync`
+- Confirm `tasks.md` was updated after `Run Sync`
 - Refresh `Dashboard` to reload Today Queue
 
 ## 4. Scheduled Sync (optional)
@@ -103,11 +103,11 @@ Right panel (Per-Project Config):
 Configure the `asana_config.json` for each project.
 
 - **Asana Project GIDs**: Enter the GIDs of the Asana projects belonging to this local project, one per line.
-  - All tasks from these projects will be synced to the project's `asana-tasks.md`.
+  - All tasks from these projects will be synced to the project's `tasks.md`.
 - **Workstream Map**: Map Asana Project GIDs to Workstream IDs.
   - Format: `gid=workstream-id` (e.g., `123456789=development`)
   - Separators such as `=`, `:`, and `->` are supported.
-  - This allows tasks from specific Asana projects to be routed to `workstreams/<id>/asana-tasks.md` instead of the project root.
+  - This allows tasks from specific Asana projects to be routed to `workstreams/<id>/tasks.md` instead of the project root.
 - **Workstream Field**: The name of the Asana custom field used to specify a Workstream ID directly on each task.
   - Default is `workstream-id`.
   - **This takes precedence over Workstream Map.** If a task has this custom field set, its value is used as the Workstream ID.

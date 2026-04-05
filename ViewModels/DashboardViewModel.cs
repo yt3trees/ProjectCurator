@@ -430,15 +430,26 @@ public partial class DashboardViewModel : ObservableObject
 
     public async Task CompleteTaskAsync(TodayQueueTask task)
     {
-        TodayQueueStatus = "Today Queue: Submitting to Asana...";
-        var (ok, msg) = await _todayQueueService.CompleteAsanaTaskAsync(task.AsanaTaskGid!);
-        if (ok)
+        if (task.IsLocalOnly)
         {
-            await Task.Run(() => _todayQueueService.MarkTaskCompletedInFile(task));
+            TodayQueueStatus = "Today Queue: Completing local task...";
+            await Task.Run(() => _todayQueueService.MarkLocalTaskCompletedInFile(task));
             _cachedAllTasks.Remove(task);
             Application.Current.Dispatcher.Invoke(() => TodayQueueTasks.Remove(task));
+            TodayQueueStatus = "Today Queue: Task completed.";
         }
-        TodayQueueStatus = $"Today Queue: {msg}";
+        else
+        {
+            TodayQueueStatus = "Today Queue: Submitting to Asana...";
+            var (ok, msg) = await _todayQueueService.CompleteAsanaTaskAsync(task.AsanaTaskGid!);
+            if (ok)
+            {
+                await Task.Run(() => _todayQueueService.MarkTaskCompletedInFile(task));
+                _cachedAllTasks.Remove(task);
+                Application.Current.Dispatcher.Invoke(() => TodayQueueTasks.Remove(task));
+            }
+            TodayQueueStatus = $"Today Queue: {msg}";
+        }
     }
 
     public async Task SnoozeTaskAsync(TodayQueueTask task)

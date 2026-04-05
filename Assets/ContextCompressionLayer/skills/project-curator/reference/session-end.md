@@ -14,7 +14,7 @@ Do NOT propose after: short Q&A exchanges.
 ## Procedure
 
 1. Summarize AI-assisted work: what was done, what was decided, what remains
-2. If `asana-tasks.md` exists, cross-reference with in-progress tasks
+2. If `tasks.md` exists, cross-reference with in-progress tasks
 3. Present the proposal:
 
 ```

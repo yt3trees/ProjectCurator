@@ -850,6 +850,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                    Text="{Binding TodayQueueStatus}"
@@ -892,16 +893,25 @@
                                    Click="OnUnsnoozeAllClick"
                                    Visibility="{Binding HasSnoozed, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
+                        <!-- Add Task ボタン -->
+                        <ui:Button Grid.Column="5"
+                                   Content="+"
+                                   Click="OnAddTaskClick"
+                                   Height="34" Padding="10,0" FontSize="15"
+                                   Margin="0,0,6,0"
+                                   Appearance="Secondary"
+                                   ToolTip="Add a new task"/>
+
                         <!-- 高さモード切り替えボタン -->
                         <ui:Button x:Name="QueueResizeToggleBtn"
-                                   Grid.Column="5"
+                                   Grid.Column="6"
                                    Content="↕"
                                    Click="OnToggleQueueResize"
                                    Height="34" Padding="10,0" FontSize="11" Margin="0,0,6,0"
                                    Appearance="Secondary"
                                    ToolTip="Switch to resizable mode"/>
 
-                        <ui:Button Grid.Column="6" Content="↻"
+                        <ui:Button Grid.Column="7" Content="↻"
                                    Height="34" Padding="10,0" FontSize="12"
                                    ToolTip="Refresh Today Queue"
                                    Click="OnTodayQueueRefreshClick"/>

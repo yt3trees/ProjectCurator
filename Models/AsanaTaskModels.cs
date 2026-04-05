@@ -24,7 +24,7 @@ public class ParsedAsanaTask
     public string RawLine { get; set; } = "";
     /// <summary>サブタスクの場合に設定される親タスクのタイトル。トップレベルタスクは null。</summary>
     public string? ParentTitle { get; set; }
-    /// <summary>Asana notes の先頭数行 (asana-tasks.md の &gt; blockquote 行から収集)。</summary>
+    /// <summary>Asana notes の先頭数行 (tasks.md の &gt; blockquote 行から収集)。</summary>
     public string? Description { get; set; }
 }
 

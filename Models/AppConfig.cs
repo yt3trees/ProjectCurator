@@ -71,5 +71,5 @@ public class AppSettings
     public Dictionary<string, string> LlmParameters { get; set; } = [];
     public string LlmUserProfile { get; set; } = "";
     // Capture 設定
-    public bool CaptureTaskLogEnabled { get; set; } = false;   // task 起票成功時に asana-tasks.md へ即時追記するか
+    public bool CaptureTaskLogEnabled { get; set; } = false;   // task 起票成功時に tasks.md へ即時追記するか
 }

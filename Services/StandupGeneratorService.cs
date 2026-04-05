@@ -156,8 +156,8 @@ public class StandupGeneratorService : IDisposable
     {
         var result = new List<string>();
 
-        // obsidian_notes/asana-tasks.md から completed: YYYY-MM-DD コメントを持つ行を抽出
-        var asanaPath = Path.Combine(proj.AiContextPath, "obsidian_notes", "asana-tasks.md");
+        // obsidian_notes/tasks.md から completed: YYYY-MM-DD コメントを持つ行を抽出
+        var asanaPath = Path.Combine(proj.AiContextPath, "obsidian_notes", "tasks.md");
         if (!File.Exists(asanaPath)) return result;
 
         try

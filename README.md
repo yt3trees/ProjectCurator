@@ -21,7 +21,7 @@ flowchart TD
             F1["🎯 current_focus.md<br>Current Focus"]
             F2["⚖️ decision_log<br>Decision Log"]
             F4["📓 Obsidian Vault<br>Knowledge & Notes"]
-            F3["📋 asana-tasks.md<br>Task Status"]
+            F3["📋 tasks.md<br>Task Status"]
         end
         
         UI -->|Manage & Update| MD
@@ -40,6 +40,7 @@ flowchart TD
     User -->|Document context<br>& decisions| UI
     
     Asana -.->|Sync tasks| F3
+    UI -.->|"Add task (without Asana)"| F3
     
     MD <-->|【Write】 Autonomously update context after work<br>━━━━━━━━━━━━━━━━━━━━━━━━━<br>【Read】 Use files as project foundation| AI
     

@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using ProjectCurator.Helpers;
 using ProjectCurator.Models;
 
@@ -449,6 +450,109 @@ public class CaptureService
         var raw = $"{projectGid}|{summary}|{body}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
         return Convert.ToHexString(hash)[..16];
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // ローカルタスク作成 (Asana 未設定時)
+    // ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Asana 未設定時のローカルタスク作成。tasks.md の In Progress セクションに追記。
+    /// </summary>
+    public async Task<CaptureRouteResult> CreateLocalTaskAsync(
+        CaptureClassification classification,
+        string originalInput,
+        CancellationToken ct = default)
+    {
+        var projects = await _discovery.GetProjectInfoListAsync(ct: ct);
+        var project = projects.FirstOrDefault(p =>
+            string.Equals(p.Name, classification.ProjectName, StringComparison.OrdinalIgnoreCase));
+
+        if (project == null)
+            return new CaptureRouteResult { Success = false, Message = "Project not found." };
+
+        var taskLine = BuildTaskLine(classification);
+        var tasksPath = ResolveTasksPath(project, classification);
+
+        EnsureTaskFileExists(tasksPath);
+        AppendToInProgressSection(tasksPath, taskLine);
+
+        await AppendToCaptureLogInternalAsync(
+            $"[task][local] [{classification.ProjectName}] {classification.Summary}\n{originalInput}", ct);
+
+        return new CaptureRouteResult
+        {
+            Success = true,
+            Message = $"Local task added to {Path.GetFileName(tasksPath)}",
+            TargetFilePath = tasksPath
+        };
+    }
+
+    private static string BuildTaskLine(CaptureClassification classification)
+    {
+        var line = $"- [ ] {classification.Summary}";
+        if (!string.IsNullOrWhiteSpace(classification.DueOn))
+            line += $" (Due: {classification.DueOn})";
+        return line;
+    }
+
+    private string ResolveTasksPath(ProjectInfo project, CaptureClassification classification)
+    {
+        var obsidianNotes = Path.Combine(project.AiContextPath, "obsidian_notes");
+
+        if (!string.IsNullOrWhiteSpace(classification.WorkstreamHint))
+        {
+            var wsPath = Path.Combine(obsidianNotes, "workstreams",
+                classification.WorkstreamHint, "tasks.md");
+            if (File.Exists(wsPath) || Directory.Exists(Path.GetDirectoryName(wsPath)!))
+                return wsPath;
+        }
+
+        return Path.Combine(obsidianNotes, "tasks.md");
+    }
+
+    private void EnsureTaskFileExists(string tasksPath)
+    {
+        if (File.Exists(tasksPath)) return;
+
+        Directory.CreateDirectory(Path.GetDirectoryName(tasksPath)!);
+        var template = "## In Progress\n\n## Completed\n";
+        _encoding.WriteFile(tasksPath, template, "utf-8");
+    }
+
+    private void AppendToInProgressSection(string tasksPath, string taskLine)
+    {
+        var (content, encoding) = _encoding.ReadFile(tasksPath);
+        var lines = content.Split('\n').ToList();
+
+        int insertIdx = -1;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            if (Regex.IsMatch(lines[i], @"^\s*#{2,3}\s*In\s+Progress\b"))
+            {
+                insertIdx = i + 1;
+                while (insertIdx < lines.Count
+                    && !Regex.IsMatch(lines[insertIdx], @"^\s*#{2,3}\s")
+                    && !string.IsNullOrWhiteSpace(lines[insertIdx]))
+                {
+                    insertIdx++;
+                }
+                break;
+            }
+        }
+
+        if (insertIdx < 0)
+        {
+            lines.Add("");
+            lines.Add("## In Progress");
+            lines.Add(taskLine);
+        }
+        else
+        {
+            lines.Insert(insertIdx, taskLine);
+        }
+
+        _encoding.WriteFile(tasksPath, string.Join('\n', lines), encoding);
     }
 
     // ─────────────────────────────────────────────────────────

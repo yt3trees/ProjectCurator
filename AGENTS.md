@@ -64,7 +64,7 @@ MVVM + Dependency Injection (`Microsoft.Extensions.DependencyInjection`). All se
 |---|---|
 | ConfigService | JSON config at `%USERPROFILE%\.projectcurator\` (new default) or `Documents\Projects\_config\` (legacy, auto-detected); override via `PROJECTCURATOR_CONFIG_DIR` env var. Files: settings.json, asana_global.json, hidden_projects.json, pinned_folders.json |
 | ProjectDiscoveryService | Recursively scans Local and Box project roots; 5-minute TTL cache; detects junction status, focus age, decision log count, uncommitted git changes |
-| TodayQueueService | Reads/prioritizes tasks from `asana-tasks.md` into overdue/today/soon/normal buckets |
+| TodayQueueService | Reads/prioritizes tasks from `tasks.md` into overdue/today/soon/normal buckets |
 | AsanaSyncService | Syncs Asana API tasks to Markdown files; maps workstreams via asana_config.json per project |
 | ContextCompressionLayerService | Manages AI context files (current_focus.md, decision_log, project_summary.md); extracts embedded skills from assembly to disk on first run |
 | StandupGeneratorService | Generates daily standup Markdown on startup and hourly (6am+) |
@@ -73,7 +73,7 @@ MVVM + Dependency Injection (`Microsoft.Extensions.DependencyInjection`). All se
 | FileEncodingService | Async file I/O with BOM-based encoding detection (UTF-8/UTF-8BOM/SJIS/UTF-16); preserves encoding on write |
 | ScriptRunnerService | Runs PowerShell/Python scripts async; dispatches output to UI thread; cancellable |
 | LlmClientService | Sends chat completion requests to OpenAI or Azure OpenAI; reads provider/key/model/endpoint from settings; supports Test Connection |
-| AsanaTaskParser | Parses `asana-tasks.md` into structured task lists for use in LLM prompts |
+| AsanaTaskParser | Parses `tasks.md` into structured task lists for use in LLM prompts |
 | FocusUpdateService | Orchestrates the "Update Focus from Asana" flow: loads context files, builds prompt, calls LlmClientService, saves backup to `focus_history/`, and returns proposed diff |
 | DecisionLogService | Reads and parses decision log Markdown files from `_ai-context/decision_log/` (and per-workstream subdirs) |
 | DecisionLogGeneratorService | AI-driven decision log generation: detects candidates from focus_history diff, generates draft, refines via LLM in three separate async steps |

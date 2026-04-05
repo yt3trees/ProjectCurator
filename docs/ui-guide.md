@@ -34,7 +34,7 @@ This is the standard project card view with health signals, repository status, a
 - Workstreams can be expanded per project. From each row, you can open `current_focus.md`, open the workstream `_work` folder (right-click to create today's work folder), or pin a recent folder. A Team View button appears on workstream rows (and on the project card) when Team View is configured; clicking it opens the Team View dialog.
 - Team View dialog shows each team member's Asana tasks grouped by project, with due dates and overdue indicators (⚠). A Sync button fetches the latest tasks from Asana and updates `team-tasks.md`.
 - `Pinned Folders` appears when you pin at least one folder. You can open, unpin, drag to reorder, or clear all pins.
-- `Today Queue` reads unchecked tasks from `asana-tasks.md` files and shows them by urgency (Overdue, Today, In Nd, No due).
+- `Today Queue` reads unchecked tasks from `tasks.md` files and shows them by urgency (Overdue, Today, In Nd, No due).
 - In each Today Queue row, you can open the task in Asana, snooze it until tomorrow, or mark it done in Asana.
 - Today Queue also has project/workstream filters, Show All (Top 10 vs up to 100), unsnooze all, manual refresh, and fixed/resizable height mode.
 
@@ -69,7 +69,7 @@ Tree-based file browser for AI context files (`current_focus.md`, `decision_log`
 
 <img src="../_assets/ai-feature/UpdateFocusFromAsana.png" width="60%" alt="Update Focus from Asana dialog" />
 
-Update Focus from Asana (AI) reads `asana-tasks.md`, sends context to the configured LLM, and shows a diff-based proposal dialog; it supports workstream filtering, natural-language refinement, and `View Debug`, and saves a backup to `focus_history/`.
+Update Focus from Asana (AI) reads `tasks.md`, sends context to the configured LLM, and shows a diff-based proposal dialog; it supports workstream filtering, natural-language refinement, and `View Debug`, and saves a backup to `focus_history/`.
 
 <img src="../_assets/ai-feature/AI-DecisionLog_1.png" width="60%" alt="AI Decision Log dialog step 1" />
 <img src="../_assets/ai-feature/AI-DecisionLog_2.png" width="60%" alt="AI Decision Log dialog step 2" />

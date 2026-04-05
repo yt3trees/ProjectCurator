@@ -2406,7 +2406,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
 
         var asanaChk = new System.Windows.Controls.CheckBox
         {
-            Content = "Add tasks to asana-tasks.md",
+            Content = "Add tasks to tasks.md",
             IsChecked = analysisResult.AsanaTasks.IsSelected && analysisResult.AsanaTasks.HasItems,
             IsEnabled = analysisResult.AsanaTasks.HasItems,
             Foreground = text, FontSize = 13,

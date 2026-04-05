@@ -62,7 +62,7 @@ public class FocusUpdateService
         {
             foreach (var ws in project.Workstreams.Where(w => !w.IsClosed))
             {
-                var wsAsanaPath = Path.Combine(obsidianNotes, "workstreams", ws.Id, "asana-tasks.md");
+                var wsAsanaPath = Path.Combine(obsidianNotes, "workstreams", ws.Id, "tasks.md");
                 if (File.Exists(wsAsanaPath))
                     workstreamTasks.Add((ws.Id, ws.Label, _parser.ParseFile(wsAsanaPath)));
             }
@@ -115,17 +115,17 @@ public class FocusUpdateService
         {
             // workstream モード
             var wsFocusPath  = Path.Combine(aiCtxContent, "workstreams", workstreamId, "current_focus.md");
-            var wsAsanaPath  = Path.Combine(obsidianNotes, "workstreams", workstreamId, "asana-tasks.md");
+            var wsAsanaPath  = Path.Combine(obsidianNotes, "workstreams", workstreamId, "tasks.md");
 
             // workstream の current_focus.md がなければ general にフォールバック
             var focusPath = File.Exists(wsFocusPath)
                 ? wsFocusPath
                 : Path.Combine(aiCtxContent, "current_focus.md");
 
-            // workstream の asana-tasks.md がなければ root にフォールバック
+            // workstream の tasks.md がなければ root にフォールバック
             var asanaPath = File.Exists(wsAsanaPath)
                 ? wsAsanaPath
-                : Path.Combine(obsidianNotes, "asana-tasks.md");
+                : Path.Combine(obsidianNotes, "tasks.md");
 
             return (focusPath, asanaPath, WorkMode.SharedWork, workstreamId);
         }
@@ -133,7 +133,7 @@ public class FocusUpdateService
         {
             // general モード
             var focusPath = Path.Combine(aiCtxContent, "current_focus.md");
-            var asanaPath = Path.Combine(obsidianNotes, "asana-tasks.md");
+            var asanaPath = Path.Combine(obsidianNotes, "tasks.md");
             return (focusPath, asanaPath, WorkMode.General, "");
         }
     }
