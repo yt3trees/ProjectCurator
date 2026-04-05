@@ -59,6 +59,9 @@
                     <ui:NavigationViewItem Content="Timeline"
                         Icon="{ui:SymbolIcon Symbol=Timeline24}"
                         TargetPageType="{x:Type pages:TimelinePage}" />
+                    <ui:NavigationViewItem Content="Wiki"
+                        Icon="{ui:SymbolIcon Symbol=BookDatabase24}"
+                        TargetPageType="{x:Type pages:WikiPage}" />
                     <ui:NavigationViewItem Content="Git Repos"
                         Icon="{ui:SymbolIcon Symbol=BranchFork24}"
                         TargetPageType="{x:Type pages:GitReposPage}" />

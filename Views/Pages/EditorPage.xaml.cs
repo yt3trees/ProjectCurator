@@ -43,7 +43,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         // AvalonEdit インスタンスを生成
         _editor = new TextEditor
         {
-            FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+            FontFamily = new System.Windows.Media.FontFamily("JetBrains Mono, Cascadia Mono, Consolas"),
             FontSize = 14,
             WordWrap = false,
             ShowLineNumbers = true,
@@ -576,7 +576,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
 
         _diffViewer = new TextEditor
         {
-            FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+            FontFamily = new System.Windows.Media.FontFamily("JetBrains Mono, Cascadia Mono, Consolas"),
             FontSize = 14,
             WordWrap = false,
             ShowLineNumbers = true,
@@ -949,7 +949,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             BorderBrush = surface2,
             BorderThickness = new Thickness(1),
             Padding = new Thickness(8),
-            FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+            FontFamily = new System.Windows.Media.FontFamily("JetBrains Mono, Cascadia Mono, Consolas"),
             FontSize = 12,
             MinHeight = 80,
             MaxHeight = 400,
@@ -1573,7 +1573,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         // ---- AvalonEdit プレビュー (読み取り専用) ----
         var previewViewer = new ICSharpCode.AvalonEdit.TextEditor
         {
-            FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+            FontFamily = new System.Windows.Media.FontFamily("JetBrains Mono, Cascadia Mono, Consolas"),
             FontSize = 12, WordWrap = false, ShowLineNumbers = true, IsReadOnly = true,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Visible,
             VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
@@ -2188,7 +2188,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
 
                 var draftViewer = new ICSharpCode.AvalonEdit.TextEditor
                 {
-                    FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+                    FontFamily = new System.Windows.Media.FontFamily("JetBrains Mono, Cascadia Mono, Consolas"),
                     FontSize = 12, IsReadOnly = true,
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                     VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
@@ -2255,7 +2255,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         // diff ビュー
         var focusDiffViewer = new ICSharpCode.AvalonEdit.TextEditor
         {
-            FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+            FontFamily = new System.Windows.Media.FontFamily("JetBrains Mono, Cascadia Mono, Consolas"),
             FontSize = 12, IsReadOnly = true,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
@@ -2357,7 +2357,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             {
                 var tensionsViewer = new ICSharpCode.AvalonEdit.TextEditor
                 {
-                    FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+                    FontFamily = new System.Windows.Media.FontFamily("JetBrains Mono, Cascadia Mono, Consolas"),
                     FontSize = 12, IsReadOnly = true,
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                     VerticalScrollBarVisibility   = ScrollBarVisibility.Auto,
@@ -2820,7 +2820,7 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                 Background = surface1, Foreground = text,
                 BorderBrush = surface2, BorderThickness = new Thickness(1),
                 Padding = new Thickness(8),
-                FontFamily = new System.Windows.Media.FontFamily("Consolas, 'Courier New', monospace"),
+                FontFamily = new System.Windows.Media.FontFamily("JetBrains Mono, Cascadia Mono, Consolas"),
                 FontSize = 11
             };
 
@@ -2943,3 +2943,4 @@ internal class InputDialog : Window
         Loaded += (s, e) => _textBox.Focus();
     }
 }
+

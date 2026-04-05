@@ -33,9 +33,17 @@ flowchart LR
         QC["🪟 Quick Capture<br>Ctrl+Shift+C<br>AI-routed inbox"]
     end
 
+    subgraph Wiki ["📚 Knowledge Base (Wiki)"]
+        direction TB
+        WI["📥 Ingest<br>Import source, generate summary page"]
+        WQ["💬 Query<br>Ask questions against the Wiki"]
+        WL["🔍 Lint<br>Detect contradictions & orphan pages"]
+    end
+
     Profile -.-> Dashboard
     Profile -.-> Editor
     Profile -.-> Global
+    Profile -.-> Wiki
 ```
 
 ## Setup
@@ -126,3 +134,128 @@ Press `Ctrl+Shift+C` from anywhere on your desktop to open a lightweight capture
 | `memo` | Appends a timestamped entry to `_config/capture_log.md` |
 
 When AI Features is disabled, you can still use Quick Capture by selecting the category and project manually.
+
+## Wiki
+
+The Wiki tab lets the LLM incrementally build and maintain a project-specific knowledge base from your source files.
+
+### Page Categories
+
+Pages generated during Import are organized into four categories. The LLM assigns categories automatically.
+
+| Category | Location | Contents |
+|---|---|---|
+| Wiki Files | `wiki/` root | `index.md` (page list) and `log.md` (operation log). Management files auto-updated by the LLM |
+| sources | `pages/sources/` | One summary page per imported source file |
+| entities | `pages/entities/` | Concrete "things" in the project: tables, screens, APIs, reports, user roles, etc. |
+| concepts | `pages/concepts/` | Design philosophy and business rules: approval flows, workflows, technical policies, decision criteria, etc. |
+| analysis | `pages/analysis/` | Q&A pages and comparative analyses saved from the Query tab |
+
+A helpful rule of thumb: "What is it (noun)?" → entities; "How does it work or why is it so (verb/policy)?" → concepts.
+
+### Import (Ingest a Source)
+
+Click "+ Import Source" or drag and drop a file onto the Wiki tab. The LLM automatically:
+
+- Saves the source to `wiki/raw/` (immutable copy)
+- Creates a summary page in `pages/sources/`
+- Creates or updates related `pages/entities/` and `pages/concepts/` pages
+- Updates `index.md` and `log.md`
+
+Supported formats: `.md` / `.txt` (PDF / Word require text conversion first).
+
+LLM responses are received as JSON; the count of created and updated pages is shown in the status bar.
+
+#### Import Prompt Structure
+
+The LLM call is a single `ChatCompletionAsync` (system + user).
+
+System prompt:
+- Full text of `wiki-schema.md` (acts as the LLM's operating instructions for the wiki)
+- Output language directive (Japanese if PC locale is Japanese, otherwise English)
+- Response format directive: JSON only (no code fences)
+- Instruction to include YAML frontmatter (`title` / `created` / `updated` / `sources` / `tags`) in each page
+- Instruction to use `[[PageName]]` wikilink format for cross-references
+
+User prompt includes:
+- Full text of the current `index.md` (list of existing pages)
+- Source file name and full body text
+- Instructions: create a sources/ summary page, update existing pages with full content, create new entity/concept pages, generate the full updated index.md, generate a log.md entry
+
+LLM response JSON schema:
+
+```json
+{
+  "summary": "brief description of what was done",
+  "newPages": [{ "path": "pages/category/filename.md", "content": "full Markdown" }],
+  "updatedPages": [{ "path": "pages/category/filename.md", "diff": "full updated Markdown" }],
+  "indexUpdate": "full updated index.md content",
+  "logEntry": "log.md entry to append"
+}
+```
+
+The `diff` field in `updatedPages` returns the full updated content (not a patch).
+
+### Query (Ask the Wiki)
+
+Answers questions by reading the accumulated Wiki. Unlike RAG, pages are passed directly to the LLM rather than being searched and re-synthesized on every call.
+
+- 100 pages or fewer (Small mode): all page contents (up to 50 pages) are passed directly to the LLM
+- More than 100 pages (Medium+ mode): the LLM first selects 5 relevant pages from the index, then generates an answer from those pages (2 LLM calls)
+
+Use "Save as Wiki Page" to save the answer to `pages/analysis/`.
+
+#### Query Prompt Structure
+
+Small mode uses 1 `ChatCompletionAsync` call; Medium+ mode uses 2.
+
+[Small mode] System prompt:
+- Declaration that the model is the wiki answer assistant
+- Instruction to answer based ONLY on the provided wiki content
+- Instruction to list referenced pages in `[[PageName]]` format at the end
+- Output language directive (locale-based)
+- Full text of `wiki-schema.md` (project context)
+
+[Small mode] User prompt includes:
+- The question
+- Full text of `index.md`
+- Full contents of relevant pages (up to 50)
+
+[Medium+ mode] First call (page selection):
+- System: "wiki search assistant — respond with file paths only, one per line"
+- User: question + full `index.md` → returns paths of 5 relevant pages
+
+[Medium+ mode] Second call: same structure as Small mode, using the 5 selected pages
+
+### Lint
+
+Combines static checks (C#) and LLM analysis to validate Wiki quality.
+
+| Check | Description | Method |
+|---|---|---|
+| BrokenLink | `[[wikilink]]` pointing to a non-existent page | Static |
+| Orphan | Page with no inbound links (sources and management files excluded) | Static |
+| MissingSource | Source reference not found in `raw/` (checks frontmatter of sources/ pages) | Static |
+| Stale | Page not updated in 30+ days (sources and management files excluded) | Static |
+| Contradiction | Conflicting descriptions of the same fact across pages | LLM |
+| Missing | Topic mentioned in 3+ pages but with no dedicated page | LLM |
+
+When AI Features is disabled, only static checks are run.
+
+#### Lint Prompt Structure
+
+The LLM check is a single `ChatCompletionAsync` call.
+
+System prompt (sent in Japanese when locale is Japanese):
+- Declaration that the model is the wiki quality auditor
+- Scope: Contradiction and Missing checks only
+- Strict response format:
+  - `CONTRADICTION: [page1] vs [page2] — [description]`
+  - `MISSING: [topic] — mentioned in [page1], [page2]...`
+  - Use `CONTRADICTION: none` / `MISSING: none` when nothing is found
+
+User prompt includes:
+- Full text of `index.md`
+- One-line summary of each page (up to 80 pages; summaries rather than full content to reduce token usage)
+
+The LLM response is parsed line by line and dispatched by `CONTRADICTION:` / `MISSING:` prefix.

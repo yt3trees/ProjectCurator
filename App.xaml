@@ -14,6 +14,8 @@
             <conv:InverseBoolConverter x:Key="InverseBoolConverter" xmlns:conv="clr-namespace:ProjectCurator.Helpers"/>
             <conv:DirtyConverter x:Key="DirtyConverter" xmlns:conv="clr-namespace:ProjectCurator.Helpers"/>
             <conv:ShowAllLabelConverter x:Key="ShowAllLabelConverter" xmlns:conv="clr-namespace:ProjectCurator.Helpers"/>
+            <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisConverter" xmlns:conv="clr-namespace:ProjectCurator.Helpers"/>
+            <conv:IntToVisibilityConverter x:Key="IntToVisibilityConverter" xmlns:conv="clr-namespace:ProjectCurator.Helpers"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

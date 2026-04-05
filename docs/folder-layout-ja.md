@@ -116,6 +116,17 @@ Obsidian Vault Root/
         │   ├── decision_log/          # 構造化された意思決定ログ
         │   │   └── TEMPLATE.md        # 新規決定用テンプレート
         │   ├── focus_history/         # current_focus.md の自動バックアップ
+        │   ├── wiki/                  # プロジェクトWiki (Wikiタブから初期化)
+        │   │   ├── wiki-schema.md     # LLMへの運用指示書(プロジェクトに合わせて編集可)
+        │   │   ├── index.md           # ページカタログ(LLMが自動更新)
+        │   │   ├── log.md             # 操作ログ(append-only)
+        │   │   ├── .wiki-meta.json    # 統計・設定メタデータ
+        │   │   ├── raw/               # 取り込み済みソースファイル(不変保存)
+        │   │   └── pages/
+        │   │       ├── sources/       # ソース要約ページ (1ソース = 1ページ)
+        │   │       ├── entities/      # エンティティページ(テーブル・画面・API等)
+        │   │       ├── concepts/      # 概念・設計方針・ワークフロー
+        │   │       └── analysis/      # Query から保存した分析・Q&Aページ
         │   └── workstreams/           # Workstream 単位のコンテキスト(作成時)
         │       └── <workstream-id>/
         │           ├── current_focus.md

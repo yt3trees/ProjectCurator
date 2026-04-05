@@ -40,6 +40,17 @@ public class ShowAllLabelConverter : IValueConverter
         => throw new NotImplementedException();
 }
 
+/// <summary>bool の逆値を Visibility に変換する (false → Visible, true → Collapsed)。</summary>
+[ValueConversion(typeof(bool), typeof(Visibility))]
+public class InverseBoolToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is bool b && b ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is Visibility v && v != Visibility.Visible;
+}
+
 /// <summary>bool (IsDirectory) を SymbolRegular アイコンに変換する。</summary>
 public class DirIconConverter : IValueConverter
 {
@@ -72,6 +83,17 @@ public class HeatmapIntensityToBrushConverter : IValueConverter
         var alpha = (byte)(45 + (int)(intensity * 185));
         return new SolidColorBrush(MediaColor.FromArgb(alpha, accentColor.R, accentColor.G, accentColor.B));
     }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+
+/// <summary>int が 0 より大きい場合に Visible、それ以外の場合に Collapsed を返す。</summary>
+[ValueConversion(typeof(int), typeof(Visibility))]
+public class IntToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is int i && i > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotImplementedException();

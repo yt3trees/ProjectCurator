@@ -11,6 +11,7 @@
 - [Timeline](#timeline)
 - [Git Repos](#git-repos)
 - [Asana Sync](#asana-sync)
+- [Wiki](#wiki)
 - [Agent Hub](#agent-hub)
 - [Setup - New Project](#setup---new-project)
 - [Setup - Workstreams](#setup---workstreams)
@@ -110,6 +111,72 @@ Scans workspace roots and lists repositories with remote URLs, branches, and las
 Configure per-project Asana sync with scheduling, workstream mapping, and section filters.
 
 See [Asana Setup](asana-setup.md) for full setup steps and page reference.
+
+## Wiki
+
+A per-project knowledge base that the LLM builds and maintains incrementally. Import meeting notes, design documents, or any text source, and the LLM auto-generates summary, entity, and concept pages with cross-links.
+
+### How to Create a Wiki
+
+1. Go to the Wiki tab and select a project from the dropdown at the top right
+2. Enter a Domain (e.g., ERP / Web / Infra) and click Initialize Wiki
+3. The directory structure is created under `_ai-context/context/wiki/`
+
+Once a Wiki exists, three sub-views become available.
+
+### Pages
+
+Left pane shows a category-based page tree; right pane shows the selected page's Markdown. Use the search bar to filter by title or path, and click "Open in Editor" to edit directly.
+
+#### Page Categories
+
+The page tree uses the following categories. The LLM assigns categories automatically during Import.
+
+| Category | Location | Contents |
+|---|---|---|
+| Wiki Files | `wiki/` root | `index.md` (page list) and `log.md` (operation log). Management files auto-updated by the LLM |
+| sources | `pages/sources/` | One summary page per imported source file |
+| entities | `pages/entities/` | Concrete "things" in the project: tables, screens, APIs, reports, user roles, etc. |
+| concepts | `pages/concepts/` | Design philosophy and business rules: approval flows, workflows, technical policies, decision criteria, etc. |
+| analysis | `pages/analysis/` | Q&A pages and comparative analyses saved from the Query tab |
+
+A helpful rule of thumb: "What is it (noun)?" → entities; "How does it work or why is it so (verb/policy)?" → concepts.
+
+#### Import Source
+
+Click "+ Import Source" at the bottom or drag and drop a file onto the Wiki tab. Supported formats: `.md` / `.txt` (PDF / Word require text conversion first).
+
+When AI Features is enabled, the LLM automatically:
+- Saves the source to `wiki/raw/` (immutable copy)
+- Creates a summary page in `pages/sources/`
+- Creates or updates related `pages/entities/` and `pages/concepts/` pages
+- Updates `index.md` and `log.md`
+
+### Query (requires AI Features)
+
+Ask questions about the Wiki in natural language.
+
+1. Type your question and click Ask (or press Enter)
+2. The LLM uses `index.md` to find relevant pages and generates an answer
+3. Review the answer and referenced pages, then optionally click "Save as Wiki Page" to save to `pages/analysis/`
+4. Past Q&A sessions appear in the History panel in chronological order
+
+### Lint
+
+Validate Wiki consistency using static checks and LLM analysis.
+
+Click "Run Lint" to detect the following:
+
+| Category | Description | Method |
+|---|---|---|
+| BrokenLink | `[[wikilink]]` pointing to a non-existent page | Static |
+| Orphan | Page with no inbound links | Static |
+| MissingSource | Source reference in `raw/` that does not exist | Static |
+| Stale | Page not updated in 30+ days | Static |
+| Contradiction | Conflicting descriptions of the same fact | LLM |
+| Missing | Topic mentioned in multiple pages but with no dedicated page | LLM |
+
+LLM checks (Contradiction / Missing) run only when AI Features is enabled.
 
 ## Agent Hub
 

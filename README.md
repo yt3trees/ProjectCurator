@@ -75,6 +75,7 @@ Whether you run many projects in parallel or manage a single complex one, Projec
 | Timeline | Review recent project activity in chronological order |
 | Git Repos | Recursively scan workspace roots for repositories |
 | Asana Sync | Sync Asana tasks to project/workstream Markdown outputs |
+| Wiki | LLM-powered knowledge base: import sources, query, and lint for consistency |
 | Agent Hub | Manage reusable sub-agent/context-rule library and deploy per project, per CLI |
 | Setup | Create/check/archive projects, tier conversion, workstream management |
 | Settings | Hotkey, workspace roots, LLM API configuration |

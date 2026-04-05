@@ -88,6 +88,10 @@ public partial class App : WpfApplication
         services.AddSingleton<StateSnapshotService>();
         services.AddSingleton<AgentHubService>();
         services.AddSingleton<AgentDeploymentService>();
+        services.AddSingleton<WikiService>();
+        services.AddSingleton<WikiIngestService>();
+        services.AddSingleton<WikiQueryService>();
+        services.AddSingleton<WikiLintService>();
 
         // ViewModels
         services.AddSingleton<MainWindowViewModel>();
@@ -100,6 +104,7 @@ public partial class App : WpfApplication
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<CommandPaletteViewModel>();
         services.AddSingleton<AgentHubViewModel>();
+        services.AddSingleton<WikiViewModel>();
 
         // Pages
         services.AddSingleton<DashboardPage>();
@@ -110,6 +115,7 @@ public partial class App : WpfApplication
         services.AddSingleton<SetupPage>();
         services.AddSingleton<SettingsPage>();
         services.AddSingleton<AgentHubPage>();
+        services.AddSingleton<WikiPage>();
 
         // wpf-ui: IPageService for DI-based page resolution
         services.AddSingleton<IPageService, AppPageService>();

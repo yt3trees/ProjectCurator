@@ -11,6 +11,7 @@
 - [Timeline](#timeline)
 - [Git Repos](#git-repos)
 - [Asana Sync](#asana-sync)
+- [Wiki](#wiki)
 - [Agent Hub](#agent-hub)
 - [Setup - New Project](#setup---new-project)
 - [Setup - Workstreams](#setup---workstreams)
@@ -110,6 +111,72 @@ Import Meeting Notes (AI) は会議メモを1回で分析し、Decisions / Focus
 プロジェクトごとにAsana同期のスケジュール、Workstreamマッピング、セクションフィルタを設定できます。
 
 詳細な設定手順とページリファレンスは [Asana連携設定](asana-setup-ja.md) を参照してください。
+
+## Wiki
+
+プロジェクトごとのナレッジベースを LLM が段階的に構築・保守する機能です。議事録や設計書を取り込むと、LLM が要約・エンティティ・概念ページを自動生成して相互リンク付きで整理します。
+
+### Wiki の作成方法
+
+1. Wiki タブに移動し、右上のドロップダウンでプロジェクトを選択
+2. 「Domain」(例: ERP / Web / Infra) を入力して Initialize Wiki をクリック
+3. `_ai-context/context/wiki/` にディレクトリ一式が作成されます
+
+Wiki が存在する場合は3つのサブビューが使えます。
+
+### Pages
+
+左ペインにカテゴリ別ページツリー、右ペインで選択ページの Markdown を表示します。検索バーでタイトル・パスを絞り込み、「Open in Editor」で直接編集できます。
+
+#### ページのカテゴリ
+
+ページツリーは以下のカテゴリで構成されます。LLM が Import 時に自動で分類します。
+
+| カテゴリ | 格納場所 | 内容 |
+|---|---|---|
+| Wiki Files | `wiki/` 直下 | `index.md`(ページ一覧) と `log.md`(操作ログ)。LLM が自動更新する管理ファイル |
+| sources | `pages/sources/` | 取り込んだソースファイルごとの要約ページ。1ソース = 1ページ |
+| entities | `pages/entities/` | プロジェクト上の具体的な「もの」のページ。テーブル定義・画面・API・帳票・ユーザーロールなど |
+| concepts | `pages/concepts/` | 設計思想や業務ルールのページ。承認フロー・ワークフロー・技術方針・判断基準など |
+| analysis | `pages/analysis/` | Query タブで「Save as Wiki Page」した Q&A や比較分析のページ |
+
+entities と concepts の違いの目安: 「それは何か(名詞)」→ entities、「それはどう動くか・なぜそうなのか(動詞・方針)」→ concepts。
+
+#### ソースの取り込み (Import)
+
+下部の「+ Import Source」をクリックするか、Wiki タブにファイルをドラッグ＆ドロップします。対応形式: `.md` / `.txt` (PDF / Word は現在テキスト変換要)。
+
+AI 機能が有効なとき、LLM が以下を自動実行します:
+- `wiki/raw/` にソースを保存 (不変コピー)
+- `pages/sources/` に要約ページを作成
+- 関連する `pages/entities/` と `pages/concepts/` ページを作成・更新
+- `index.md` と `log.md` を更新
+
+### Query (AI機能が必要)
+
+Wiki に対して自然言語で質問できます。
+
+1. 質問を入力して Ask をクリック (Enter でも送信)
+2. LLM が index.md を参照して関連ページを特定し、回答を生成
+3. 回答と参照ページを確認し、「Save as Wiki Page」で `pages/analysis/` に保存可能
+4. 過去の Q&A は History パネルに時系列で表示されます
+
+### Lint
+
+Wiki の整合性を静的 + LLM チェックで検証します。
+
+「Run Lint」をクリックすると以下を検出します:
+
+| カテゴリ | 内容 | 確認方法 |
+|---------|------|---------|
+| BrokenLink | 存在しないページへの [[wikilink]] | 静的 |
+| Orphan | インバウンドリンクが 0 のページ | 静的 |
+| MissingSource | raw/ に存在しないソース参照 | 静的 |
+| Stale | 30 日以上更新されていないページ | 静的 |
+| Contradiction | 同じ事実に対する矛盾した記述 | LLM |
+| Missing | 複数ページで言及されているがページ未作成のトピック | LLM |
+
+LLM チェック (Contradiction / Missing) は AI 機能が有効なときのみ実行されます。
 
 ## Agent Hub
 

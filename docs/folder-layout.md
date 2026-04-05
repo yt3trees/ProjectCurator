@@ -116,6 +116,17 @@ Obsidian Vault Root/
         │   ├── decision_log/          # Structured decision records
         │   │   └── TEMPLATE.md        # Template for new decisions
         │   ├── focus_history/         # Auto-backups of current_focus.md
+        │   ├── wiki/                  # Project knowledge base (Wiki feature)
+        │   │   ├── wiki-schema.md     # LLM operating instructions for this wiki
+        │   │   ├── index.md           # Page index (auto-managed by LLM)
+        │   │   ├── log.md             # Operation log (auto-managed by LLM)
+        │   │   ├── .wiki-meta.json    # Stats and settings metadata
+        │   │   ├── raw/               # Immutable source file copies
+        │   │   └── pages/
+        │   │       ├── sources/       # One summary page per imported source
+        │   │       ├── entities/      # Concrete "things" (tables, screens, APIs, etc.)
+        │   │       ├── concepts/      # Design policies and business rules
+        │   │       └── analysis/      # Q&A pages saved from the Query tab
         │   └── workstreams/           # Per-workstream context (if created)
         │       └── <workstream-id>/
         │           ├── current_focus.md

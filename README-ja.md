@@ -71,6 +71,7 @@ ProjectCurator は、人間とAI両方にとっての「面倒な行き来」を
 | Dashboard | プロジェクトヘルス、Today Queue、AI機能有効時はWhat's Nextによる優先アクション提案 |
 | Editor | コンテキスト用Markdown編集、AI機能有効時はフォーカス自動更新・意思決定ログ生成・会議メモ取り込み |
 | Timeline | 最近の変更履歴を時系列で確認 |
+| Wiki | ソースを取り込み LLM がナレッジベースを自動構築。Query で Wiki に質問、Lint で整合性チェック |
 | Git Repos | ワークスペース内のGitリポジトリを再帰スキャン |
 | Asana Sync | Asanaタスクをプロジェクト別/Workstream別Markdownに同期 |
 | Agent Hub | サブエージェント/コンテキストルールのライブラリ管理と、CLI別Deploy/Undeploy |
