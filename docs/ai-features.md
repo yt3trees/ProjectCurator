@@ -4,6 +4,22 @@
 
 All AI features require `Enable AI Features` to be on (Settings > LLM API). Supported providers: OpenAI and Azure OpenAI.
 
+## Table of Contents
+
+ - [AI Features Overview](#ai-features-overview)
+ - [Setup](#setup)
+ - [User Profile](#user-profile)
+ - [What's Next (Dashboard)](#whats-next-dashboard)
+ - [Context Briefing (Dashboard Card)](#context-briefing-dashboard-card)
+ - [Today's Plan (Dashboard)](#todays-plan-dashboard)
+ - [Update Focus from Asana (Editor)](#update-focus-from-asana-editor)
+ - [AI Decision Log (Editor)](#ai-decision-log-editor)
+ - [Import Meeting Notes (Editor)](#import-meeting-notes-editor)
+ - [Quick Capture (Global Hotkey)](#quick-capture-global-hotkey)
+ - [Wiki](#wiki)
+ - [Lint](#lint)
+
+<a id="ai-features-overview"></a>
 ## AI Features Overview
 
 The AI features in ProjectCurator are categorized into three main situations: Planning (Dashboard), Updating/Logging (Editor), and Capturing thoughts (Global).
@@ -35,7 +51,7 @@ flowchart LR
 
     subgraph Wiki ["📚 Knowledge Base (Wiki)"]
         direction TB
-        WI["📥 Ingest<br>Import source, generate summary page"]
+        WI["📥 Import<br>Import source, generate summary page"]
         WQ["💬 Query<br>Ask questions against the Wiki"]
         WL["🔍 Lint<br>Detect contradictions & orphan pages"]
     end
@@ -46,6 +62,7 @@ flowchart LR
     Profile -.-> Wiki
 ```
 
+<a id="setup"></a>
 ## Setup
 
 1. Open `Settings > LLM API`
@@ -53,6 +70,7 @@ flowchart LR
 3. Click `Test Connection`
 4. Once the test passes, toggle `Enable AI Features` on and save
 
+<a id="user-profile"></a>
 ## User Profile
 
 Enter a free-text description of your role, priorities, and working style in `Settings > LLM API > User Profile`. This text is prepended as a `## User Profile` section to the system prompt of every LLM call, so the model has your context without repeating it in each prompt.
@@ -65,12 +83,14 @@ Prefer concise bullet points. Flag overloaded days rather than packing in tasks.
 Language: respond in Japanese unless the document is already in English.
 ```
 
+<a id="whats-next-dashboard"></a>
 ## What's Next (Dashboard)
 
 Click the lightbulb icon in the Dashboard toolbar to get 3-5 AI-prioritized action suggestions across all projects. The model analyzes overdue tasks, stale focus files, uncommitted changes, and unrecorded decisions, then ranks actions by urgency. Each suggestion has an Open button to navigate directly to the relevant file.
 
 <img src="../_assets/ai-feature/WhatsNext.png" width="70%" alt="What's Next dialog" />
 
+<a id="context-briefing-dashboard-card"></a>
 ## Context Briefing (Dashboard Card)
 
 Click the lightbulb icon on a project card to generate a project-specific resume briefing. The model reads `current_focus.md`, recent `decision_log` entries, `open_issues.md`, active/completed Asana tasks, and uncommitted repo signals, then outputs:
@@ -83,18 +103,21 @@ The dialog supports `Copy`, `Open in Editor`, and `View Debug` (prompt/response 
 
 <img src="../_assets/ai-feature/ContextBriefing.png" width="70%" alt="Context Briefing dialog" />
 
+<a id="todays-plan-dashboard"></a>
 ## Today's Plan (Dashboard)
 
 Today's Plan dialog provides a time-blocked day plan (for example, Morning / Afternoon), with `Open`, `Copy`, `Save`, and `View Debug` actions.
 
 <img src="../_assets/ai-feature/TodaysPlan.png" width="70%" alt="Today's Plan dialog" />
 
+<a id="update-focus-from-asana-editor"></a>
 ## Update Focus from Asana (Editor)
 
 Click the `Update Focus from Asana` button in the Editor toolbar to generate a diff-based update proposal for the open `current_focus.md`. The model reads Asana task data and the existing file, then proposes changes while preserving your heading structure and writing style. A backup is saved to `focus_history/` automatically. Supports workstream filtering, natural-language refinement, and a debug view.
 
 <img src="../_assets/ai-feature/UpdateFocusFromAsana.png" width="70%" alt="Update Focus from Asana dialog" />
 
+<a id="ai-decision-log-editor"></a>
 ## AI Decision Log (Editor)
 
 Click `Dec Log` in the Editor toolbar (AI mode) to open the decision log assistant. Describe what was decided; the model generates a structured draft with Options / Why / Risk / Revisit Trigger sections. Supports natural-language refinement and optionally removes the resolved item from `open_issues.md`. Saves as `decision_log/YYYY-MM-DD_{topic}.md`.
@@ -102,6 +125,7 @@ Click `Dec Log` in the Editor toolbar (AI mode) to open the decision log assista
 <img src="../_assets/ai-feature/AI-DecisionLog_1.png" width="70%" alt="AI Decision Log dialog step 1" />
 <img src="../_assets/ai-feature/AI-DecisionLog_2.png" width="70%" alt="AI Decision Log dialog step 2" />
 
+<a id="import-meeting-notes-editor"></a>
 ## Import Meeting Notes (Editor)
 
 Click the `Import Meeting Notes` button in the Editor toolbar (or press `Ctrl+Enter` in the notes input dialog) to paste raw meeting notes and have the LLM analyze them in a single pass. The model produces four types of output, each shown in a separate tab of the preview dialog:
@@ -121,6 +145,7 @@ Select which items to apply and click `Apply Selected`. A `View Debug` button in
 <img src="../_assets/ai-feature/ImportMeetingNotes_1.png" width="70%" alt="Import Meeting Notes dialog step 1" />
 <img src="../_assets/ai-feature/ImportMeetingNotes_2.png" width="70%" alt="Import Meeting Notes dialog step 2" />
 
+<a id="quick-capture-global-hotkey"></a>
 ## Quick Capture (Global Hotkey)
 
 Press `Ctrl+Shift+C` from anywhere on your desktop to open a lightweight capture window. Type a free-text note and press Enter. If AI Features is enabled, an LLM classifies the input and routes it automatically:
@@ -135,6 +160,7 @@ Press `Ctrl+Shift+C` from anywhere on your desktop to open a lightweight capture
 
 When AI Features is disabled, you can still use Quick Capture by selecting the category and project manually.
 
+<a id="wiki"></a>
 ## Wiki
 
 The Wiki tab lets the LLM incrementally build and maintain a project-specific knowledge base from your source files.
@@ -153,7 +179,9 @@ Pages generated during Import are organized into four categories. The LLM assign
 
 A helpful rule of thumb: "What is it (noun)?" → entities; "How does it work or why is it so (verb/policy)?" → concepts.
 
-### Import (Ingest a Source)
+<img src="../_assets/Wiki-Pages.png" width="80%" alt="Wiki Pages tab" />
+
+### Import (Add a Source)
 
 Click "+ Import Source" or drag and drop a file onto the Wiki tab. The LLM prepares:
 
@@ -168,7 +196,7 @@ Before saving, each proposed page change is shown as a diff:
 - New pages: diff against empty content
 - Updated pages: diff against the current file
 
-You approve each item in sequence. If you skip any item, the ingest result is not saved for that source file (all-or-nothing) to avoid index/page mismatch.
+You approve each item in sequence. If you skip any item, the import result is not saved for that source file (all-or-nothing) to avoid index/page mismatch.
 
 #### LLM Update Flow During Import
 
@@ -180,8 +208,8 @@ flowchart TD
     D["Load wiki-schema.md and index.md"]
     E["LLM selects update candidate paths"]
     F["Load full content of selected pages"]
-    G["Build ingest prompt with selected page contents"]
-    H["Send ingest request to LLM"]
+    G["Build import prompt with selected page contents"]
+    H["Send import request to LLM"]
     I{"Can response JSON be parsed?"}
     J["Show per-file diff review"]
     K{"All items approved?"}
@@ -192,7 +220,7 @@ flowchart TD
     P["Update .wiki-meta.json stats"]
     Q["Done"]
     R["Skip save for this source"]
-    S["Fail with ingest error"]
+    S["Fail with import error"]
 
     A --> B
     B --> C
@@ -218,7 +246,7 @@ flowchart TD
 
 Import now uses 2 LLM calls:
 - Call 1: select existing page paths likely to need updates
-- Call 2: generate final ingest output using full content of those selected pages
+- Call 2: generate final import output using full content of those selected pages
 
 System prompt:
 - Full text of `wiki-schema.md` (acts as the LLM's operating instructions for the wiki)
@@ -268,6 +296,8 @@ Answers questions by reading the accumulated Wiki. Unlike RAG, pages are passed 
 
 Use "Save as Wiki Page" to save the answer to `pages/analysis/`.
 
+<img src="../_assets/Wiki-Query.png" width="80%" alt="Wiki Query tab" />
+
 #### Query Prompt Structure
 
 Query uses up to 2 `ChatCompletionAsync` calls.
@@ -298,6 +328,7 @@ Selection post-processing in C#:
 - Full text of `index.md`
 - Full contents of selected relevant pages (up to 5)
 
+<a id="lint"></a>
 ### Lint
 
 Combines static checks (C#) and LLM analysis to validate Wiki quality.
@@ -312,6 +343,8 @@ Combines static checks (C#) and LLM analysis to validate Wiki quality.
 | Missing | Topic mentioned in 3+ pages but with no dedicated page | LLM |
 
 When AI Features is disabled, only static checks are run.
+
+<img src="../_assets/Wiki-Lint.png" width="80%" alt="Wiki Lint tab" />
 
 #### Lint Prompt Structure
 
