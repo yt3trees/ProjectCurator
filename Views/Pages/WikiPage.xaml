@@ -211,7 +211,10 @@
                                 Command="{Binding InitializeWikiCommand}"
                                 Padding="16,6"
                                 Background="{DynamicResource AppBlue}"
-                                Foreground="White"
+                                Foreground="{DynamicResource AppBackground}"
+                                FontWeight="Normal"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
                                 BorderThickness="0"/>
                         <Button Content="Cancel"
                                 Command="{Binding CancelCreateDomainCommand}"
@@ -630,15 +633,16 @@
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"/>
 
-                <Button Grid.Column="1"
-                        x:Name="ImportBtn"
-                        Content="+ Import Source"
-                        Click="OnImportClick"
-                        IsEnabled="{Binding IsAiEnabled}"
-                        Visibility="{Binding IsPagesTab, Converter={StaticResource BoolToVis}}"
-                        Padding="10,3" FontSize="11"
-                        Background="{DynamicResource AppBlue}"
-                        Foreground="White" BorderThickness="0"/>
+                <ui:Button Grid.Column="1"
+                           x:Name="ImportBtn"
+                           Content="+ Import Source"
+                           Click="OnImportClick"
+                           IsEnabled="{Binding IsAiEnabled}"
+                           Visibility="{Binding IsPagesTab, Converter={StaticResource BoolToVis}}"
+                           MinHeight="30"
+                           Padding="12,4"
+                           FontSize="11"
+                           VerticalAlignment="Center"/>
             </Grid>
         </Border>
 
