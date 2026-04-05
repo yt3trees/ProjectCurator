@@ -18,6 +18,7 @@ public class WikiQueryService
 {
     private readonly LlmClientService _llm;
     private readonly WikiService _wiki;
+    private const int MaxRelevantPages = 5;
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
@@ -112,26 +113,41 @@ tags: [analysis, qa]
         IReadOnlyList<WikiPageItem> pages,
         CancellationToken cancellationToken)
     {
-        if (pages.Count <= 100)
+        var nonRootPages = pages.Where(x => !x.IsRoot).ToList();
+        if (nonRootPages.Count == 0)
+            return "";
+
+        var selectedPaths = await SelectRelevantPagePaths(index, question, nonRootPages, cancellationToken);
+        if (selectedPaths.Count == 0)
         {
-            // Small mode: 全ページ内容を直接渡す
-            var sb = new StringBuilder();
-            foreach (var p in pages.Where(x => !x.IsRoot).Take(50))
-            {
-                var item = _wiki.GetPage(wikiRoot, p.RelativePath);
-                if (item == null) continue;
-                sb.AppendLine($"### [{p.RelativePath}]");
-                sb.AppendLine(item.Content);
-                sb.AppendLine();
-            }
-            return sb.ToString();
+            // フォールバック: タイトル/パスのキーワード一致で補完
+            selectedPaths = FallbackSelectByKeywords(question, nonRootPages)
+                .Take(MaxRelevantPages)
+                .ToList();
         }
 
-        // Medium+ mode: LLM に index から関連ページを選ばせる
+        var sb = new StringBuilder();
+        foreach (var path in selectedPaths.Take(MaxRelevantPages))
+        {
+            var item = _wiki.GetPage(wikiRoot, path);
+            if (item == null) continue;
+            sb.AppendLine($"### [{path}]");
+            sb.AppendLine(item.Content);
+            sb.AppendLine();
+        }
+        return sb.ToString();
+    }
+
+    private async Task<List<string>> SelectRelevantPagePaths(
+        string index,
+        string question,
+        IReadOnlyList<WikiPageItem> pages,
+        CancellationToken cancellationToken)
+    {
         var selectionPrompt = $"""
 Given this question: "{question}"
 
-From the wiki index below, list the 5 most relevant page paths (one per line, path only):
+From the wiki index below, list the {MaxRelevantPages} most relevant page paths (one per line, path only):
 {index}
 """;
         var selected = await _llm.ChatCompletionAsync(
@@ -139,18 +155,40 @@ From the wiki index below, list the 5 most relevant page paths (one per line, pa
             selectionPrompt,
             cancellationToken);
 
-        var selectedPaths = selected.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var sb2 = new StringBuilder();
-        foreach (var path in selectedPaths.Take(5))
-        {
-            var normalizedPath = path.Trim('`', ' ', '-');
-            var item = _wiki.GetPage(wikiRoot, normalizedPath);
-            if (item == null) continue;
-            sb2.AppendLine($"### [{normalizedPath}]");
-            sb2.AppendLine(item.Content);
-            sb2.AppendLine();
-        }
-        return sb2.ToString();
+        var existing = new HashSet<string>(pages.Select(p => p.RelativePath), StringComparer.OrdinalIgnoreCase);
+        return selected
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(path => path.Trim('`', ' ', '-'))
+            .Where(path => existing.Contains(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(MaxRelevantPages)
+            .ToList();
+    }
+
+    private static IEnumerable<string> FallbackSelectByKeywords(string question, IReadOnlyList<WikiPageItem> pages)
+    {
+        var tokens = question
+            .Split([' ', '\t', '\r', '\n', '　', ',', '.', '、', '。', ':', '：', ';', '；', '/', '\\', '(', ')', '[', ']', '{', '}', '"', '\''],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(t => t.Length >= 2)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (tokens.Length == 0)
+            return pages.Select(p => p.RelativePath);
+
+        return pages
+            .Select(p => new
+            {
+                p.RelativePath,
+                Score = tokens.Count(t =>
+                    p.Title.Contains(t, StringComparison.OrdinalIgnoreCase) ||
+                    p.RelativePath.Contains(t, StringComparison.OrdinalIgnoreCase))
+            })
+            .Where(x => x.Score > 0)
+            .OrderByDescending(x => x.Score)
+            .ThenBy(x => x.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.RelativePath);
     }
 
     // ---- プロンプト構築 ----

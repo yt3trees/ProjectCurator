@@ -411,7 +411,11 @@
                                     IsEnabled="{Binding IsQuerying, Converter={StaticResource InverseBoolConverter}}"
                                     Margin="6,0,0,0" Padding="16,6"
                                     Background="{DynamicResource AppBlue}"
-                                    Foreground="White" BorderThickness="0"/>
+                                    Foreground="{DynamicResource AppBackground}"
+                                    FontWeight="Normal"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    BorderThickness="0"/>
                         </Grid>
 
                         <Border Grid.Row="2"

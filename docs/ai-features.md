@@ -262,32 +262,41 @@ The `diff` field in `updatedPages` returns the full updated content (not a patch
 
 Answers questions by reading the accumulated Wiki. Unlike RAG, pages are passed directly to the LLM rather than being searched and re-synthesized on every call.
 
-- 100 pages or fewer (Small mode): all page contents (up to 50 pages) are passed directly to the LLM
-- More than 100 pages (Medium+ mode): the LLM first selects 5 relevant pages from the index, then generates an answer from those pages (2 LLM calls)
+- Candidate pages are always selected semantically before answer generation (max 5 pages).
+- The answer call reads only those selected pages, not all pages.
+- If selection fails, a keyword fallback picks pages whose title/path best match the question.
 
 Use "Save as Wiki Page" to save the answer to `pages/analysis/`.
 
 #### Query Prompt Structure
 
-Small mode uses 1 `ChatCompletionAsync` call; Medium+ mode uses 2.
+Query uses up to 2 `ChatCompletionAsync` calls.
 
-[Small mode] System prompt:
+[Call 1: candidate selection] System prompt:
+- Declaration that the model is the wiki search assistant
+- Instruction to return file paths only, one per line
+
+[Call 1: candidate selection] User prompt includes:
+- The question
+- Full text of `index.md`
+
+Selection post-processing in C#:
+- Normalize each returned path (trim markdown markers and list symbols)
+- Keep existing wiki page paths only
+- Deduplicate (case-insensitive) and cap at 5 pages
+- If no valid path remains, run local fallback scoring (token overlap against page title/path)
+
+[Call 2: answer generation] System prompt:
 - Declaration that the model is the wiki answer assistant
 - Instruction to answer based ONLY on the provided wiki content
 - Instruction to list referenced pages in `[[PageName]]` format at the end
 - Output language directive (locale-based)
 - Full text of `wiki-schema.md` (project context)
 
-[Small mode] User prompt includes:
+[Call 2: answer generation] User prompt includes:
 - The question
 - Full text of `index.md`
-- Full contents of relevant pages (up to 50)
-
-[Medium+ mode] First call (page selection):
-- System: "wiki search assistant — respond with file paths only, one per line"
-- User: question + full `index.md` → returns paths of 5 relevant pages
-
-[Medium+ mode] Second call: same structure as Small mode, using the 5 selected pages
+- Full contents of selected relevant pages (up to 5)
 
 ### Lint
 
