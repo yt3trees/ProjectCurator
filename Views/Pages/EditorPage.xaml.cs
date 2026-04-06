@@ -45,9 +45,9 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         {
             FontFamily = new System.Windows.Media.FontFamily("JetBrains Mono, Cascadia Mono, Consolas"),
             FontSize = 14,
-            WordWrap = false,
+            WordWrap = true,
             ShowLineNumbers = true,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         };
         AddBottomViewportPadding(_editor);

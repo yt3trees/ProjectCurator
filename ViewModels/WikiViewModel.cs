@@ -62,6 +62,7 @@ public partial class WikiViewModel : ObservableObject
     private readonly WikiQueryService _queryService;
     private readonly WikiLintService _lintService;
     private readonly LlmClientService _llmClient;
+    private readonly TrayService _trayService;
 
     private CancellationTokenSource? _cts;
     private bool _suppressDirtyTracking;
@@ -99,6 +100,11 @@ public partial class WikiViewModel : ObservableObject
     [ObservableProperty] private bool isQuerying;
     [ObservableProperty] private bool hasQueryAnswer;
     [ObservableProperty] private WikiQueryRecord? lastQueryRecord;
+    [ObservableProperty] private bool hasMoreHistory;
+
+    private string _currentSessionId = "";
+    private List<string> _pastSessionFiles = [];
+    private int _nextSessionIndex;
 
     // ── Lint タブ ─────────────────────────────────────
     [ObservableProperty] private ObservableCollection<WikiLintIssueViewModel> lintIssues = [];
@@ -110,6 +116,7 @@ public partial class WikiViewModel : ObservableObject
 
     // ── 共通 ─────────────────────────────────────────
     [ObservableProperty] private bool isLoading;
+    [ObservableProperty] private bool isImporting;
     [ObservableProperty] private bool isAiEnabled;
     [ObservableProperty] private string statusText = "";
 
@@ -124,7 +131,8 @@ public partial class WikiViewModel : ObservableObject
         WikiIngestService ingestService,
         WikiQueryService queryService,
         WikiLintService lintService,
-        LlmClientService llmClient)
+        LlmClientService llmClient,
+        TrayService trayService)
     {
         _discovery    = discovery;
         _config       = config;
@@ -133,6 +141,7 @@ public partial class WikiViewModel : ObservableObject
         _queryService = queryService;
         _lintService  = lintService;
         _llmClient    = llmClient;
+        _trayService  = trayService;
 
         IsAiEnabled = _config.LoadSettings().AiEnabled;
         WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
@@ -203,7 +212,14 @@ public partial class WikiViewModel : ObservableObject
         HasWiki = Directory.Exists(root);
 
         if (HasWiki)
+        {
+            _currentSessionId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            _queryService.StartNewSession(WikiRoot, _currentSessionId);
+            QueryHistory.Clear();
+            HasMoreHistory = false;
+            _ = LoadInitialHistoryAsync();
             _ = LoadPagesAsync();
+        }
     }
 
     // ────────────────────────────────────────────────
@@ -385,7 +401,7 @@ public partial class WikiViewModel : ObservableObject
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
 
-        IsLoading = true;
+        IsImporting = true;
         try
         {
             var progress = new Progress<string>(msg => StatusText = msg);
@@ -422,7 +438,7 @@ public partial class WikiViewModel : ObservableObject
         {
             StatusText = "Ingest cancelled.";
         }
-        finally { IsLoading = false; }
+        finally { IsImporting = false; }
     }
 
     private async Task<bool> ReviewIngestChangesAsync(string sourceFilePath, IngestResult result, CancellationToken cancellationToken)
@@ -434,6 +450,10 @@ public partial class WikiViewModel : ObservableObject
         var owner = Application.Current?.MainWindow;
         if (owner == null)
             throw new InvalidOperationException("Main window is not available for review dialog.");
+
+        _trayService.ShowBalloonTip(
+            "Wiki Ingest Review",
+            $"{Path.GetFileName(sourceFilePath)}: {reviewItems.Count} page(s) ready for review.");
 
         for (int i = 0; i < reviewItems.Count; i++)
         {
@@ -583,6 +603,7 @@ public partial class WikiViewModel : ObservableObject
             HasQueryAnswer = true;
             LastQueryRecord = record;
             QueryHistory.Insert(0, record);
+            _trayService.ShowBalloonTip("Wiki Query", "Answer is ready.");
         }
         catch (Exception ex)
         {
@@ -590,6 +611,31 @@ public partial class WikiViewModel : ObservableObject
             HasQueryAnswer = true;
         }
         finally { IsQuerying = false; }
+    }
+
+    private async Task LoadInitialHistoryAsync()
+    {
+        _pastSessionFiles = WikiQueryService.GetPastSessionFiles(WikiRoot, _currentSessionId);
+        _nextSessionIndex = 0;
+        if (_pastSessionFiles.Count > 0)
+        {
+            var records = await WikiQueryService.LoadSessionFileAsync(_pastSessionFiles[0]);
+            foreach (var r in Enumerable.Reverse(records))
+                QueryHistory.Add(r);
+            _nextSessionIndex = 1;
+        }
+        HasMoreHistory = _nextSessionIndex < _pastSessionFiles.Count;
+    }
+
+    [RelayCommand]
+    private async Task LoadMoreHistory()
+    {
+        if (_nextSessionIndex >= _pastSessionFiles.Count) return;
+        var records = await WikiQueryService.LoadSessionFileAsync(_pastSessionFiles[_nextSessionIndex]);
+        foreach (var r in Enumerable.Reverse(records))
+            QueryHistory.Add(r);
+        _nextSessionIndex++;
+        HasMoreHistory = _nextSessionIndex < _pastSessionFiles.Count;
     }
 
     [RelayCommand]

@@ -46,7 +46,8 @@ public class WikiService
     public static string GetIndexPath(string wikiRoot) => Path.Combine(wikiRoot, "index.md");
     public static string GetLogPath(string wikiRoot)   => Path.Combine(wikiRoot, "log.md");
     public static string GetSchemaPath(string wikiRoot)=> Path.Combine(wikiRoot, "wiki-schema.md");
-    public static string GetMetaPath(string wikiRoot)  => Path.Combine(wikiRoot, ".wiki-meta.json");
+    public static string GetMetaPath(string wikiRoot)         => Path.Combine(wikiRoot, ".wiki-meta.json");
+    public static string GetQueryHistoryDir(string wikiRoot) => Path.Combine(wikiRoot, "query_history");
 
     // ---- 初期化 ----
 

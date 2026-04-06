@@ -39,6 +39,7 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
     private bool _syncingEditor;
     private IHighlightingDefinition? _markdownHighlighting;
     private string? _lastRenderedPath;
+    private readonly FlowDocumentScrollViewer _wikiQueryAnswerViewer;
 
     public WikiPage(WikiViewModel viewModel)
     {
@@ -93,6 +94,24 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
         };
         WikiEditorHost.Content = _wikiEditor;
         WikiRenderHost.Content = _wikiRenderViewer;
+
+        _wikiQueryAnswerViewer = new FlowDocumentScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            IsToolBarVisible = false,
+            Document = new FlowDocument()
+        };
+        _wikiQueryAnswerViewer.PreviewMouseWheel += (s, e) =>
+        {
+            var sv = FindVisualChild<ScrollViewer>(_wikiQueryAnswerViewer);
+            if (sv != null)
+            {
+                sv.ScrollToVerticalOffset(sv.VerticalOffset - (e.Delta * 0.5));
+                e.Handled = true;
+            }
+        };
+        WikiQueryAnswerHost.Content = _wikiQueryAnswerViewer;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -119,6 +138,8 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
                 SyncEditorFromViewModel();
                 SyncRenderFromViewModel();
             }
+            else if (args.PropertyName == nameof(WikiViewModel.QueryAnswer))
+                SyncQueryAnswerFromViewModel();
         };
 
         await ViewModel.InitAsync();
@@ -155,6 +176,11 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
         _syncingEditor = true;
         _wikiEditor.Text = text;
         _syncingEditor = false;
+    }
+
+    private void SyncQueryAnswerFromViewModel()
+    {
+        _wikiQueryAnswerViewer.Document = BuildMarkdownDocument(ViewModel.QueryAnswer ?? "");
     }
 
     private void SyncRenderFromViewModel()

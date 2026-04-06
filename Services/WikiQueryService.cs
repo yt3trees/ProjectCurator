@@ -21,12 +21,70 @@ public class WikiQueryService
     private const int MaxRelevantPages = 5;
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions SaveOpts = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
+
+    private string? _currentSessionFilePath;
 
     public WikiQueryService(LlmClientService llm, WikiService wiki)
     {
         _llm = llm;
         _wiki = wiki;
     }
+
+    // ---- セッション管理 ----
+
+    public void StartNewSession(string wikiRoot, string sessionId)
+    {
+        var dir = WikiService.GetQueryHistoryDir(wikiRoot);
+        Directory.CreateDirectory(dir);
+        _currentSessionFilePath = Path.Combine(dir, $"{sessionId}.json");
+    }
+
+    private async Task AppendToCurrentSessionAsync(WikiQueryRecord record, CancellationToken ct)
+    {
+        if (_currentSessionFilePath == null) return;
+        List<WikiQueryRecord> records = [];
+        if (File.Exists(_currentSessionFilePath))
+        {
+            try
+            {
+                var existing = await File.ReadAllTextAsync(_currentSessionFilePath, Encoding.UTF8, ct);
+                records = JsonSerializer.Deserialize<List<WikiQueryRecord>>(existing, SaveOpts) ?? [];
+            }
+            catch { records = []; }
+        }
+        records.Add(record);
+        await File.WriteAllTextAsync(
+            _currentSessionFilePath,
+            JsonSerializer.Serialize(records, SaveOpts),
+            Encoding.UTF8, ct);
+    }
+
+    public static async Task<List<WikiQueryRecord>> LoadSessionFileAsync(
+        string filePath,
+        CancellationToken ct = default)
+    {
+        if (!File.Exists(filePath)) return [];
+        try
+        {
+            var json = await File.ReadAllTextAsync(filePath, Encoding.UTF8, ct);
+            return JsonSerializer.Deserialize<List<WikiQueryRecord>>(json, SaveOpts) ?? [];
+        }
+        catch { return []; }
+    }
+
+    /// <summary>現セッションを除いた過去セッションファイルを新しい順で返す。</summary>
+    public static List<string> GetPastSessionFiles(string wikiRoot, string currentSessionId)
+    {
+        var dir = WikiService.GetQueryHistoryDir(wikiRoot);
+        if (!Directory.Exists(dir)) return [];
+        return [.. Directory.GetFiles(dir, "*.json")
+            .Where(f => !Path.GetFileNameWithoutExtension(f)
+                .Equals(currentSessionId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(f => f)];
+    }
+
+    // ---- クエリ ----
 
     public async Task<WikiQueryRecord> Query(
         string wikiRoot,
@@ -56,13 +114,18 @@ public class WikiQueryService
 
         await _wiki.UpdateMeta(wikiRoot, m => m.Stats.LastQuery = DateTime.UtcNow);
 
-        return new WikiQueryRecord
+        var record = new WikiQueryRecord
         {
             AskedAt = DateTime.Now,
             Question = question,
             Answer = rawAnswer,
             ReferencedPages = referencedPages
         };
+
+        // Step 5: セッションファイルに保存
+        await AppendToCurrentSessionAsync(record, cancellationToken);
+
+        return record;
     }
 
     public async Task<string> SaveAnswerAsPage(
