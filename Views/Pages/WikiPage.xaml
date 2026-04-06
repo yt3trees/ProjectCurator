@@ -506,15 +506,38 @@
                                 <Border Grid.Row="0"
                                         Background="{DynamicResource AppSurface2}"
                                         Padding="8,4" CornerRadius="6,6,0,0">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Answer" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource AppSubtext0}"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text=" (loading...)" FontSize="11"
-                                                   Foreground="{DynamicResource AppYellow}"
-                                                   VerticalAlignment="Center"
-                                                   Visibility="{Binding IsQuerying, Converter={StaticResource BoolToVis}}"/>
-                                    </StackPanel>
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                            <TextBlock Text="Answer" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource AppSubtext0}"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Text=" (loading...)" FontSize="11"
+                                                       Foreground="{DynamicResource AppYellow}"
+                                                       VerticalAlignment="Center"
+                                                       Visibility="{Binding IsQuerying, Converter={StaticResource BoolToVis}}"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Command="{Binding SaveAnswerAsPageCommand}"
+                                                    IsEnabled="{Binding IsAiEnabled}"
+                                                    Visibility="{Binding HasQueryAnswer, Converter={StaticResource BoolToVis}}"
+                                                    ToolTip="Save as Wiki Page"
+                                                    Padding="6,4" Margin="0,0,2,0"
+                                                    Background="{DynamicResource AppSurface1}"
+                                                    Foreground="{DynamicResource AppSubtext0}"
+                                                    BorderThickness="0">
+                                                <ui:SymbolIcon Symbol="Save24" FontSize="14" Filled="False"/>
+                                            </Button>
+                                            <Button Command="{Binding ResetConversationCommand}"
+                                                    IsEnabled="{Binding IsQuerying, Converter={StaticResource InverseBoolConverter}}"
+                                                    ToolTip="New conversation"
+                                                    Padding="6,4"
+                                                    Background="{DynamicResource AppSurface1}"
+                                                    Foreground="{DynamicResource AppSubtext0}"
+                                                    BorderThickness="0">
+                                                <ui:SymbolIcon Symbol="ChatAdd24" FontSize="14" Filled="False"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
 
                                 <ContentPresenter x:Name="WikiQueryAnswerHost" Grid.Row="1"/>
@@ -523,51 +546,36 @@
                                         Background="{DynamicResource AppSurface0}"
                                         Padding="8,4" CornerRadius="0,0,6,6"
                                         Visibility="{Binding HasQueryAnswer, Converter={StaticResource BoolToVis}}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                            <TextBlock Text="Refs:"
-                                                       FontSize="10" Foreground="{DynamicResource AppSubtext0}"
-                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                            <ItemsControl ItemsSource="{Binding QueryReferencedPages}">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <WrapPanel Orientation="Horizontal"/>
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Button Command="{Binding DataContext.NavigateToPageCommand,
-                                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                CommandParameter="{Binding}"
-                                                                Background="Transparent"
-                                                                BorderThickness="0"
-                                                                Padding="0" Margin="0,0,4,0"
-                                                                Cursor="Hand">
-                                                            <Border Background="{DynamicResource AppSurface2}"
-                                                                    CornerRadius="3" Padding="5,2">
-                                                                <TextBlock Text="{Binding}" FontSize="10"
-                                                                           Foreground="{DynamicResource AppBlue}"
-                                                                           TextDecorations="Underline"/>
-                                                            </Border>
-                                                        </Button>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-
-                                        <ui:Button Grid.Column="1"
-                                                Command="{Binding SaveAnswerAsPageCommand}"
-                                                IsEnabled="{Binding IsAiEnabled}"
-                                                ToolTip="Save as Wiki Page"
-                                                Padding="6,3">
-                                            <ui:SymbolIcon Symbol="Save24" FontSize="14" Filled="False"/>
-                                        </ui:Button>
-                                    </Grid>
+                                    <WrapPanel Orientation="Horizontal">
+                                        <TextBlock Text="Refs:"
+                                                   FontSize="10" Foreground="{DynamicResource AppSubtext0}"
+                                                   VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <ItemsControl ItemsSource="{Binding QueryReferencedPages}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.NavigateToPageCommand,
+                                                                RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Padding="0" Margin="0,2,4,2"
+                                                            Cursor="Hand">
+                                                        <Border Background="{DynamicResource AppSurface2}"
+                                                                CornerRadius="3" Padding="5,2">
+                                                            <TextBlock Text="{Binding}" FontSize="10"
+                                                                       Foreground="{DynamicResource AppBlue}"
+                                                                       TextDecorations="Underline"/>
+                                                        </Border>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </WrapPanel>
                                 </Border>
                             </Grid>
                         </Border>
@@ -603,13 +611,17 @@
                             </ListBox.ItemTemplate>
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource WikiListItemStyle}">
+                                    <Setter Property="Tag"
+                                            Value="{Binding DataContext.DeleteQueryFromHistoryCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}"/>
                                     <Setter Property="ContextMenu">
                                         <Setter.Value>
                                             <ContextMenu>
                                                 <MenuItem Header="Delete"
-                                                          Command="{Binding DataContext.DeleteQueryFromHistoryCommand,
-                                                              RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                          CommandParameter="{Binding}"/>
+                                                          Command="{Binding PlacementTarget.Tag,
+                                                              RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext,
+                                                              RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                             </ContextMenu>
                                         </Setter.Value>
                                     </Setter>

@@ -154,4 +154,8 @@ public class WikiQueryRecord
     public string Answer { get; set; } = "";
     public List<string> ReferencedPages { get; set; } = [];
     public string? SavedAsPage { get; set; }
+
+    /// <summary>過去セッションから読み込んだ場合のセッションファイルパス。JSONには保存しない。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? SessionFilePath { get; set; }
 }

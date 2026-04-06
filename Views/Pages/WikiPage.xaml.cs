@@ -138,9 +138,14 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
                 SyncEditorFromViewModel();
                 SyncRenderFromViewModel();
             }
-            else if (args.PropertyName == nameof(WikiViewModel.QueryAnswer))
-                SyncQueryAnswerFromViewModel();
+            else if (args.PropertyName == nameof(WikiViewModel.SelectedQueryRecord))
+                UpdateQueryAnswerView();
         };
+
+        ViewModel.ConversationLog.CollectionChanged += (_, _) =>
+            UpdateQueryAnswerView();
+        ViewModel.SessionPreviewRecords.CollectionChanged += (_, _) =>
+            UpdateQueryAnswerView();
 
         await ViewModel.InitAsync();
     }
@@ -178,9 +183,89 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
         _syncingEditor = false;
     }
 
-    private void SyncQueryAnswerFromViewModel()
+    private void UpdateQueryAnswerView()
     {
-        _wikiQueryAnswerViewer.Document = BuildMarkdownDocument(ViewModel.QueryAnswer ?? "");
+        if (ViewModel.SessionPreviewRecords.Count > 0)
+        {
+            // 過去セッションの全会話を表示
+            _wikiQueryAnswerViewer.Document = BuildConversationDocument(ViewModel.SessionPreviewRecords);
+        }
+        else
+        {
+            // 現セッションの会話ログを表示
+            _wikiQueryAnswerViewer.Document = BuildConversationDocument(ViewModel.ConversationLog);
+            var sv = FindVisualChild<ScrollViewer>(_wikiQueryAnswerViewer);
+            sv?.ScrollToEnd();
+        }
+    }
+
+    private static FlowDocument BuildConversationDocument(IEnumerable<Curia.Models.WikiQueryRecord> records)
+    {
+        var doc = new FlowDocument
+        {
+            PagePadding = new Thickness(14, 10, 14, SystemParameters.HorizontalScrollBarHeight + 6),
+            FontFamily = new System.Windows.Media.FontFamily("Segoe UI, Lucida Sans Unicode, Arial"),
+            FontSize = 13,
+            LineHeight = 20
+        };
+
+        if (Application.Current?.Resources["AppText"] is System.Windows.Media.Brush appText)
+            doc.Foreground = appText;
+
+        var subtext = Application.Current?.Resources["AppSubtext0"] as System.Windows.Media.Brush
+                      ?? System.Windows.Media.Brushes.Gray;
+        var blue    = Application.Current?.Resources["AppBlue"] as System.Windows.Media.Brush
+                      ?? System.Windows.Media.Brushes.SteelBlue;
+        var surface = Application.Current?.Resources["AppSurface1"] as System.Windows.Media.Brush
+                      ?? System.Windows.Media.Brushes.Transparent;
+        var divider = Application.Current?.Resources["AppSurface2"] as System.Windows.Media.Brush
+                      ?? System.Windows.Media.Brushes.DimGray;
+
+        bool first = true;
+        foreach (var record in records)
+        {
+            if (!first)
+            {
+                doc.Blocks.Add(new Paragraph(new Run("─────────────────────────────────────"))
+                {
+                    Foreground = divider,
+                    Margin = new Thickness(0, 6, 0, 6),
+                    FontSize = 10
+                });
+            }
+            first = false;
+
+            // 質問ヘッダー
+            doc.Blocks.Add(new Paragraph(new Run(record.Question))
+            {
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 13,
+                Foreground = blue,
+                Margin = new Thickness(0, 0, 0, 4)
+            });
+
+            // 回答 (Markdown パース)
+            var answerDoc = BuildMarkdownDocument(record.Answer ?? "");
+            foreach (var block in answerDoc.Blocks.ToList())
+            {
+                answerDoc.Blocks.Remove(block);
+                doc.Blocks.Add(block);
+            }
+
+            // 参照ページ (あれば)
+            if (record.ReferencedPages.Count > 0)
+            {
+                doc.Blocks.Add(new Paragraph(
+                    new Run("Refs: " + string.Join(", ", record.ReferencedPages)))
+                {
+                    FontSize = 10,
+                    Foreground = subtext,
+                    Margin = new Thickness(0, 4, 0, 0)
+                });
+            }
+        }
+
+        return doc;
     }
 
     private void SyncRenderFromViewModel()

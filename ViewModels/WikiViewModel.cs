@@ -98,6 +98,8 @@ public partial class WikiViewModel : ObservableObject
     [ObservableProperty] private string queryAnswer = "";
     [ObservableProperty] private ObservableCollection<string> queryReferencedPages = [];
     [ObservableProperty] private ObservableCollection<WikiQueryRecord> queryHistory = [];
+    [ObservableProperty] private ObservableCollection<WikiQueryRecord> conversationLog = [];
+    [ObservableProperty] private ObservableCollection<WikiQueryRecord> sessionPreviewRecords = [];
     [ObservableProperty] private bool isQuerying;
     [ObservableProperty] private bool hasQueryAnswer;
     [ObservableProperty] private WikiQueryRecord? lastQueryRecord;
@@ -105,6 +107,7 @@ public partial class WikiViewModel : ObservableObject
     [ObservableProperty] private WikiQueryRecord? selectedQueryRecord;
 
     private string _currentSessionId = "";
+    private bool _currentSessionHistoryAdded;
     private List<string> _pastSessionFiles = [];
     private int _nextSessionIndex;
 
@@ -218,6 +221,12 @@ public partial class WikiViewModel : ObservableObject
             _currentSessionId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             _queryService.StartNewSession(WikiRoot, _currentSessionId);
             QueryHistory.Clear();
+            ConversationLog.Clear();
+            SessionPreviewRecords.Clear();
+            _currentSessionHistoryAdded = false;
+            HasQueryAnswer = false;
+            LastQueryRecord = null;
+            QueryReferencedPages.Clear();
             HasMoreHistory = false;
             _ = LoadInitialHistoryAsync();
             _ = LoadPagesAsync();
@@ -593,63 +602,115 @@ public partial class WikiViewModel : ObservableObject
         _cts = new CancellationTokenSource();
 
         IsQuerying = true;
-        HasQueryAnswer = false;
-        QueryAnswer = "";
-        QueryReferencedPages.Clear();
         try
         {
             var record = await _queryService.Query(WikiRoot, QueryText, _cts.Token);
             QueryText = "";
-            QueryAnswer = record.Answer;
+            ConversationLog.Add(record);
+            if (!_currentSessionHistoryAdded)
+            {
+                QueryHistory.Insert(0, record); // SessionFilePath = null → 現セッションのエントリー
+                _currentSessionHistoryAdded = true;
+            }
+            SelectedQueryRecord = null;
+            SessionPreviewRecords.Clear();
+            QueryReferencedPages.Clear();
             foreach (var p in record.ReferencedPages)
                 QueryReferencedPages.Add(p);
             HasQueryAnswer = true;
             LastQueryRecord = record;
-            QueryHistory.Insert(0, record);
             _trayService.ShowBalloonTip("Wiki Query", "Answer is ready.");
         }
         catch (Exception ex)
         {
-            QueryAnswer = $"Error: {ex.Message}";
+            // エラーは一時的なレコードとして会話ログに追加
+            ConversationLog.Add(new WikiQueryRecord
+            {
+                AskedAt = DateTime.Now,
+                Question = QueryText,
+                Answer = $"Error: {ex.Message}",
+                ReferencedPages = []
+            });
             HasQueryAnswer = true;
         }
         finally { IsQuerying = false; }
     }
 
+    private const int HistoryBatchSize = 15;
+
     private async Task LoadInitialHistoryAsync()
     {
         _pastSessionFiles = WikiQueryService.GetPastSessionFiles(WikiRoot, _currentSessionId);
         _nextSessionIndex = 0;
-        if (_pastSessionFiles.Count > 0)
-        {
-            var records = await WikiQueryService.LoadSessionFileAsync(_pastSessionFiles[0]);
-            foreach (var r in Enumerable.Reverse(records))
-                QueryHistory.Add(r);
-            _nextSessionIndex = 1;
-        }
-        HasMoreHistory = _nextSessionIndex < _pastSessionFiles.Count;
+        await LoadHistoryBatchAsync();
+    }
+
+    /// <summary>セッションファイルの先頭レコードをHistoryに1エントリーとして追加する。</summary>
+    private async Task LoadSessionSummaryAsync(string filePath)
+    {
+        var records = await WikiQueryService.LoadSessionFileAsync(filePath);
+        if (records.Count == 0) return;
+        var first = records[0];
+        first.SessionFilePath = filePath; // 過去セッション識別用
+        QueryHistory.Add(first);
+    }
+
+    [RelayCommand]
+    private void ResetConversation()
+    {
+        _currentSessionId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        _queryService.StartNewSession(WikiRoot, _currentSessionId);
+        _currentSessionHistoryAdded = false;
+        ConversationLog.Clear();
+        SessionPreviewRecords.Clear();
+        QueryReferencedPages.Clear();
+        HasQueryAnswer = false;
+        LastQueryRecord = null;
+        SelectedQueryRecord = null;
     }
 
     [RelayCommand]
     private async Task LoadMoreHistory()
     {
         if (_nextSessionIndex >= _pastSessionFiles.Count) return;
-        var records = await WikiQueryService.LoadSessionFileAsync(_pastSessionFiles[_nextSessionIndex]);
-        foreach (var r in Enumerable.Reverse(records))
-            QueryHistory.Add(r);
-        _nextSessionIndex++;
+        await LoadHistoryBatchAsync();
+    }
+
+    private async Task LoadHistoryBatchAsync()
+    {
+        int end = Math.Min(_nextSessionIndex + HistoryBatchSize, _pastSessionFiles.Count);
+        for (int i = _nextSessionIndex; i < end; i++)
+            await LoadSessionSummaryAsync(_pastSessionFiles[i]);
+        _nextSessionIndex = end;
         HasMoreHistory = _nextSessionIndex < _pastSessionFiles.Count;
     }
 
     partial void OnSelectedQueryRecordChanged(WikiQueryRecord? value)
     {
-        if (value == null) return;
-        QueryAnswer = value.Answer;
+        if (value == null) { SessionPreviewRecords.Clear(); return; }
+
+        if (value.SessionFilePath == null)
+        {
+            // 現セッションのエントリーをクリック → ConversationLogを表示
+            SessionPreviewRecords.Clear();
+            return;
+        }
+
+        // 過去セッション → 全レコードを非同期ロード
         QueryReferencedPages.Clear();
         foreach (var p in value.ReferencedPages)
             QueryReferencedPages.Add(p);
         HasQueryAnswer = true;
         LastQueryRecord = value;
+        _ = LoadSessionPreviewAsync(value.SessionFilePath);
+    }
+
+    private async Task LoadSessionPreviewAsync(string filePath)
+    {
+        var records = await WikiQueryService.LoadSessionFileAsync(filePath);
+        SessionPreviewRecords.Clear();
+        foreach (var r in records)
+            SessionPreviewRecords.Add(r);
     }
 
     [RelayCommand]
