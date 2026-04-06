@@ -86,9 +86,9 @@ Whether you run many projects in parallel or manage a single complex one, Curia 
 |---|---|
 | ![](_assets/Dashboard.png) | ![](_assets/Editor.png) |
 
-| Agent Hub | Timeline |
+| Agent Hub | Wiki |
 |---|---|
-| ![](_assets/AgentHub.png) | ![](_assets/Timeline.png) |
+| ![](_assets/AgentHub.png) | ![](_assets/Wiki-Pages.png) |
 
 | AI: What's Next | AI: Import Meeting Notes |
 |---|---|

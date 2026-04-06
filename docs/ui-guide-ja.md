@@ -128,33 +128,13 @@ Wiki が存在する場合は3つのサブビューが使えます。
 
 左ペインにカテゴリ別ページツリー、右ペインで選択ページの Markdown を表示します。検索バーでタイトル・パスを絞り込み、「Open in Editor」で直接編集できます。
 
-#### ページのカテゴリ
-
-ページツリーは以下のカテゴリで構成されます。LLM が Import 時に自動で分類します。
-
-| カテゴリ | 格納場所 | 内容 |
-|---|---|---|
-| Wiki Files | `wiki/` 直下 | `index.md`(ページ一覧) と `log.md`(操作ログ)。LLM が自動更新する管理ファイル |
-| sources | `pages/sources/` | 取り込んだソースファイルごとの要約ページ。1ソース = 1ページ |
-| entities | `pages/entities/` | プロジェクト上の具体的な「もの」のページ。テーブル定義・画面・API・帳票・ユーザーロールなど |
-| concepts | `pages/concepts/` | 設計思想や業務ルールのページ。承認フロー・ワークフロー・技術方針・判断基準など |
-| analysis | `pages/analysis/` | Query タブで「Save as Wiki Page」した Q&A や比較分析のページ |
-
-entities と concepts の違いの目安: 「それは何か(名詞)」→ entities、「それはどう動くか・なぜそうなのか(動詞・方針)」→ concepts。
+ページは sources / entities / concepts / analysis の4カテゴリに分類されます。カテゴリ詳細は [Wiki機能ドキュメント](wiki-features-ja.md) を参照してください。
 
 #### ソースの取り込み (Import)
 
-下部の「+ Import Source」をクリックするか、Wiki タブにファイルをドラッグ＆ドロップします。対応形式: `.md` / `.txt` (PDF / Word は現在テキスト変換要)。
+下部の「+ Import Source」をクリックするか、Wiki タブにファイルをドラッグ＆ドロップします。対応形式: `.md` / `.txt` / `.pdf` / `.docx`。
 
-AI 機能が有効なとき、LLM は以下の更新案を生成します:
-- `wiki/raw/` にソースを保存 (不変コピー)
-- `pages/sources/` に要約ページを作成
-- 関連する `pages/entities/` と `pages/concepts/` ページを作成・更新
-- `index.md` と `log.md` の更新案を生成
-
-保存前に、新規/更新ページごとの差分レビューを表示し、承認後に保存されます。
-
-プロンプト詳細と「ドキュメントをLLMに渡して更新するフロー」は [Wiki機能ドキュメント](wiki-features-ja.md) を参照してください。
+AI 機能が有効なとき、LLM が新規・更新ページを生成し、保存前に差分レビューを表示します。Import フローとプロンプト詳細は [Wiki機能ドキュメント](wiki-features-ja.md) を参照してください。
 
 ### Query (AI機能が必要)
 
@@ -167,20 +147,9 @@ Wiki に対して自然言語で質問できます。
 
 ### Lint
 
-Wiki の整合性を静的 + LLM チェックで検証します。
+Wiki の整合性を静的 + LLM チェックで検証します。「Run Lint」をクリックすると、リンク切れ・孤立ページ・陳腐化コンテンツ・矛盾・未作成トピックを検出します。LLM チェック (Contradiction / Missing) は AI 機能が有効なときのみ実行されます。
 
-「Run Lint」をクリックすると以下を検出します:
-
-| カテゴリ | 内容 | 確認方法 |
-|---------|------|---------|
-| BrokenLink | 存在しないページへの [[wikilink]] | 静的 |
-| Orphan | インバウンドリンクが 0 のページ | 静的 |
-| MissingSource | raw/ に存在しないソース参照 | 静的 |
-| Stale | 30 日以上更新されていないページ | 静的 |
-| Contradiction | 同じ事実に対する矛盾した記述 | LLM |
-| Missing | 複数ページで言及されているがページ未作成のトピック | LLM |
-
-LLM チェック (Contradiction / Missing) は AI 機能が有効なときのみ実行されます。
+チェック種別の一覧とプロンプト詳細は [Wiki機能ドキュメント](wiki-features-ja.md#lint) を参照してください。
 
 ## Agent Hub
 

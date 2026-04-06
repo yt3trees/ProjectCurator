@@ -128,33 +128,13 @@ Once a Wiki exists, three sub-views become available.
 
 Left pane shows a category-based page tree; right pane shows the selected page's Markdown. Use the search bar to filter by title or path, and click "Open in Editor" to edit directly.
 
-#### Page Categories
-
-The page tree uses the following categories. The LLM assigns categories automatically during Import.
-
-| Category | Location | Contents |
-|---|---|---|
-| Wiki Files | `wiki/` root | `index.md` (page list) and `log.md` (operation log). Management files auto-updated by the LLM |
-| sources | `pages/sources/` | One summary page per imported source file |
-| entities | `pages/entities/` | Concrete "things" in the project: tables, screens, APIs, reports, user roles, etc. |
-| concepts | `pages/concepts/` | Design philosophy and business rules: approval flows, workflows, technical policies, decision criteria, etc. |
-| analysis | `pages/analysis/` | Q&A pages and comparative analyses saved from the Query tab |
-
-A helpful rule of thumb: "What is it (noun)?" → entities; "How does it work or why is it so (verb/policy)?" → concepts.
+Pages are organized into four categories (sources, entities, concepts, analysis). For category details, see [Wiki Features](wiki-features.md).
 
 #### Import Source
 
-Click "+ Import Source" at the bottom or drag and drop a file onto the Wiki tab. Supported formats: `.md` / `.txt` (PDF / Word require text conversion first).
+Click "+ Import Source" at the bottom or drag and drop a file onto the Wiki tab. Supported formats: `.md` / `.txt` / `.pdf` / `.docx`.
 
-When AI Features is enabled, the LLM prepares:
-- Saves the source to `wiki/raw/` (immutable copy)
-- Creates a summary page in `pages/sources/`
-- Creates or updates related `pages/entities/` and `pages/concepts/` pages
-- Updates to `index.md` and `log.md`
-
-Before saving, each new/updated page is shown in a diff review dialog. Changes are saved only after approval.
-
-For prompt details and the document-to-LLM update flow, see [Wiki Features](wiki-features.md).
+When AI Features is enabled, the LLM generates new and updated pages; each change is shown in a diff review dialog before saving. For the full import flow and prompt details, see [Wiki Features](wiki-features.md).
 
 ### Query (requires AI Features)
 
@@ -167,20 +147,9 @@ Ask questions about the Wiki in natural language.
 
 ### Lint
 
-Validate Wiki consistency using static checks and LLM analysis.
+Validate Wiki consistency using static checks and LLM analysis. Click "Run Lint" to detect broken links, orphan pages, stale content, contradictions, and missing topics. LLM checks (Contradiction / Missing) run only when AI Features is enabled.
 
-Click "Run Lint" to detect the following:
-
-| Category | Description | Method |
-|---|---|---|
-| BrokenLink | `[[wikilink]]` pointing to a non-existent page | Static |
-| Orphan | Page with no inbound links | Static |
-| MissingSource | Source reference in `raw/` that does not exist | Static |
-| Stale | Page not updated in 30+ days | Static |
-| Contradiction | Conflicting descriptions of the same fact | LLM |
-| Missing | Topic mentioned in multiple pages but with no dedicated page | LLM |
-
-LLM checks (Contradiction / Missing) run only when AI Features is enabled.
+For the full check list and prompt details, see [Wiki Features](wiki-features.md#lint).
 
 ## Agent Hub
 

@@ -84,9 +84,9 @@ Curia は、人間とAI両方にとっての「面倒な行き来」を減らし
 |---|---|
 | ![](_assets/Dashboard.png) | ![](_assets/Editor.png) |
 
-| Agent Hub | Timeline |
+| Agent Hub | Wiki |
 |---|---|
-| ![](_assets/AgentHub.png) | ![](_assets/Timeline.png) |
+| ![](_assets/AgentHub.png) | ![](_assets/Wiki-Pages.png) |
 
 | AI: What's Next | AI: Import Meeting Notes |
 |---|---|
