@@ -73,4 +73,7 @@ public class AppSettings
     // Capture 設定
     public bool CaptureTaskLogEnabled { get; set; } = false;   // task 起票成功時に tasks.md へ即時追記するか
     public string LlmLanguage { get; set; } = "English";       // LLM レスポンスの言語指定
+    // Editor / Wiki フォントサイズ
+    public int EditorFontSize { get; set; } = 14;
+    public int MarkdownRenderFontSize { get; set; } = 13;
 }

@@ -135,6 +135,13 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool captureTaskLogEnabled;
 
+    // Editor / Wiki フォントサイズ
+    [ObservableProperty]
+    private int editorFontSize = 14;
+
+    [ObservableProperty]
+    private int markdownRenderFontSize = 13;
+
     // About
     public string AppVersion { get; } =
         "v" + (System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0");
@@ -212,6 +219,8 @@ public partial class SettingsViewModel : ObservableObject
             AiEnabled          = settings.AiEnabled;
             AiToggleCanEnable  = settings.AiEnabled; // 既にオンなら再テスト不要
             CaptureTaskLogEnabled = settings.CaptureTaskLogEnabled;
+            EditorFontSize = settings.EditorFontSize;
+            MarkdownRenderFontSize   = settings.MarkdownRenderFontSize;
         }
         finally
         {
@@ -284,8 +293,11 @@ public partial class SettingsViewModel : ObservableObject
         settings.LlmLanguage    = LlmLanguage.Trim();
         settings.AiEnabled      = AiEnabled;
         settings.CaptureTaskLogEnabled = CaptureTaskLogEnabled;
+        settings.EditorFontSize = EditorFontSize;
+        settings.MarkdownRenderFontSize   = MarkdownRenderFontSize;
         _configService.SaveSettings(settings);
         UpdateWorkspacePathsWarning();
+        WeakReferenceMessenger.Default.Send(new FontSizeChangedMessage(EditorFontSize, MarkdownRenderFontSize));
     }
 
     [RelayCommand]

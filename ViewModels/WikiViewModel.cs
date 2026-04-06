@@ -124,6 +124,8 @@ public partial class WikiViewModel : ObservableObject
     [ObservableProperty] private bool isImporting;
     [ObservableProperty] private bool isAiEnabled;
     [ObservableProperty] private string statusText = "";
+    [ObservableProperty] private int editorFontSize = 14;
+    [ObservableProperty] private int markdownRenderFontSize = 13;
 
     // ── Wiki 初期化 ───────────────────────────────────
     [ObservableProperty] private string newWikiDomain = "";
@@ -148,9 +150,17 @@ public partial class WikiViewModel : ObservableObject
         _llmClient    = llmClient;
         _trayService  = trayService;
 
-        IsAiEnabled = _config.LoadSettings().AiEnabled;
+        var settings = _config.LoadSettings();
+        IsAiEnabled            = settings.AiEnabled;
+        EditorFontSize         = settings.EditorFontSize;
+        MarkdownRenderFontSize = settings.MarkdownRenderFontSize;
         WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
             (_, msg) => IsAiEnabled = msg.Enabled);
+        WeakReferenceMessenger.Default.Register<FontSizeChangedMessage>(this, (_, msg) =>
+        {
+            EditorFontSize         = msg.EditorFontSize;
+            MarkdownRenderFontSize = msg.MarkdownRenderFontSize;
+        });
     }
 
     // ────────────────────────────────────────────────

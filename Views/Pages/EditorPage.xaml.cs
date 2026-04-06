@@ -112,6 +112,10 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
                 else
                     HideDiffView();
             }
+            else if (e.PropertyName == nameof(EditorViewModel.EditorFontSize))
+            {
+                _editor.FontSize = ViewModel.EditorFontSize;
+            }
         };
     }
 
@@ -122,9 +126,10 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
     {
         // ハイライト定義を一度だけ登録
         RegisterMarkdownHighlighting();
-        
+
         await ViewModel.LoadProjectsAsync();
         ApplyEditorTheme();
+        _editor.FontSize = ViewModel.EditorFontSize;
     }
 
     private void ApplyEditorTheme()

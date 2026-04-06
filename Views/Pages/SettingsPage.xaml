@@ -183,6 +183,71 @@
                 </Grid>
             </Border>
 
+            <!-- ===== Editor / Wiki ===== -->
+            <TextBlock Text="Editor / Wiki" FontSize="15" FontWeight="SemiBold"
+                       Foreground="{DynamicResource AppText}" Margin="0,20,0,10"/>
+
+            <Border Background="{DynamicResource AppSurface0}"
+                    BorderBrush="{DynamicResource AppSurface2}"
+                    BorderThickness="1" CornerRadius="6"
+                    Padding="16,12" Margin="0,0,0,6">
+                <StackPanel>
+                    <!-- Editor Font Size -->
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Editor font size" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppText}"/>
+                            <TextBlock Text="Font size for the Markdown editor (8-28)" FontSize="11"
+                                       Foreground="{DynamicResource AppSubtext0}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Slider Minimum="8" Maximum="28" TickFrequency="1"
+                                    IsSnapToTickEnabled="True" Width="160"
+                                    Value="{Binding EditorFontSize, Mode=TwoWay}"
+                                    VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding EditorFontSize}"
+                                       FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppBlue}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0" Width="28"
+                                       TextAlignment="Right"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Separator Background="{DynamicResource AppSurface2}" Margin="0,0,0,14"/>
+
+                    <!-- Wiki Font Size -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Markdown rendering font size" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppText}"/>
+                            <TextBlock Text="Font size for the Wiki Markdown preview (8-28)" FontSize="11"
+                                       Foreground="{DynamicResource AppSubtext0}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Slider Minimum="8" Maximum="28" TickFrequency="1"
+                                    IsSnapToTickEnabled="True" Width="160"
+                                    Value="{Binding MarkdownRenderFontSize, Mode=TwoWay}"
+                                    VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding MarkdownRenderFontSize}"
+                                       FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppBlue}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0" Width="28"
+                                       TextAlignment="Right"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- ===== Dashboard Settings ===== -->
             <TextBlock Text="Dashboard Settings" FontSize="15" FontWeight="SemiBold"
                        Foreground="{DynamicResource AppText}" Margin="0,20,0,10"/>

@@ -20,3 +20,12 @@ public class AiEnabledChangedMessage(bool enabled)
 {
     public bool Enabled { get; } = enabled;
 }
+
+/// <summary>
+/// Editor / Wiki のフォントサイズが変わったときのメッセージ。
+/// </summary>
+public class FontSizeChangedMessage(int editorFontSize, int wikiFontSize)
+{
+    public int EditorFontSize { get; } = editorFontSize;
+    public int MarkdownRenderFontSize { get; } = wikiFontSize;
+}

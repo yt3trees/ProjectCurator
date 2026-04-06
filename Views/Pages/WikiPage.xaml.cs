@@ -140,6 +140,13 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             }
             else if (args.PropertyName == nameof(WikiViewModel.SelectedQueryRecord))
                 UpdateQueryAnswerView();
+            else if (args.PropertyName == nameof(WikiViewModel.EditorFontSize))
+                _wikiEditor.FontSize = ViewModel.EditorFontSize;
+            else if (args.PropertyName == nameof(WikiViewModel.MarkdownRenderFontSize))
+            {
+                SyncRenderFromViewModel();
+                UpdateQueryAnswerView();
+            }
         };
 
         ViewModel.ConversationLog.CollectionChanged += (_, _) =>
@@ -147,6 +154,7 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
         ViewModel.SessionPreviewRecords.CollectionChanged += (_, _) =>
             UpdateQueryAnswerView();
 
+        _wikiEditor.FontSize = ViewModel.EditorFontSize;
         await ViewModel.InitAsync();
     }
 
@@ -188,25 +196,25 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
         if (ViewModel.SessionPreviewRecords.Count > 0)
         {
             // 過去セッションの全会話を表示
-            _wikiQueryAnswerViewer.Document = BuildConversationDocument(ViewModel.SessionPreviewRecords);
+            _wikiQueryAnswerViewer.Document = BuildConversationDocument(ViewModel.SessionPreviewRecords, ViewModel.MarkdownRenderFontSize);
         }
         else
         {
             // 現セッションの会話ログを表示
-            _wikiQueryAnswerViewer.Document = BuildConversationDocument(ViewModel.ConversationLog);
+            _wikiQueryAnswerViewer.Document = BuildConversationDocument(ViewModel.ConversationLog, ViewModel.MarkdownRenderFontSize);
             var sv = FindVisualChild<ScrollViewer>(_wikiQueryAnswerViewer);
             sv?.ScrollToEnd();
         }
     }
 
-    private static FlowDocument BuildConversationDocument(IEnumerable<Curia.Models.WikiQueryRecord> records)
+    private static FlowDocument BuildConversationDocument(IEnumerable<Curia.Models.WikiQueryRecord> records, double fontSize = 13)
     {
         var doc = new FlowDocument
         {
             PagePadding = new Thickness(14, 10, 14, SystemParameters.HorizontalScrollBarHeight + 6),
             FontFamily = new System.Windows.Media.FontFamily("Segoe UI, Lucida Sans Unicode, Arial"),
-            FontSize = 13,
-            LineHeight = 20
+            FontSize = fontSize,
+            LineHeight = Math.Max(fontSize + 6, 20)
         };
 
         if (Application.Current?.Resources["AppText"] is System.Windows.Media.Brush appText)
@@ -239,13 +247,13 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             doc.Blocks.Add(new Paragraph(new Run(record.Question))
             {
                 FontWeight = FontWeights.SemiBold,
-                FontSize = 13,
+                FontSize = fontSize,
                 Foreground = blue,
                 Margin = new Thickness(0, 0, 0, 4)
             });
 
             // 回答 (Markdown パース)
-            var answerDoc = BuildMarkdownDocument(record.Answer ?? "");
+            var answerDoc = BuildMarkdownDocument(record.Answer ?? "", fontSize);
             foreach (var block in answerDoc.Blocks.ToList())
             {
                 answerDoc.Blocks.Remove(block);
@@ -270,8 +278,8 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
 
     private void SyncRenderFromViewModel()
     {
-        _wikiRenderViewer.Document = BuildMarkdownDocument(ViewModel.PreviewContent ?? "");
-        
+        _wikiRenderViewer.Document = BuildMarkdownDocument(ViewModel.PreviewContent ?? "", ViewModel.MarkdownRenderFontSize);
+
         // ファイルが切り替わった時のみスクロールをリセット（編集中に上に戻るのを防ぐ）
         if (_lastRenderedPath != ViewModel.SelectedPagePath)
         {
@@ -304,14 +312,14 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             SystemParameters.HorizontalScrollBarHeight + 2);
     }
 
-    private static FlowDocument BuildMarkdownDocument(string markdown)
+    private static FlowDocument BuildMarkdownDocument(string markdown, double fontSize = 13)
     {
         var doc = new FlowDocument
         {
             PagePadding = new Thickness(14, 10, 14, SystemParameters.HorizontalScrollBarHeight + 6),
             FontFamily = new System.Windows.Media.FontFamily("Segoe UI, Lucida Sans Unicode, Arial"),
-            FontSize = 13,
-            LineHeight = 20 // 行間を少し広げて読みやすく
+            FontSize = fontSize,
+            LineHeight = Math.Max(fontSize + 6, 20)
         };
 
         // Set default foreground from theme
@@ -374,8 +382,9 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             {
                 var level = Math.Min(6, trimmed.TakeWhile(c => c == '#').Count());
                 var text = trimmed[level..].Trim();
-                // 見出しサイズも全体に合わせて少しスケールダウン
-                var size = level switch { 1 => 20d, 2 => 18d, 3 => 16d, 4 => 14d, _ => 13d };
+                // 見出しサイズはベースフォントサイズに対して相対的に決定
+                var scale = level switch { 1 => 1.54d, 2 => 1.38d, 3 => 1.23d, 4 => 1.08d, _ => 1d };
+                var size = Math.Round(fontSize * scale);
                 var headingTopMargin = level <= 2 ? 14d : 10d;
                 doc.Blocks.Add(new Paragraph(new Run(text))
                 {

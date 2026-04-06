@@ -111,6 +111,10 @@ public partial class EditorViewModel : ObservableObject
     [ObservableProperty]
     private bool isAiEnabled;
 
+    // ---- フォントサイズ ----
+    [ObservableProperty]
+    private int editorFontSize = 14;
+
     // ---- new decision_log 要求コールバック ----
     public Func<Task<string?>>? RequestNewDecisionLogName;
 
@@ -155,9 +159,13 @@ public partial class EditorViewModel : ObservableObject
         _meetingNotesService = meetingNotesService;
         _trayService = trayService;
 
-        IsAiEnabled = _configService.LoadSettings().AiEnabled;
+        var settings = _configService.LoadSettings();
+        IsAiEnabled    = settings.AiEnabled;
+        EditorFontSize = settings.EditorFontSize;
         WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
             (_, msg) => IsAiEnabled = msg.Enabled);
+        WeakReferenceMessenger.Default.Register<FontSizeChangedMessage>(this,
+            (_, msg) => EditorFontSize = msg.EditorFontSize);
     }
 
     // =====================================================================
