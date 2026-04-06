@@ -23,6 +23,7 @@ public class WikiIngestService
 {
     private readonly LlmClientService _llm;
     private readonly WikiService _wiki;
+    private readonly ConfigService _configService;
     private const int MaxUpdateCandidates = 8;
     private const int MaxPdfOcrPages = 20;
 
@@ -31,10 +32,11 @@ public class WikiIngestService
         PropertyNameCaseInsensitive = true
     };
 
-    public WikiIngestService(LlmClientService llm, WikiService wiki)
+    public WikiIngestService(LlmClientService llm, WikiService wiki, ConfigService configService)
     {
         _llm = llm;
         _wiki = wiki;
+        _configService = configService;
     }
 
     public async Task<IngestResult> IngestSource(
@@ -173,9 +175,9 @@ public class WikiIngestService
 
     // ---- プロンプト構築 ----
 
-    private static string BuildSystemPrompt(string schema)
+    private string BuildSystemPrompt(string schema)
     {
-        var isJapanese = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ja";
+        var language = _configService.LoadSettings().LlmLanguage;
         return $$"""
 You are the Wiki maintainer for Curia.
 Follow the wiki-schema.md below exactly.
@@ -187,7 +189,7 @@ IMPORTANT:
 - For updatedPages, return the FULL updated content in the "diff" field (not a patch).
 - Keep pages concise and well-structured in Markdown.
 - Use [[PageName]] wikilink format for cross-references.
-- Write all page content in {{(isJapanese ? "Japanese" : "English")}}.
+- Write all page content in {{language}}.
 - Include YAML frontmatter at the top of each page:
   ---
   title: "..."

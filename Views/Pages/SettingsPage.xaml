@@ -351,6 +351,15 @@
                              Foreground="{DynamicResource AppText}"
                              BorderBrush="{DynamicResource AppSurface2}"/>
 
+                    <TextBlock Text="Language" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
+                    <TextBlock Text="Language for AI responses (e.g. English, Japanese, French)." FontSize="11"
+                               Foreground="{DynamicResource AppSubtext0}" Margin="0,1,0,4"/>
+                    <TextBox Text="{Binding LlmLanguage, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,2,0,8" Padding="6,4"
+                             Background="{DynamicResource AppSurface1}"
+                             Foreground="{DynamicResource AppText}"
+                             BorderBrush="{DynamicResource AppSurface2}"/>
+
                     <!-- Azure OpenAI のみ表示 -->
                     <StackPanel>
                         <StackPanel.Style>

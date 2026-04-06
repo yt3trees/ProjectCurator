@@ -18,6 +18,7 @@ public class WikiQueryService
 {
     private readonly LlmClientService _llm;
     private readonly WikiService _wiki;
+    private readonly ConfigService _configService;
     private const int MaxRelevantPages = 5;
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
@@ -25,10 +26,11 @@ public class WikiQueryService
 
     private string? _currentSessionFilePath;
 
-    public WikiQueryService(LlmClientService llm, WikiService wiki)
+    public WikiQueryService(LlmClientService llm, WikiService wiki, ConfigService configService)
     {
         _llm = llm;
         _wiki = wiki;
+        _configService = configService;
     }
 
     // ---- セッション管理 ----
@@ -71,6 +73,30 @@ public class WikiQueryService
             return JsonSerializer.Deserialize<List<WikiQueryRecord>>(json, SaveOpts) ?? [];
         }
         catch { return []; }
+    }
+
+    /// <summary>指定レコードをセッションファイルから削除する。</summary>
+    public async Task DeleteRecordAsync(string wikiRoot, WikiQueryRecord record, CancellationToken ct = default)
+    {
+        var dir = WikiService.GetQueryHistoryDir(wikiRoot);
+        if (!Directory.Exists(dir)) return;
+        foreach (var file in Directory.GetFiles(dir, "*.json"))
+        {
+            try
+            {
+                var json = await File.ReadAllTextAsync(file, Encoding.UTF8, ct);
+                var records = JsonSerializer.Deserialize<List<WikiQueryRecord>>(json, SaveOpts) ?? [];
+                var before = records.Count;
+                records.RemoveAll(r => r.AskedAt == record.AskedAt && r.Question == record.Question);
+                if (records.Count == before) continue;
+                if (records.Count == 0)
+                    File.Delete(file);
+                else
+                    await File.WriteAllTextAsync(file, JsonSerializer.Serialize(records, SaveOpts), Encoding.UTF8, ct);
+                return;
+            }
+            catch { }
+        }
     }
 
     /// <summary>現セッションを除いた過去セッションファイルを新しい順で返す。</summary>
@@ -256,15 +282,15 @@ From the wiki index below, list the {MaxRelevantPages} most relevant page paths 
 
     // ---- プロンプト構築 ----
 
-    private static string BuildAnswerSystemPrompt(string schema)
+    private string BuildAnswerSystemPrompt(string schema)
     {
-        var isJapanese = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ja";
+        var language = _configService.LoadSettings().LlmLanguage;
         return $"""
 You are a knowledgeable assistant for a project wiki.
 Answer questions based ONLY on the provided wiki content.
 If the answer is not in the wiki, say so clearly.
 Always cite the pages you referenced using [[PageName]] format.
-Write your answer in {(isJapanese ? "Japanese" : "English")}.
+Write your answer in {language}.
 
 Project context:
 {schema}

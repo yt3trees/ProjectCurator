@@ -266,7 +266,7 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
 
             if (string.IsNullOrWhiteSpace(trimmed))
             {
-                doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 0, 0, 4) });
+                // Skip blank lines; paragraph margins provide spacing
                 continue;
             }
 
@@ -291,12 +291,13 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
                 var text = trimmed[level..].Trim();
                 // 見出しサイズも全体に合わせて少しスケールダウン
                 var size = level switch { 1 => 20d, 2 => 18d, 3 => 16d, 4 => 14d, _ => 13d };
+                var headingTopMargin = level <= 2 ? 14d : 10d;
                 doc.Blocks.Add(new Paragraph(new Run(text))
                 {
                     FontWeight = FontWeights.SemiBold,
                     FontSize = size,
                     Foreground = new SolidColorBrush(MediaColor.FromRgb(0x79, 0xc0, 0xff)),
-                    Margin = new Thickness(0, 8, 0, 4)
+                    Margin = new Thickness(0, headingTopMargin, 0, 4)
                 });
                 continue;
             }
@@ -305,7 +306,7 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             {
                 doc.Blocks.Add(new Paragraph(new Run("• " + trimmed[2..].Trim()))
                 {
-                    Margin = new Thickness(10, 0, 0, 2)
+                    Margin = new Thickness(10, 0, 0, 3)
                 });
                 continue;
             }
@@ -315,7 +316,7 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             {
                 doc.Blocks.Add(new Paragraph(new Run(ordered))
                 {
-                    Margin = new Thickness(10, 0, 0, 2)
+                    Margin = new Thickness(10, 0, 0, 3)
                 });
                 continue;
             }
@@ -324,7 +325,7 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             {
                 doc.Blocks.Add(new Paragraph(new Run(trimmed[2..]))
                 {
-                    Margin = new Thickness(12, 0, 0, 4),
+                    Margin = new Thickness(12, 0, 0, 5),
                     Foreground = new SolidColorBrush(MediaColor.FromRgb(0x9b, 0xd0, 0x9b))
                 });
                 continue;
@@ -332,7 +333,7 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
 
             doc.Blocks.Add(new Paragraph(new Run(line))
             {
-                Margin = new Thickness(0, 0, 0, 4)
+                Margin = new Thickness(0, 0, 0, 6)
             });
         }
 

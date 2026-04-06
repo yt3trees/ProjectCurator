@@ -2018,10 +2018,10 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             }
 
             var userPrompt = BuildBriefingUserPrompt(data);
-            var lang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-            var systemPrompt = lang == "ja"
-                ? BriefingSystemPrompt + "\n\nRespond in Japanese."
-                : BriefingSystemPrompt;
+            var language = _configService.LoadSettings().LlmLanguage;
+            var systemPrompt = language.Equals("English", StringComparison.OrdinalIgnoreCase)
+                ? BriefingSystemPrompt
+                : BriefingSystemPrompt + $"\n\nRespond in {language}.";
 
             var response = await _llmClientService.ChatCompletionAsync(systemPrompt, userPrompt, cts.Token);
             if (string.IsNullOrWhiteSpace(response))
@@ -2973,10 +2973,10 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             var tasks = ViewModel.GetTopTasksForAi(30);
             var userPrompt = BuildWhatsNextUserPrompt(projects, tasks, focusPreviews);
 
-            var lang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-            var systemPrompt = lang == "ja"
-                ? WhatsNextSystemPrompt + "\n\nRespond entirely in Japanese."
-                : WhatsNextSystemPrompt;
+            var language = _configService.LoadSettings().LlmLanguage;
+            var systemPrompt = language.Equals("English", StringComparison.OrdinalIgnoreCase)
+                ? WhatsNextSystemPrompt
+                : WhatsNextSystemPrompt + $"\n\nRespond entirely in {language}.";
 
             var response = await _llmClientService.ChatCompletionAsync(
                 systemPrompt, userPrompt, cts.Token);

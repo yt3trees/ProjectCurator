@@ -72,4 +72,5 @@ public class AppSettings
     public string LlmUserProfile { get; set; } = "";
     // Capture 設定
     public bool CaptureTaskLogEnabled { get; set; } = false;   // task 起票成功時に tasks.md へ即時追記するか
+    public string LlmLanguage { get; set; } = "English";       // LLM レスポンスの言語指定
 }

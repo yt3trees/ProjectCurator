@@ -114,6 +114,10 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string llmUserProfile = "";
 
+    // LLM レスポンス言語
+    [ObservableProperty]
+    private string llmLanguage = "English";
+
     [ObservableProperty]
     private string llmStatus = "";
 
@@ -202,6 +206,7 @@ public partial class SettingsViewModel : ObservableObject
             LlmParametersText = string.Join("\n",
                 settings.LlmParameters.Select(kv => $"{kv.Key} = {kv.Value}"));
             LlmUserProfile     = settings.LlmUserProfile;
+            LlmLanguage        = string.IsNullOrWhiteSpace(settings.LlmLanguage) ? "English" : settings.LlmLanguage;
             LlmIsAzure         = settings.LlmProvider.Equals("azure_openai", StringComparison.OrdinalIgnoreCase);
             LlmStatus          = "";
             AiEnabled          = settings.AiEnabled;
@@ -276,6 +281,7 @@ public partial class SettingsViewModel : ObservableObject
         settings.LlmApiVersion  = LlmApiVersion.Trim();
         settings.LlmParameters  = ParseLlmParametersText(LlmParametersText);
         settings.LlmUserProfile = LlmUserProfile;
+        settings.LlmLanguage    = LlmLanguage.Trim();
         settings.AiEnabled      = AiEnabled;
         settings.CaptureTaskLogEnabled = CaptureTaskLogEnabled;
         _configService.SaveSettings(settings);
@@ -293,6 +299,7 @@ public partial class SettingsViewModel : ObservableObject
         settings.LlmApiVersion  = LlmApiVersion.Trim();
         settings.LlmParameters  = ParseLlmParametersText(LlmParametersText);
         settings.LlmUserProfile = LlmUserProfile;
+        settings.LlmLanguage    = LlmLanguage.Trim();
         settings.AiEnabled      = AiEnabled;
         _configService.SaveSettings(settings);
         LlmStatus = $"Saved {DateTime.Now:HH:mm:ss}";

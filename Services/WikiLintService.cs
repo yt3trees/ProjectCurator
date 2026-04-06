@@ -16,11 +16,13 @@ public class WikiLintService
 {
     private readonly LlmClientService _llm;
     private readonly WikiService _wiki;
+    private readonly ConfigService _configService;
 
-    public WikiLintService(LlmClientService llm, WikiService wiki)
+    public WikiLintService(LlmClientService llm, WikiService wiki, ConfigService configService)
     {
         _llm = llm;
         _wiki = wiki;
+        _configService = configService;
     }
 
     public async Task<WikiLintResult> RunLint(
@@ -203,8 +205,8 @@ public class WikiLintService
             sb.AppendLine($"- {page.RelativePath}: {page.Title} — {firstLine[..Math.Min(100, firstLine.Length)]}");
         }
 
-        var isJapanese = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ja";
-        var systemPrompt = isJapanese ? """
+        var language = _configService.LoadSettings().LlmLanguage;
+        var systemPrompt = language.Equals("Japanese", StringComparison.OrdinalIgnoreCase) ? """
 あなたはWikiの品質監査担当です。以下の2点についてWikiページを分析してください:
 1. 矛盾: 同じ事実について異なる記述があるページ
 2. ページ不足: 3ページ以上で言及されているがページが存在しないトピック

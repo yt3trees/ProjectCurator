@@ -41,6 +41,17 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Background" Value="{DynamicResource AppSurface2}"/>
@@ -281,38 +292,52 @@
                             </Grid>
                         </Border>
 
-                        <ScrollViewer Grid.Row="1"
-                                      VerticalScrollBarVisibility="Auto"
-                                      HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding PageTree}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel>
-                                            <Border Background="{DynamicResource AppSurface1}"
-                                                    Padding="6,3" Margin="0,4,0,0">
-                                                <TextBlock Text="{Binding Title}"
-                                                           FontSize="10" FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource AppSubtext0}"/>
-                                            </Border>
-                                            <ListBox ItemsSource="{Binding Children}"
-                                                     SelectionChanged="OnPageItemSelected"
-                                                     ItemContainerStyle="{StaticResource WikiListItemStyle}"
-                                                     BorderThickness="0"
-                                                     Background="Transparent"
-                                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                                <ListBox.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding Title}"
-                                                                   FontSize="12"
-                                                                   TextTrimming="CharacterEllipsis"/>
-                                                    </DataTemplate>
-                                                </ListBox.ItemTemplate>
-                                            </ListBox>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
+                        <Grid Grid.Row="1">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding PageTree}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <Border Background="{DynamicResource AppSurface1}"
+                                                        Padding="6,3" Margin="0,4,0,0">
+                                                    <TextBlock Text="{Binding Title}"
+                                                               FontSize="10" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource AppSubtext0}"/>
+                                                </Border>
+                                                <ListBox ItemsSource="{Binding Children}"
+                                                         SelectionChanged="OnPageItemSelected"
+                                                         ItemContainerStyle="{StaticResource WikiListItemStyle}"
+                                                         BorderThickness="0"
+                                                         Background="Transparent"
+                                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding Title}"
+                                                                       FontSize="12"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <!-- Page tree loading overlay -->
+                            <Border Background="{DynamicResource AppSurface0}"
+                                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <ui:ProgressRing Width="24" Height="24" IsIndeterminate="True"
+                                                     HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Loading..."
+                                               Margin="0,8,0,0" FontSize="12"
+                                               Foreground="{DynamicResource AppSubtext0}"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
                     </Grid>
 
                     <GridSplitter Grid.Column="1"
@@ -413,7 +438,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="260"/>
+                        <ColumnDefinition Width="180"/>
                     </Grid.ColumnDefinitions>
 
                     <Grid Grid.Column="0">
@@ -546,7 +571,7 @@
                                    Margin="0,0,0,6"/>
                         <ListBox Grid.Row="1"
                                  ItemsSource="{Binding QueryHistory}"
-                                 ItemContainerStyle="{StaticResource WikiListItemStyle}"
+                                 SelectedItem="{Binding SelectedQueryRecord}"
                                  Background="{DynamicResource AppSurface1}"
                                  BorderBrush="{DynamicResource AppSurface2}"
                                  BorderThickness="1">
@@ -557,10 +582,24 @@
                                                    FontSize="10" Foreground="{DynamicResource AppSubtext0}"/>
                                         <TextBlock Text="{Binding Question}"
                                                    FontSize="11" Foreground="{DynamicResource AppText}"
-                                                   TextTrimming="CharacterEllipsis" MaxWidth="230"/>
+                                                   TextTrimming="CharacterEllipsis" MaxWidth="160"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource WikiListItemStyle}">
+                                    <Setter Property="ContextMenu">
+                                        <Setter.Value>
+                                            <ContextMenu>
+                                                <MenuItem Header="Delete"
+                                                          Command="{Binding DataContext.DeleteQueryFromHistoryCommand,
+                                                              RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                          CommandParameter="{Binding}"/>
+                                            </ContextMenu>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
                         </ListBox>
                         <Button Grid.Row="2"
                                 Content="Load more..."

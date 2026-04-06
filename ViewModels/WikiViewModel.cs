@@ -101,6 +101,7 @@ public partial class WikiViewModel : ObservableObject
     [ObservableProperty] private bool hasQueryAnswer;
     [ObservableProperty] private WikiQueryRecord? lastQueryRecord;
     [ObservableProperty] private bool hasMoreHistory;
+    [ObservableProperty] private WikiQueryRecord? selectedQueryRecord;
 
     private string _currentSessionId = "";
     private List<string> _pastSessionFiles = [];
@@ -597,6 +598,7 @@ public partial class WikiViewModel : ObservableObject
         try
         {
             var record = await _queryService.Query(WikiRoot, QueryText, _cts.Token);
+            QueryText = "";
             QueryAnswer = record.Answer;
             foreach (var p in record.ReferencedPages)
                 QueryReferencedPages.Add(p);
@@ -636,6 +638,25 @@ public partial class WikiViewModel : ObservableObject
             QueryHistory.Add(r);
         _nextSessionIndex++;
         HasMoreHistory = _nextSessionIndex < _pastSessionFiles.Count;
+    }
+
+    partial void OnSelectedQueryRecordChanged(WikiQueryRecord? value)
+    {
+        if (value == null) return;
+        QueryAnswer = value.Answer;
+        QueryReferencedPages.Clear();
+        foreach (var p in value.ReferencedPages)
+            QueryReferencedPages.Add(p);
+        HasQueryAnswer = true;
+        LastQueryRecord = value;
+    }
+
+    [RelayCommand]
+    private async Task DeleteQueryFromHistory(WikiQueryRecord? record)
+    {
+        if (record == null || string.IsNullOrEmpty(WikiRoot)) return;
+        QueryHistory.Remove(record);
+        await _queryService.DeleteRecordAsync(WikiRoot, record);
     }
 
     [RelayCommand]

@@ -15,11 +15,13 @@ public class DecisionLogGeneratorService
 {
     private readonly LlmClientService    _llm;
     private readonly FileEncodingService _encoding;
+    private readonly ConfigService       _configService;
 
-    public DecisionLogGeneratorService(LlmClientService llm, FileEncodingService encoding)
+    public DecisionLogGeneratorService(LlmClientService llm, FileEncodingService encoding, ConfigService configService)
     {
-        _llm      = llm;
-        _encoding = encoding;
+        _llm           = llm;
+        _encoding      = encoding;
+        _configService = configService;
     }
 
     // -----------------------------------------------------------------------
@@ -135,9 +137,8 @@ public class DecisionLogGeneratorService
         IReadOnlyList<string>? attachedFilePaths = null,
         CancellationToken ct = default)
     {
-        var isJapanese   = System.Globalization.CultureInfo.CurrentUICulture
-                               .TwoLetterISOLanguageName == "ja";
-        var systemPrompt = BuildDraftSystemPrompt(isJapanese);
+        var language     = _configService.LoadSettings().LlmLanguage;
+        var systemPrompt = BuildDraftSystemPrompt(language);
         var userPrompt   = await BuildDraftUserPromptAsync(
             userInput, selectedCandidates, status, trigger, project, workstreamId, attachedFilePaths);
 
@@ -324,9 +325,8 @@ public class DecisionLogGeneratorService
         IReadOnlyList<(string instruction, string result)> history,
         CancellationToken ct = default)
     {
-        var isJapanese   = System.Globalization.CultureInfo.CurrentUICulture
-                               .TwoLetterISOLanguageName == "ja";
-        var systemPrompt = BuildDraftSystemPrompt(isJapanese);
+        var language     = _configService.LoadSettings().LlmLanguage;
+        var systemPrompt = BuildDraftSystemPrompt(language);
         var messages = new List<(string role, string content)>
         {
             ("user",      initialUserPrompt),
@@ -417,9 +417,9 @@ public class DecisionLogGeneratorService
         Output ONLY the JSON array, no explanation.
         """;
 
-    private static string BuildDraftSystemPrompt(bool isJapanese)
+    private static string BuildDraftSystemPrompt(string language)
     {
-        if (isJapanese)
+        if (language.Equals("Japanese", StringComparison.OrdinalIgnoreCase))
             return """
                 You are an assistant that creates structured decision log entries.
 
