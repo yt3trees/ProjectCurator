@@ -114,15 +114,15 @@
                 <ui:Button Command="{Binding ShowCreateDomainCommand}"
                            ToolTip="Create new Wiki Domain"
                            Margin="4,0,0,0"
-                           Padding="6,3"
+                           Padding="8,3"
                            Visibility="{Binding Domains.Count, Converter={StaticResource IntToVisibilityConverter}}">
-                    <ui:SymbolIcon Symbol="Add24" FontSize="14"/>
+                    <ui:SymbolIcon Symbol="Add24" FontSize="16"/>
                 </ui:Button>
 
                 <ui:Button Click="OnWikiTermClick"
                            ToolTip="Open terminal / Right-click: launch AI agent"
-                           Margin="12,0,0,0"
-                           Padding="6,3"
+                           Margin="4,0,0,0"
+                           Padding="8,3"
                            Visibility="{Binding HasWiki, Converter={StaticResource BoolToVis}}">
                     <ui:Button.ContextMenu>
                         <ContextMenu>
@@ -131,7 +131,7 @@
                             <MenuItem Header="Codex"  Tag="codex"  Click="OnWikiTermMenuAgent"/>
                         </ContextMenu>
                     </ui:Button.ContextMenu>
-                    <ui:SymbolIcon Symbol="WindowConsole20" FontSize="14"/>
+                    <ui:SymbolIcon Symbol="WindowConsole20" FontSize="16"/>
                 </ui:Button>
             </StackPanel>
         </Grid>
@@ -643,9 +643,13 @@
                         <Button Content="Run Lint"
                                 Command="{Binding RunLintCommand}"
                                 IsEnabled="{Binding IsLinting, Converter={StaticResource InverseBoolConverter}}"
-                                Padding="14,6"
+                                Padding="16,6"
                                 Background="{DynamicResource AppBlue}"
-                                Foreground="White" BorderThickness="0"/>
+                                Foreground="{DynamicResource AppBackground}"
+                                FontWeight="Normal"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                BorderThickness="0"/>
                         <TextBlock Text="{Binding LintLastRun, StringFormat='Last run: {0}'}"
                                    FontSize="11" Foreground="{DynamicResource AppSubtext0}"
                                    VerticalAlignment="Center" Margin="12,0,0,0"/>

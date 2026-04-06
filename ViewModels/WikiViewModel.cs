@@ -665,14 +665,16 @@ public partial class WikiViewModel : ObservableObject
     [RelayCommand]
     private void OpenTerminal()
     {
-        if (SelectedProject == null || !Directory.Exists(SelectedProject.Path)) return;
-        OpenTerminalAtPath(SelectedProject.Path);
+        var path = Directory.Exists(WikiRoot) ? WikiRoot : SelectedProject?.Path;
+        if (path == null || !Directory.Exists(path)) return;
+        OpenTerminalAtPath(path);
     }
 
     public void OpenAgentTerminal(string agent)
     {
-        if (SelectedProject == null || !Directory.Exists(SelectedProject.Path)) return;
-        OpenAgentAtPath(SelectedProject.Path, agent);
+        var path = Directory.Exists(WikiRoot) ? WikiRoot : SelectedProject?.Path;
+        if (path == null || !Directory.Exists(path)) return;
+        OpenAgentAtPath(path, agent);
     }
 
     private static void OpenTerminalAtPath(string path)
