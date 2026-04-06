@@ -536,6 +536,19 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
         }
     }
 
+    // ── Terminal ─────────────────────────────────────────────────────────────
+
+    private void OnWikiTermClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.OpenTerminalCommand.Execute(null);
+    }
+
+    private void OnWikiTermMenuAgent(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.MenuItem mi)
+            ViewModel.OpenAgentTerminal(mi.Tag as string ?? "");
+    }
+
     // ── Query Enter key ──────────────────────────────────────────────────────
 
     private void OnQueryKeyDown(object sender, WpfKeyEventArgs e)

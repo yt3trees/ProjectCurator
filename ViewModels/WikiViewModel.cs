@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -657,6 +658,45 @@ public partial class WikiViewModel : ObservableObject
         if (record == null || string.IsNullOrEmpty(WikiRoot)) return;
         QueryHistory.Remove(record);
         await _queryService.DeleteRecordAsync(WikiRoot, record);
+    }
+
+    // ── Terminal ──────────────────────────────────────────────────────────────
+
+    [RelayCommand]
+    private void OpenTerminal()
+    {
+        if (SelectedProject == null || !Directory.Exists(SelectedProject.Path)) return;
+        OpenTerminalAtPath(SelectedProject.Path);
+    }
+
+    public void OpenAgentTerminal(string agent)
+    {
+        if (SelectedProject == null || !Directory.Exists(SelectedProject.Path)) return;
+        OpenAgentAtPath(SelectedProject.Path, agent);
+    }
+
+    private static void OpenTerminalAtPath(string path)
+    {
+        if (TryStart("wt.exe", $"-d \"{path}\"")) return;
+        if (TryStart("pwsh.exe", $"-NoExit -Command \"Set-Location '{path}'\"")) return;
+        TryStart("powershell.exe", $"-NoExit -Command \"Set-Location '{path}'\"");
+    }
+
+    private static void OpenAgentAtPath(string path, string agent)
+    {
+        if (TryStart("wt.exe", $"-d \"{path}\" -- pwsh.exe -NoExit -Command \"{agent}\"")) return;
+        if (TryStart("pwsh.exe", $"-NoExit -Command \"Set-Location '{path}'; {agent}\"")) return;
+        TryStart("powershell.exe", $"-NoExit -Command \"Set-Location '{path}'; {agent}\"");
+    }
+
+    private static bool TryStart(string exe, string args)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = false });
+            return true;
+        }
+        catch { return false; }
     }
 
     [RelayCommand]
