@@ -589,12 +589,25 @@ public partial class WikiViewModel : ObservableObject
     {
         if (!HasWiki || parameter == null) return;
 
-        var files = parameter switch
+        List<string> files;
+        string supplementaryPrompt = "";
+
+        switch (parameter)
         {
-            IEnumerable<string> e => e.ToList(),
-            string s => [s],
-            _ => new List<string>()
-        };
+            case (string[] arr, string prompt):
+                files = arr.ToList();
+                supplementaryPrompt = prompt;
+                break;
+            case IEnumerable<string> e:
+                files = e.ToList();
+                break;
+            case string s:
+                files = [s];
+                break;
+            default:
+                files = [];
+                break;
+        }
 
         if (files.Count == 0) return;
 
@@ -619,7 +632,7 @@ public partial class WikiViewModel : ObservableObject
                 StatusText = statusMsg;
                 WikiIngestService.AppendLog(wikiRoot, $"--- Start: {file} ---");
 
-                var result = await _ingestService.GenerateIngestProposal(WikiRoot, file, progress, _cts.Token);
+                var result = await _ingestService.GenerateIngestProposal(WikiRoot, file, supplementaryPrompt, progress, _cts.Token);
                 if (!result.Success)
                 {
                     var errMsg = $"Error on {Path.GetFileName(file)}: {result.ErrorMessage}";

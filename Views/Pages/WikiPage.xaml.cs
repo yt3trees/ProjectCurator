@@ -691,7 +691,12 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             Multiselect = true
         };
         if (dlg.ShowDialog() != true) return;
-        ViewModel.IngestSourceCommand.Execute(dlg.FileNames);
+
+        var owner = Window.GetWindow(this);
+        var (ok, prompt) = ImportPromptDialog.Show(owner, dlg.FileNames);
+        if (!ok) return;
+
+        ViewModel.IngestSourceCommand.Execute((dlg.FileNames, prompt));
     }
 
     // ── Drag & drop ──────────────────────────────────────────────────────────
@@ -718,7 +723,10 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
 
         if (supportedFiles.Length > 0)
         {
-            ViewModel.IngestSourceCommand.Execute(supportedFiles);
+            var owner = Window.GetWindow(this);
+            var (ok, prompt) = ImportPromptDialog.Show(owner, supportedFiles);
+            if (ok)
+                ViewModel.IngestSourceCommand.Execute((supportedFiles, prompt));
         }
         else
         {

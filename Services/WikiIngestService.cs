@@ -42,10 +42,11 @@ public class WikiIngestService
     public async Task<IngestResult> IngestSource(
         string wikiRoot,
         string sourceFilePath,
+        string? supplementaryPrompt = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var proposal = await GenerateIngestProposal(wikiRoot, sourceFilePath, progress, cancellationToken);
+        var proposal = await GenerateIngestProposal(wikiRoot, sourceFilePath, supplementaryPrompt, progress, cancellationToken);
         if (!proposal.Success)
             return proposal;
 
@@ -56,6 +57,7 @@ public class WikiIngestService
     public async Task<IngestResult> GenerateIngestProposal(
         string wikiRoot,
         string sourceFilePath,
+        string? supplementaryPrompt = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -80,9 +82,10 @@ public class WikiIngestService
 
             var promptConfig = _wiki.LoadPrompts(wikiRoot);
             var overrides = promptConfig.IsUnknownVersion ? null : promptConfig.Import;
+            var effectiveOverrides = MergeSupplementaryPrompt(overrides, supplementaryPrompt);
             var categoriesConfig = _wiki.LoadCategories(wikiRoot);
 
-            var systemPrompt = BuildSystemPrompt(schema, categoriesConfig.Categories, overrides);
+            var systemPrompt = BuildSystemPrompt(schema, categoriesConfig.Categories, effectiveOverrides);
             progress?.Report("Selecting update candidates...");
             var updateCandidates = await SelectUpdateCandidates(
                 wikiRoot,
@@ -101,7 +104,7 @@ public class WikiIngestService
                 Path.GetFileName(sourceFilePath),
                 existingPagesContent,
                 existingTags,
-                overrides);
+                effectiveOverrides);
 
             // 4. LLM 呼び出し
             progress?.Report("Calling LLM...");
@@ -404,6 +407,21 @@ Response JSON schema:
         parts.Add(basePrompt);
         if (!string.IsNullOrEmpty(overrides.SystemSuffix)) parts.Add(overrides.SystemSuffix);
         return string.Join("\n\n", parts);
+    }
+
+    private static WikiPromptOverrides? MergeSupplementaryPrompt(WikiPromptOverrides? overrides, string? extra)
+    {
+        if (string.IsNullOrWhiteSpace(extra)) return overrides;
+        return overrides != null
+            ? new WikiPromptOverrides
+              {
+                  SystemPrefix = overrides.SystemPrefix,
+                  SystemSuffix = overrides.SystemSuffix,
+                  UserSuffix   = string.IsNullOrEmpty(overrides.UserSuffix)
+                                 ? extra
+                                 : overrides.UserSuffix + "\n\n" + extra
+              }
+            : new WikiPromptOverrides { UserSuffix = extra };
     }
 
     private static string BuildUserPrompt(
