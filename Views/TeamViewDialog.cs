@@ -152,15 +152,8 @@ internal static class TeamViewDialog
         // ===== 初期データ表示 =====
         LoadAndDisplayTeamTasks(membersPanel, statusText, teamTasksFilePath, teamTaskParser, appResources, text, subtext, red, blue);
 
-        // ===== イベント =====
-        closeBtn.Click += (_, _) => dialogWindow.Close();
-
-        titleBar.MouseLeftButtonDown += (_, ev) =>
-        {
-            if (ev.LeftButton == MouseButtonState.Pressed) dialogWindow.DragMove();
-        };
-
-        syncBtn.Click += async (_, _) =>
+        // ===== Sync処理 =====
+        async Task RunSyncAsync()
         {
             syncBtn.IsEnabled = false;
             statusText.Text = "Syncing...";
@@ -190,7 +183,20 @@ internal static class TeamViewDialog
             {
                 Application.Current.Dispatcher.Invoke(() => syncBtn.IsEnabled = true);
             }
+        }
+
+        // ===== イベント =====
+        closeBtn.Click += (_, _) => dialogWindow.Close();
+
+        titleBar.MouseLeftButtonDown += (_, ev) =>
+        {
+            if (ev.LeftButton == MouseButtonState.Pressed) dialogWindow.DragMove();
         };
+
+        syncBtn.Click += async (_, _) => await RunSyncAsync();
+
+        // ウィンドウ表示時に自動Sync
+        dialogWindow.ContentRendered += async (_, _) => await RunSyncAsync();
 
         dialogWindow.ShowDialog();
     }
