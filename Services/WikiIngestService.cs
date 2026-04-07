@@ -80,8 +80,9 @@ public class WikiIngestService
 
             var promptConfig = _wiki.LoadPrompts(wikiRoot);
             var overrides = promptConfig.IsUnknownVersion ? null : promptConfig.Import;
+            var categoriesConfig = _wiki.LoadCategories(wikiRoot);
 
-            var systemPrompt = BuildSystemPrompt(schema, overrides);
+            var systemPrompt = BuildSystemPrompt(schema, categoriesConfig.Categories, overrides);
             progress?.Report("Selecting update candidates...");
             var updateCandidates = await SelectUpdateCandidates(
                 wikiRoot,
@@ -114,6 +115,7 @@ public class WikiIngestService
             CanonicalizeResultTags(llmResp, existingTags);
 
             progress?.Report("Proposal generated. Awaiting review.");
+            AppendLog(wikiRoot, $"[GenerateProposal] OK — newPages={llmResp.NewPages.Count}, updatedPages={llmResp.UpdatedPages.Count}, summary={llmResp.Summary}");
 
             return new IngestResult
             {
@@ -130,10 +132,12 @@ public class WikiIngestService
         }
         catch (OperationCanceledException)
         {
+            AppendLog(wikiRoot, "[GenerateProposal] Cancelled.");
             return Fail("Ingest cancelled.");
         }
         catch (Exception ex)
         {
+            AppendLog(wikiRoot, $"[GenerateProposal] Exception: {ex}");
             return Fail($"Ingest error: {ex.Message}");
         }
     }
@@ -172,6 +176,7 @@ public class WikiIngestService
         {
             result.Success = false;
             result.ErrorMessage = string.Join("\n", validationErrors);
+            AppendLog(wikiRoot, $"[ApplyIngest] Validation failed:\n{result.ErrorMessage}");
             return;
         }
 
@@ -195,6 +200,7 @@ public class WikiIngestService
         {
             result.Success = false;
             result.ErrorMessage = $"Duplicate target paths detected: {string.Join(", ", dups.Select(g => g.Key))}";
+            AppendLog(wikiRoot, $"[ApplyIngest] Duplicate paths: {result.ErrorMessage}");
             return;
         }
 
@@ -209,6 +215,7 @@ public class WikiIngestService
         {
             result.Success = false;
             result.ErrorMessage = ex.Message;
+            AppendLog(wikiRoot, $"[ApplyIngest] Domain lock failed: {ex.Message}");
             return;
         }
 
@@ -260,6 +267,9 @@ public class WikiIngestService
 
             // ---- コミット実行（AC-14, AC-38） ----
             progress?.Report("Writing approved pages...");
+            AppendLog(wikiRoot, $"[ApplyIngest] wikiRoot={wikiRoot}");
+            AppendLog(wikiRoot, $"[ApplyIngest] targets={string.Join(", ", targets.Select(t => $"{t.Item1}(isNew={t.Item2})"))}");
+            AppendLog(wikiRoot, $"[ApplyIngest] contentMap keys={string.Join(", ", contentMap.Keys)}");
             try
             {
                 // カテゴリディレクトリを事前作成
@@ -273,6 +283,7 @@ public class WikiIngestService
                 await _wiki.CommitTransactionAsync(wikiRoot, txn, entry =>
                 {
                     var relPath = Path.GetRelativePath(wikiRoot, entry.TargetPath).Replace('\\', '/');
+                    AppendLog(wikiRoot, $"[Commit] Writing entry: targetPath={entry.TargetPath}, relPath={relPath}, contentFound={contentMap.ContainsKey(relPath)}");
                     if (contentMap.TryGetValue(relPath, out var c)) return Task.FromResult(c);
                     return Task.FromResult("");
                 });
@@ -284,6 +295,7 @@ public class WikiIngestService
                 catch { /* best effort */ }
                 result.Success = false;
                 result.ErrorMessage = $"Write failed: {ex.Message}. Changes have been rolled back.";
+                AppendLog(wikiRoot, $"[ApplyIngest] Commit exception (rolled back): {ex}");
                 return;
             }
 
@@ -299,6 +311,7 @@ public class WikiIngestService
             }
             catch { /* メタ更新失敗はエラーとしない */ }
 
+            AppendLog(wikiRoot, "[ApplyIngest] Committed successfully.");
             progress?.Report("Saved.");
         }
         finally
@@ -309,9 +322,12 @@ public class WikiIngestService
 
     // ---- プロンプト構築 ----
 
-    private string BuildSystemPrompt(string schema, WikiPromptOverrides? overrides = null)
+    private string BuildSystemPrompt(string schema, IReadOnlyList<string>? categories = null, WikiPromptOverrides? overrides = null)
     {
         var language = _configService.LoadSettings().LlmLanguage;
+        var categoryLine = categories is { Count: > 0 }
+            ? $"- Allowed page categories (use ONLY these): {string.Join(", ", categories)}"
+            : "- Page paths must be: pages/<category>/filename.md";
         var basePrompt = $$"""
 You are the Wiki maintainer for Curia.
 Follow the wiki-schema.md below exactly.
@@ -324,6 +340,7 @@ IMPORTANT:
 - Keep pages concise and well-structured in Markdown.
 - Use [[PageName]] wikilink format for cross-references.
 - Write all page content in {{language}}.
+- {{categoryLine}}
 - Include YAML frontmatter at the top of each page:
   ---
   title: "..."
@@ -645,6 +662,21 @@ Select up to {MaxUpdateCandidates} existing pages that most likely need updates.
         {
             return null;
         }
+    }
+
+    // ---- ファイルログ ----
+
+    public static void AppendLog(string wikiRoot, string message)
+    {
+        try
+        {
+            var logDir = Path.Combine(wikiRoot, "log");
+            Directory.CreateDirectory(logDir);
+            var logFile = Path.Combine(logDir, $"ingest-{DateTime.Now:yyyyMMdd}.log");
+            var line = $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}";
+            File.AppendAllText(logFile, line, Encoding.UTF8);
+        }
+        catch { /* ログ失敗は無視 */ }
     }
 
     private static IngestResult Fail(string msg) => new() { Success = false, ErrorMessage = msg };

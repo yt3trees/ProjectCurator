@@ -1199,7 +1199,7 @@ public class AsanaSyncService
             ["project"] = projectGid,
             ["opt_fields"] =
                 "name,completed,due_on,assignee,assignee.name,assignee.gid,gid," +
-                "projects,projects.name",
+                "projects,projects.name,followers,followers.gid",
             ["completed_since"] = "now"
         };
         return await FetchPagedTasksAsync("https://app.asana.com/api/1.0/tasks", query, token, log, ct);
@@ -1224,6 +1224,11 @@ public class AsanaSyncService
             {
                 // 自分のタスクは除外
                 if (!string.IsNullOrWhiteSpace(selfUserGid) && task.Assignee?.Gid == selfUserGid)
+                    continue;
+
+                // 自分がコラボレーター(フォロワー)に含まれていないタスクは除外
+                if (!string.IsNullOrWhiteSpace(selfUserGid) &&
+                    !task.Followers.Any(f => f.Gid == selfUserGid))
                     continue;
 
                 var assignee = task.Assignee?.Name;

@@ -600,7 +600,25 @@ Prefer updating existing pages over creating duplicates.
         cfg.Categories.Add(normalized);
         await SaveCategoriesAtomicAsync(wikiRoot, cfg);
         await UpdateAgentsMdCategoryBlockAsync(wikiRoot, cfg.Categories);
+        Directory.CreateDirectory(Path.Combine(GetPagesDir(wikiRoot), normalized));
+        await AppendCategoryToIndexAsync(wikiRoot, normalized);
         return (true, null);
+    }
+
+    private static async Task AppendCategoryToIndexAsync(string wikiRoot, string category)
+    {
+        var indexPath = GetIndexPath(wikiRoot);
+        if (!File.Exists(indexPath)) return;
+
+        var title = char.ToUpperInvariant(category[0]) + category[1..];
+        var section = $"\n## {title} (0)\n| Page | Summary | Sources | Tags |\n|------|---------|---------|------|\n";
+
+        var existing = await File.ReadAllTextAsync(indexPath, Encoding.UTF8);
+        // 既にセクションがあれば追加しない
+        if (existing.Contains($"## {title}", StringComparison.OrdinalIgnoreCase)) return;
+
+        var newContent = existing.TrimEnd() + section;
+        await File.WriteAllTextAsync(indexPath, newContent, Encoding.UTF8);
     }
 
     public async Task<(bool Success, string? Error)> DeleteCategoryAsync(string wikiRoot, string name)

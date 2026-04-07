@@ -306,6 +306,7 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <ui:SymbolIcon Grid.Column="0" Symbol="Search24" FontSize="12"
                                                Foreground="{DynamicResource AppSubtext0}"
@@ -316,6 +317,14 @@
                                          BorderThickness="0"
                                          Foreground="{DynamicResource AppText}"
                                          FontSize="12"/>
+                                <Button Grid.Column="2"
+                                        Command="{Binding ReloadCategoriesCommand}"
+                                        Background="Transparent" BorderThickness="0"
+                                        Padding="4,2" Cursor="Hand"
+                                        ToolTip="Refresh pages">
+                                    <ui:SymbolIcon Symbol="ArrowSync24" FontSize="12"
+                                                   Foreground="{DynamicResource AppSubtext0}"/>
+                                </Button>
                             </Grid>
                         </Border>
 

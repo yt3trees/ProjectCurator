@@ -604,35 +604,73 @@ public partial class WikiViewModel : ObservableObject
         IsImporting = true;
         try
         {
-            var progress = new Progress<string>(msg => StatusText = msg);
+            var wikiRoot = WikiRoot;
+            var progress = new Progress<string>(msg =>
+            {
+                StatusText = msg;
+                WikiIngestService.AppendLog(wikiRoot, msg);
+            });
             int count = 0;
 
             foreach (var file in files)
             {
                 count++;
-                StatusText = $"Ingesting ({count}/{files.Count}): {Path.GetFileName(file)}...";
+                var statusMsg = $"Ingesting ({count}/{files.Count}): {Path.GetFileName(file)}...";
+                StatusText = statusMsg;
+                WikiIngestService.AppendLog(wikiRoot, $"--- Start: {file} ---");
 
                 var result = await _ingestService.GenerateIngestProposal(WikiRoot, file, progress, _cts.Token);
                 if (!result.Success)
                 {
-                    StatusText = $"Error on {Path.GetFileName(file)}: {result.ErrorMessage}";
+                    var errMsg = $"Error on {Path.GetFileName(file)}: {result.ErrorMessage}";
+                    StatusText = errMsg;
+                    WikiIngestService.AppendLog(wikiRoot, $"[GenerateProposal] FAILED: {result.ErrorMessage}");
                     // 1つ失敗しても次へ進む（必要に応じて break しても良い）
                     await Task.Delay(2000); // エラーメッセージを見せるため少し待機
+                    continue;
+                }
+
+                // LLM がページ変更不要と判断した場合はバルーン通知して index/log のみ更新
+                if (result.NewPages.Count == 0 && result.UpdatedPages.Count == 0)
+                {
+                    var noChangeSummary = string.IsNullOrWhiteSpace(result.Summary)
+                        ? "No page changes needed."
+                        : result.Summary;
+                    StatusText = $"No page changes: {Path.GetFileName(file)} — {noChangeSummary}";
+                    WikiIngestService.AppendLog(wikiRoot, $"[Review] No page changes needed: {noChangeSummary}");
+                    _trayService.ShowBalloonTip(
+                        "Wiki Ingest — No Changes",
+                        $"{Path.GetFileName(file)}: {noChangeSummary}");
+                    // index.md / log.md だけ更新する
+                    await _ingestService.ApplyIngestResult(WikiRoot, result, progress, _cts.Token);
+                    await Task.Delay(3000);
                     continue;
                 }
 
                 if (!await ReviewIngestChangesAsync(file, result, _cts.Token))
                 {
                     StatusText = $"Skipped: {Path.GetFileName(file)} (no changes saved)";
+                    WikiIngestService.AppendLog(wikiRoot, $"[Review] Skipped by user: {file}");
                     continue;
                 }
 
+                WikiIngestService.AppendLog(wikiRoot, $"[Review] Approved by user: {file}");
                 await _ingestService.ApplyIngestResult(WikiRoot, result, progress, _cts.Token);
+                if (!result.Success)
+                {
+                    var errMsg = $"Error saving {Path.GetFileName(file)}: {result.ErrorMessage}";
+                    StatusText = errMsg;
+                    WikiIngestService.AppendLog(wikiRoot, $"[ApplyIngest] FAILED: {result.ErrorMessage}");
+                    await Task.Delay(3000);
+                    continue;
+                }
                 StatusText = $"Saved: {Path.GetFileName(file)}";
+                WikiIngestService.AppendLog(wikiRoot, $"--- Done: {file} ---");
             }
 
             StatusText = $"Ingest complete. Processed {files.Count} files.";
             await LoadPagesAsync();
+            WikiIngestService.AppendLog(wikiRoot, $"[LoadPages] After ingest: pageTree count={PageTree.Count}, wikiRoot={WikiRoot}");
         }
         catch (OperationCanceledException)
         {
