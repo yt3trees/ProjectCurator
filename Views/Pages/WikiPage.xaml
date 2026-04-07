@@ -178,6 +178,14 @@
                     <ui:SymbolIcon Symbol="Add24" FontSize="16"/>
                 </ui:Button>
 
+                <ui:Button Command="{Binding OpenFolderCommand}"
+                           ToolTip="Open folder in Explorer"
+                           Margin="4,0,0,0"
+                           Padding="8,3"
+                           Visibility="{Binding HasWiki, Converter={StaticResource BoolToVis}}">
+                    <ui:SymbolIcon Symbol="FolderOpen24" FontSize="16"/>
+                </ui:Button>
+
                 <ui:Button Click="OnWikiTermClick"
                            ToolTip="Open terminal / Right-click: launch AI agent"
                            Margin="4,0,0,0"

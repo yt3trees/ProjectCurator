@@ -961,6 +961,16 @@ public partial class WikiViewModel : ObservableObject
         await _queryService.DeleteRecordAsync(WikiRoot, record);
     }
 
+    // ── Folder ────────────────────────────────────────────────────────────────
+
+    [RelayCommand]
+    private void OpenFolder()
+    {
+        var path = Directory.Exists(WikiRoot) ? WikiRoot : SelectedProject?.Path;
+        if (path == null || !Directory.Exists(path)) return;
+        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{path}\"") { UseShellExecute = true });
+    }
+
     // ── Terminal ──────────────────────────────────────────────────────────────
 
     [RelayCommand]
