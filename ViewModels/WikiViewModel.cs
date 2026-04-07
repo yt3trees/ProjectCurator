@@ -16,7 +16,17 @@ using Curia.Views;
 
 namespace Curia.ViewModels;
 
-public enum WikiTab { Pages, Query, Lint }
+public enum WikiTab { Pages, Query, Lint, Prompts }
+
+// ────────────────────────────────────────────────────
+// カテゴリ表示用アイテム
+// ────────────────────────────────────────────────────
+
+public class WikiCategoryItem
+{
+    public string Name { get; set; } = "";
+    public bool IsDeletable { get; set; }
+}
 
 // ────────────────────────────────────────────────────
 // ページツリー用アイテム
@@ -79,9 +89,45 @@ public partial class WikiViewModel : ObservableObject
 
     // ── タブ切替 ──────────────────────────────────────
     [ObservableProperty] private WikiTab activeTab = WikiTab.Pages;
-    public bool IsPagesTab  => ActiveTab == WikiTab.Pages;
-    public bool IsQueryTab  => ActiveTab == WikiTab.Query;
-    public bool IsLintTab   => ActiveTab == WikiTab.Lint;
+    public bool IsPagesTab   => ActiveTab == WikiTab.Pages;
+    public bool IsQueryTab   => ActiveTab == WikiTab.Query;
+    public bool IsLintTab    => ActiveTab == WikiTab.Lint;
+    public bool IsPromptsTab => ActiveTab == WikiTab.Prompts;
+
+    // ── カテゴリ管理 ─────────────────────────────────
+    private static readonly HashSet<string> DefaultCategoryNames =
+        new(["sources", "entities", "concepts", "analysis"], StringComparer.OrdinalIgnoreCase);
+
+    [ObservableProperty] private bool isWikiReadOnly;
+    [ObservableProperty] private string wikiReadOnlyReason = "";
+    [ObservableProperty] private ObservableCollection<WikiCategoryItem> definedCategories = [];
+    [ObservableProperty] private ObservableCollection<string> undefinedCategories = [];
+    [ObservableProperty] private string agentsMdCategoryWarning = "";
+    [ObservableProperty] private bool hasAgentsMdWarning;
+    [ObservableProperty] private string newCategoryName = "";
+    private WikiCategoriesConfig _currentCategoriesConfig = new();
+
+    // ── Prompt Settings ───────────────────────────────
+    [ObservableProperty] private string promptImportSystemPrefix = "";
+    [ObservableProperty] private string promptImportSystemSuffix = "";
+    [ObservableProperty] private string promptImportUserSuffix = "";
+    [ObservableProperty] private string promptQuerySystemPrefix = "";
+    [ObservableProperty] private string promptQuerySystemSuffix = "";
+    [ObservableProperty] private string promptQueryUserSuffix = "";
+    [ObservableProperty] private string promptLintSystemPrefix = "";
+    [ObservableProperty] private string promptLintSystemSuffix = "";
+    [ObservableProperty] private string promptLintUserSuffix = "";
+    [ObservableProperty] private bool isPromptReadOnly;
+    [ObservableProperty] private string promptStatusText = "";
+    [ObservableProperty] private string defaultImportSystemPrompt = "";
+    [ObservableProperty] private string defaultQuerySystemPrompt = "";
+    [ObservableProperty] private string defaultLintSystemPrompt = "";
+
+    // ── Wiki Schema ───────────────────────────────────
+    [ObservableProperty] private string wikiSchemaContent = "";
+    [ObservableProperty] private bool isWikiSchemaDirty;
+    [ObservableProperty] private string wikiSchemaStatusText = "";
+    private bool _suppressWikiSchemaDirtyTracking;
 
     // ── Pages タブ ───────────────────────────────────
     [ObservableProperty] private ObservableCollection<WikiTreeItem> pageTree = [];
@@ -126,6 +172,8 @@ public partial class WikiViewModel : ObservableObject
     [ObservableProperty] private string statusText = "";
     [ObservableProperty] private int editorFontSize = 14;
     [ObservableProperty] private int markdownRenderFontSize = 13;
+    [ObservableProperty] private string editorTextColor = "";
+    [ObservableProperty] private string markdownRenderTextColor = "";
 
     // ── Wiki 初期化 ───────────────────────────────────
     [ObservableProperty] private string newWikiDomain = "";
@@ -151,15 +199,22 @@ public partial class WikiViewModel : ObservableObject
         _trayService  = trayService;
 
         var settings = _config.LoadSettings();
-        IsAiEnabled            = settings.AiEnabled;
-        EditorFontSize         = settings.EditorFontSize;
-        MarkdownRenderFontSize = settings.MarkdownRenderFontSize;
+        IsAiEnabled              = settings.AiEnabled;
+        EditorFontSize           = settings.EditorFontSize;
+        MarkdownRenderFontSize   = settings.MarkdownRenderFontSize;
+        EditorTextColor          = settings.EditorTextColor;
+        MarkdownRenderTextColor  = settings.MarkdownRenderTextColor;
         WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
             (_, msg) => IsAiEnabled = msg.Enabled);
         WeakReferenceMessenger.Default.Register<FontSizeChangedMessage>(this, (_, msg) =>
         {
             EditorFontSize         = msg.EditorFontSize;
             MarkdownRenderFontSize = msg.MarkdownRenderFontSize;
+        });
+        WeakReferenceMessenger.Default.Register<TextColorChangedMessage>(this, (_, msg) =>
+        {
+            EditorTextColor         = msg.EditorTextColor;
+            MarkdownRenderTextColor = msg.MarkdownRenderTextColor;
         });
     }
 
@@ -239,7 +294,7 @@ public partial class WikiViewModel : ObservableObject
             QueryReferencedPages.Clear();
             HasMoreHistory = false;
             _ = LoadInitialHistoryAsync();
-            _ = LoadPagesAsync();
+            _ = InitializeWikiDomainAsync();
         }
     }
 
@@ -252,6 +307,7 @@ public partial class WikiViewModel : ObservableObject
         OnPropertyChanged(nameof(IsPagesTab));
         OnPropertyChanged(nameof(IsQueryTab));
         OnPropertyChanged(nameof(IsLintTab));
+        OnPropertyChanged(nameof(IsPromptsTab));
     }
 
     partial void OnIsEditModeChanged(bool value)
@@ -259,9 +315,10 @@ public partial class WikiViewModel : ObservableObject
         OnPropertyChanged(nameof(IsRenderMode));
     }
 
-    [RelayCommand] private void SwitchToPages() => ActiveTab = WikiTab.Pages;
-    [RelayCommand] private void SwitchToQuery() => ActiveTab = WikiTab.Query;
-    [RelayCommand] private void SwitchToLint()  => ActiveTab = WikiTab.Lint;
+    [RelayCommand] private void SwitchToPages()   => ActiveTab = WikiTab.Pages;
+    [RelayCommand] private void SwitchToQuery()   => ActiveTab = WikiTab.Query;
+    [RelayCommand] private void SwitchToLint()    => ActiveTab = WikiTab.Lint;
+    [RelayCommand] private void SwitchToPrompts() => ActiveTab = WikiTab.Prompts;
 
     [RelayCommand] private void ShowCreateDomain() => IsCreatingNewDomain = true;
     [RelayCommand] private void CancelCreateDomain() => IsCreatingNewDomain = false;
@@ -269,6 +326,102 @@ public partial class WikiViewModel : ObservableObject
     // ────────────────────────────────────────────────
     // Pages タブ
     // ────────────────────────────────────────────────
+
+    /// <summary>Wiki ドメイン切替時の初期化（リカバリ → カテゴリロード → ページロード）。</summary>
+    private async Task InitializeWikiDomainAsync()
+    {
+        if (!HasWiki) return;
+
+        // 起動時トランザクション復旧 (AC-28, AC-29, AC-38, AC-39)
+        try { await Task.Run(() => _wikiService.RecoverPendingTransactionAsync(WikiRoot)); } catch { }
+        try { await Task.Run(() => _wikiService.RecoverPendingRenameAsync(WikiRoot)); }      catch { }
+
+        // カテゴリ設定ロード
+        await LoadCategoriesAsync();
+
+        // Prompt 設定ロード
+        LoadPromptSettings();
+
+        // Wiki Schema ロード
+        await LoadWikiSchemaAsync();
+
+        // AGENTS.md 整合チェック (AC-44)
+        CheckAgentsMdConsistency();
+
+        await LoadPagesAsync();
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        _currentCategoriesConfig = await Task.Run(() => _wikiService.LoadCategories(WikiRoot));
+
+        // 読み取り専用判定 (AC-51, AC-67)
+        if (_currentCategoriesConfig.IsUnknownVersion)
+        {
+            IsWikiReadOnly = true;
+            WikiReadOnlyReason = "Unsupported .wiki-categories.json version. Wiki is in read-only mode.";
+        }
+        else if (_currentCategoriesConfig.HasNamingConflict)
+        {
+            IsWikiReadOnly = true;
+            WikiReadOnlyReason = $"Category naming conflict: {_currentCategoriesConfig.ConflictDetail}. Resolve conflicts and reload.";
+        }
+        else
+        {
+            IsWikiReadOnly = false;
+            WikiReadOnlyReason = "";
+        }
+
+        // カテゴリ表示リスト更新 (AC-1, AC-55)
+        var (defined, undefined) = _wikiService.GetCategoryDisplayList(WikiRoot);
+        DefinedCategories.Clear();
+        foreach (var c in defined)
+            DefinedCategories.Add(new WikiCategoryItem
+            {
+                Name = c,
+                IsDeletable = !DefaultCategoryNames.Contains(c)
+            });
+        UndefinedCategories.Clear();
+        foreach (var c in undefined) UndefinedCategories.Add(c);
+    }
+
+    [RelayCommand]
+    private async Task ReloadCategories()
+    {
+        await LoadCategoriesAsync();
+        CheckAgentsMdConsistency();
+        await LoadPagesAsync();
+        StatusText = "Categories reloaded.";
+    }
+
+    private void CheckAgentsMdConsistency()
+    {
+        if (!HasWiki) return;
+        var (isValid, issue) = _wikiService.CheckAgentsMdCategoryBlock(WikiRoot, _currentCategoriesConfig.Categories);
+        if (!isValid && issue != null)
+        {
+            AgentsMdCategoryWarning = issue;
+            HasAgentsMdWarning = true;
+        }
+        else
+        {
+            AgentsMdCategoryWarning = "";
+            HasAgentsMdWarning = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task RepairAgentsMd()
+    {
+        if (!HasWiki) return;
+        try
+        {
+            await _wikiService.UpdateAgentsMdCategoryBlockAsync(WikiRoot, _currentCategoriesConfig.Categories);
+            CheckAgentsMdConsistency();
+            StatusText = "AGENTS.md category block repaired.";
+        }
+        catch (Exception ex) { StatusText = $"Repair failed: {ex.Message}"; }
+    }
 
     private async Task LoadPagesAsync()
     {
@@ -296,13 +449,22 @@ public partial class WikiViewModel : ObservableObject
             PageTree.Add(rootNode);
         }
 
-        // カテゴリ別
-        var categories = new[] { "sources", "entities", "concepts", "analysis" };
-        foreach (var cat in categories)
+        // 表示順: sources 先頭 → 設定ファイル順（DefinedCategories） → 未定義（名前昇順）
+        var definedNames = DefinedCategories.Select(x => x.Name).ToList();
+        var allCategoryNames = definedNames.Concat(UndefinedCategories).ToList();
+
+        foreach (var cat in allCategoryNames)
         {
-            var catPages = pages.Where(p => p.Category == cat).OrderBy(p => p.Title).ToList();
-            if (catPages.Count == 0) continue;
-            var node = new WikiTreeItem { Title = cat, IsCategory = true, IsExpanded = true };
+            var catLower = cat.ToLowerInvariant();
+            var catPages = pages.Where(p => p.Category.Equals(catLower, StringComparison.OrdinalIgnoreCase))
+                                .OrderBy(p => p.Title).ToList();
+            var isUndefined = UndefinedCategories.Contains(cat);
+            var title = isUndefined ? $"{catLower} (read-only)" : catLower;
+
+            if (catPages.Count == 0 && !Directory.Exists(Path.Combine(WikiService.GetPagesDir(WikiRoot), cat)))
+                continue;
+
+            var node = new WikiTreeItem { Title = title, IsCategory = true, IsExpanded = true };
             foreach (var p in catPages)
                 node.Children.Add(new WikiTreeItem { Title = p.Title, RelativePath = p.RelativePath });
             PageTree.Add(node);
@@ -388,11 +550,28 @@ public partial class WikiViewModel : ObservableObject
     private async Task SaveCurrentPage()
     {
         if (!HasWiki || string.IsNullOrEmpty(SelectedPagePath)) return;
+        if (IsWikiReadOnly) { StatusText = $"Save rejected: {WikiReadOnlyReason}"; return; }
 
-        await _wikiService.SavePage(WikiRoot, SelectedPagePath, PreviewContent);
-        _loadedPageContent = PreviewContent;
-        IsPageDirty = false;
-        StatusText = $"Saved: {SelectedPagePath}";
+        // ルートファイル (index.md / log.md) はバリデーションスキップ
+        if (SelectedPagePath is not ("index.md" or "log.md"))
+        {
+            var cats = _currentCategoriesConfig.Categories;
+            var vr = _wikiService.ValidatePagePath(WikiRoot, SelectedPagePath, cats);
+            if (!vr.IsValid)
+            {
+                StatusText = $"Save rejected: {vr.ErrorReason}";
+                return;
+            }
+        }
+
+        try
+        {
+            await _wikiService.SavePage(WikiRoot, SelectedPagePath, PreviewContent, _currentCategoriesConfig.Categories);
+            _loadedPageContent = PreviewContent;
+            IsPageDirty = false;
+            StatusText = $"Saved: {SelectedPagePath}";
+        }
+        catch (Exception ex) { StatusText = $"Save failed: {ex.Message}"; }
     }
 
     [RelayCommand]
@@ -833,6 +1012,146 @@ public partial class WikiViewModel : ObservableObject
             StatusText = $"Lint error: {ex.Message}";
         }
         finally { IsLinting = false; }
+    }
+
+    // ────────────────────────────────────────────────
+    // Prompt Settings タブ
+    // ────────────────────────────────────────────────
+
+    private void LoadPromptSettings()
+    {
+        if (!HasWiki) return;
+        var cfg = _wikiService.LoadPrompts(WikiRoot);
+        IsPromptReadOnly = cfg.IsUnknownVersion;
+        PromptImportSystemPrefix = cfg.Import.SystemPrefix;
+        PromptImportSystemSuffix = cfg.Import.SystemSuffix;
+        PromptImportUserSuffix   = cfg.Import.UserSuffix;
+        PromptQuerySystemPrefix  = cfg.Query.SystemPrefix;
+        PromptQuerySystemSuffix  = cfg.Query.SystemSuffix;
+        PromptQueryUserSuffix    = cfg.Query.UserSuffix;
+        PromptLintSystemPrefix   = cfg.Lint.SystemPrefix;
+        PromptLintSystemSuffix   = cfg.Lint.SystemSuffix;
+        PromptLintUserSuffix     = cfg.Lint.UserSuffix;
+        PromptStatusText = cfg.IsUnknownVersion
+            ? "Unsupported .wiki-prompts.json version. Prompts are read-only."
+            : "";
+
+        var language = _config.LoadSettings().LlmLanguage;
+        DefaultImportSystemPrompt = WikiIngestService.GetDefaultSystemPromptPreview(language);
+        DefaultQuerySystemPrompt  = WikiQueryService.GetDefaultSystemPromptPreview(language);
+        DefaultLintSystemPrompt   = WikiLintService.GetDefaultSystemPromptPreview(language);
+    }
+
+    [RelayCommand]
+    private async Task SavePromptSettings()
+    {
+        if (!HasWiki) return;
+        if (IsPromptReadOnly) { PromptStatusText = "Cannot save: unsupported version."; return; }
+
+        const int MaxLength = 8000;
+        var overLimit = new List<string>();
+        if (PromptImportSystemPrefix.Length > MaxLength) overLimit.Add($"Import.SystemPrefix ({PromptImportSystemPrefix.Length} chars)");
+        if (PromptImportSystemSuffix.Length > MaxLength) overLimit.Add($"Import.SystemSuffix ({PromptImportSystemSuffix.Length} chars)");
+        if (PromptImportUserSuffix.Length   > MaxLength) overLimit.Add($"Import.UserSuffix ({PromptImportUserSuffix.Length} chars)");
+        if (PromptQuerySystemPrefix.Length  > MaxLength) overLimit.Add($"Query.SystemPrefix ({PromptQuerySystemPrefix.Length} chars)");
+        if (PromptQuerySystemSuffix.Length  > MaxLength) overLimit.Add($"Query.SystemSuffix ({PromptQuerySystemSuffix.Length} chars)");
+        if (PromptQueryUserSuffix.Length    > MaxLength) overLimit.Add($"Query.UserSuffix ({PromptQueryUserSuffix.Length} chars)");
+        if (PromptLintSystemPrefix.Length   > MaxLength) overLimit.Add($"Lint.SystemPrefix ({PromptLintSystemPrefix.Length} chars)");
+        if (PromptLintSystemSuffix.Length   > MaxLength) overLimit.Add($"Lint.SystemSuffix ({PromptLintSystemSuffix.Length} chars)");
+        if (PromptLintUserSuffix.Length     > MaxLength) overLimit.Add($"Lint.UserSuffix ({PromptLintUserSuffix.Length} chars)");
+        if (overLimit.Count > 0) { PromptStatusText = $"Save rejected: fields exceed 8,000 char limit: {string.Join(", ", overLimit)}"; return; }
+
+        var cfg = new WikiPromptConfig
+        {
+            Import = new WikiPromptOverrides { SystemPrefix = PromptImportSystemPrefix, SystemSuffix = PromptImportSystemSuffix, UserSuffix = PromptImportUserSuffix },
+            Query  = new WikiPromptOverrides { SystemPrefix = PromptQuerySystemPrefix,  SystemSuffix = PromptQuerySystemSuffix,  UserSuffix = PromptQueryUserSuffix },
+            Lint   = new WikiPromptOverrides { SystemPrefix = PromptLintSystemPrefix,   SystemSuffix = PromptLintSystemSuffix,   UserSuffix = PromptLintUserSuffix },
+        };
+
+        try
+        {
+            await _wikiService.SavePromptsAtomicAsync(WikiRoot, cfg);
+            PromptStatusText = "Prompt settings saved.";
+        }
+        catch (Exception ex) { PromptStatusText = $"Save failed: {ex.Message}"; }
+    }
+
+    [RelayCommand]
+    private void ResetPromptSettings()
+    {
+        PromptImportSystemPrefix = PromptImportSystemSuffix = PromptImportUserSuffix = "";
+        PromptQuerySystemPrefix  = PromptQuerySystemSuffix  = PromptQueryUserSuffix  = "";
+        PromptLintSystemPrefix   = PromptLintSystemSuffix   = PromptLintUserSuffix   = "";
+        PromptStatusText = "Reset to defaults (not saved). Click Save to apply.";
+    }
+
+    // ── Wiki Schema ───────────────────────────────────
+
+    partial void OnWikiSchemaContentChanged(string value)
+    {
+        if (!_suppressWikiSchemaDirtyTracking)
+            IsWikiSchemaDirty = true;
+    }
+
+    private async Task LoadWikiSchemaAsync()
+    {
+        if (!HasWiki) return;
+        var path = WikiService.GetSchemaPath(WikiRoot);
+        _suppressWikiSchemaDirtyTracking = true;
+        try
+        {
+            WikiSchemaContent = File.Exists(path)
+                ? await File.ReadAllTextAsync(path, System.Text.Encoding.UTF8)
+                : "";
+            IsWikiSchemaDirty = false;
+            WikiSchemaStatusText = "";
+        }
+        catch (Exception ex) { WikiSchemaStatusText = $"Load failed: {ex.Message}"; }
+        finally { _suppressWikiSchemaDirtyTracking = false; }
+    }
+
+    [RelayCommand]
+    private async Task SaveWikiSchema()
+    {
+        if (!HasWiki) return;
+        try
+        {
+            await WikiService.WriteFileAtomicAsync(WikiService.GetSchemaPath(WikiRoot), WikiSchemaContent);
+            IsWikiSchemaDirty = false;
+            WikiSchemaStatusText = "Saved.";
+        }
+        catch (Exception ex) { WikiSchemaStatusText = $"Save failed: {ex.Message}"; }
+    }
+
+    // ────────────────────────────────────────────────
+    // カテゴリ管理
+    // ────────────────────────────────────────────────
+
+    [RelayCommand]
+    private async Task AddCategory()
+    {
+        if (!HasWiki || string.IsNullOrWhiteSpace(NewCategoryName)) return;
+        if (IsWikiReadOnly) { StatusText = $"Cannot modify categories: {WikiReadOnlyReason}"; return; }
+
+        var (success, error) = await _wikiService.AddCategoryAsync(WikiRoot, NewCategoryName.Trim());
+        if (success)
+        {
+            NewCategoryName = "";
+            await LoadCategoriesAsync();
+            StatusText = "Category added.";
+        }
+        else { StatusText = $"Cannot add category: {error}"; }
+    }
+
+    [RelayCommand]
+    private async Task DeleteCategory(string? name)
+    {
+        if (!HasWiki || string.IsNullOrWhiteSpace(name)) return;
+        if (IsWikiReadOnly) { StatusText = $"Cannot modify categories: {WikiReadOnlyReason}"; return; }
+
+        var (success, error) = await _wikiService.DeleteCategoryAsync(WikiRoot, name);
+        if (success) { await LoadCategoriesAsync(); StatusText = $"Category '{name}' removed from config."; }
+        else         { StatusText = $"Cannot remove category: {error}"; }
     }
 
     // ────────────────────────────────────────────────

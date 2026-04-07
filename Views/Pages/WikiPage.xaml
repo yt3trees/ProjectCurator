@@ -177,6 +177,18 @@
                     </StackPanel>
                 </Button>
 
+                <Button x:Name="PromptsTabBtn"
+                        Style="{StaticResource WikiTabBtnStyle}"
+                        Command="{Binding SwitchToPromptsCommand}"
+                        Margin="2,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Settings24" FontSize="12"
+                                       Foreground="{DynamicResource AppSubtext0}"
+                                       VerticalAlignment="Center" Margin="0,1,4,0"/>
+                        <TextBlock Text="Prompts" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
                 <Border Background="{DynamicResource AppSurface2}" CornerRadius="4"
                         Padding="6,2" Margin="16,0,0,0" VerticalAlignment="Center"
                         Visibility="{Binding IsAiEnabled, Converter={StaticResource InverseBoolToVisConverter}}">
@@ -728,6 +740,250 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                </Grid>
+
+                <!-- PROMPTS TAB -->
+                <Grid Visibility="{Binding IsPromptsTab, Converter={StaticResource BoolToVis}}"
+                      Margin="12,8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Read-only warning -->
+                    <Border Grid.Row="0"
+                            Visibility="{Binding IsPromptReadOnly, Converter={StaticResource BoolToVis}}"
+                            Background="{DynamicResource AppYellow}" CornerRadius="4"
+                            Padding="8,4" Margin="0,0,0,8">
+                        <TextBlock Text="{Binding PromptStatusText}"
+                                   Foreground="{DynamicResource AppBase}"
+                                   FontSize="11" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- AI disabled notice -->
+                    <Border Grid.Row="1"
+                            Visibility="{Binding IsAiEnabled, Converter={StaticResource InverseBoolToVisConverter}}"
+                            Background="{DynamicResource AppSurface2}" CornerRadius="4"
+                            Padding="8,4" Margin="0,0,0,8">
+                        <TextBlock Text="AI is disabled. Enable it in Settings &gt; LLM API to run Import, Query, and Lint. Prompt settings can be edited here regardless."
+                                   Foreground="{DynamicResource AppSubtext0}"
+                                   FontSize="11" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- Prompt editors -->
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- Wiki Schema -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock Text="Wiki Schema" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AppText}" VerticalAlignment="Center"/>
+                                <TextBlock Text="(injected into Import and Query system prompts)"
+                                           FontSize="10" Foreground="{DynamicResource AppSubtext0}"
+                                           VerticalAlignment="Center" Margin="8,1,0,0"/>
+                            </StackPanel>
+                            <TextBox x:Name="WikiSchemaTextBox"
+                                     Text="{Binding WikiSchemaContent, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="200" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Background="{DynamicResource AppSurface1}"
+                                     Foreground="{DynamicResource AppText}"
+                                     BorderBrush="{DynamicResource AppSurface2}"
+                                     FontFamily="Consolas" FontSize="11"
+                                     Margin="0,0,0,4" Padding="6" VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Disabled"
+                                     PreviewKeyDown="OnWikiSchemaKeyDown"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                <Button Content="Save Schema"
+                                        Command="{Binding SaveWikiSchemaCommand}"
+                                        Padding="8,3" FontSize="12"/>
+                                <TextBlock Text="●" Foreground="{DynamicResource AppYellow}"
+                                           FontSize="10" VerticalAlignment="Center" Margin="8,0,4,0"
+                                           Visibility="{Binding IsWikiSchemaDirty, Converter={StaticResource BoolToVis}}"/>
+                                <TextBlock Text="{Binding WikiSchemaStatusText}"
+                                           FontSize="11" Foreground="{DynamicResource AppSubtext0}"
+                                           VerticalAlignment="Center" Margin="4,0,0,0"/>
+                            </StackPanel>
+
+                            <!-- Import -->
+                            <TextBlock Text="Import Prompts" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppText}" Margin="0,0,0,6"/>
+                            <TextBlock Text="System Prefix" FontSize="11" Foreground="{DynamicResource AppSubtext0}" Margin="0,0,0,2"/>
+                            <TextBox Text="{Binding PromptImportSystemPrefix, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="60" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Background="{DynamicResource AppSurface1}"
+                                     Foreground="{DynamicResource AppText}"
+                                     BorderBrush="{DynamicResource AppSurface2}"
+                                     IsReadOnly="{Binding IsPromptReadOnly}"
+                                     Margin="0,0,0,4" Padding="4" VerticalScrollBarVisibility="Auto"/>
+                            <TextBlock Text="— Default System Prompt (read-only, generated at runtime) —"
+                                       FontSize="10" Foreground="{DynamicResource AppSubtext0}"
+                                       FontStyle="Italic" Margin="0,0,0,2"/>
+                            <TextBox Text="{Binding DefaultImportSystemPrompt, Mode=OneWay}"
+                                     Height="80" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Background="{DynamicResource AppBase}"
+                                     Foreground="{DynamicResource AppSubtext0}"
+                                     BorderBrush="{DynamicResource AppSurface2}"
+                                     IsReadOnly="True"
+                                     Margin="0,0,0,4" Padding="4" VerticalScrollBarVisibility="Auto"/>
+                            <TextBlock Text="System Suffix" FontSize="11" Foreground="{DynamicResource AppSubtext0}" Margin="0,0,0,2"/>
+                            <TextBox Text="{Binding PromptImportSystemSuffix, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="60" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Background="{DynamicResource AppSurface1}"
+                                     Foreground="{DynamicResource AppText}"
+                                     BorderBrush="{DynamicResource AppSurface2}"
+                                     IsReadOnly="{Binding IsPromptReadOnly}"
+                                     Margin="0,0,0,12" Padding="4" VerticalScrollBarVisibility="Auto"/>
+
+                            <!-- Query -->
+                            <TextBlock Text="Query Prompts" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppText}" Margin="0,0,0,6"/>
+                            <TextBlock Text="System Prefix" FontSize="11" Foreground="{DynamicResource AppSubtext0}" Margin="0,0,0,2"/>
+                            <TextBox Text="{Binding PromptQuerySystemPrefix, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="60" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Background="{DynamicResource AppSurface1}"
+                                     Foreground="{DynamicResource AppText}"
+                                     BorderBrush="{DynamicResource AppSurface2}"
+                                     IsReadOnly="{Binding IsPromptReadOnly}"
+                                     Margin="0,0,0,4" Padding="4" VerticalScrollBarVisibility="Auto"/>
+                            <TextBlock Text="— Default System Prompt (read-only, generated at runtime) —"
+                                       FontSize="10" Foreground="{DynamicResource AppSubtext0}"
+                                       FontStyle="Italic" Margin="0,0,0,2"/>
+                            <TextBox Text="{Binding DefaultQuerySystemPrompt, Mode=OneWay}"
+                                     Height="80" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Background="{DynamicResource AppBase}"
+                                     Foreground="{DynamicResource AppSubtext0}"
+                                     BorderBrush="{DynamicResource AppSurface2}"
+                                     IsReadOnly="True"
+                                     Margin="0,0,0,4" Padding="4" VerticalScrollBarVisibility="Auto"/>
+                            <TextBlock Text="System Suffix" FontSize="11" Foreground="{DynamicResource AppSubtext0}" Margin="0,0,0,2"/>
+                            <TextBox Text="{Binding PromptQuerySystemSuffix, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="60" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Background="{DynamicResource AppSurface1}"
+                                     Foreground="{DynamicResource AppText}"
+                                     BorderBrush="{DynamicResource AppSurface2}"
+                                     IsReadOnly="{Binding IsPromptReadOnly}"
+                                     Margin="0,0,0,12" Padding="4" VerticalScrollBarVisibility="Auto"/>
+
+                            <!-- Lint -->
+                            <TextBlock Text="Lint Prompts" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppText}" Margin="0,0,0,6"/>
+                            <TextBlock Text="System Prefix" FontSize="11" Foreground="{DynamicResource AppSubtext0}" Margin="0,0,0,2"/>
+                            <TextBox Text="{Binding PromptLintSystemPrefix, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="60" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Background="{DynamicResource AppSurface1}"
+                                     Foreground="{DynamicResource AppText}"
+                                     BorderBrush="{DynamicResource AppSurface2}"
+                                     IsReadOnly="{Binding IsPromptReadOnly}"
+                                     Margin="0,0,0,4" Padding="4" VerticalScrollBarVisibility="Auto"/>
+                            <TextBlock Text="— Default System Prompt (read-only, generated at runtime) —"
+                                       FontSize="10" Foreground="{DynamicResource AppSubtext0}"
+                                       FontStyle="Italic" Margin="0,0,0,2"/>
+                            <TextBox Text="{Binding DefaultLintSystemPrompt, Mode=OneWay}"
+                                     Height="80" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Background="{DynamicResource AppBase}"
+                                     Foreground="{DynamicResource AppSubtext0}"
+                                     BorderBrush="{DynamicResource AppSurface2}"
+                                     IsReadOnly="True"
+                                     Margin="0,0,0,4" Padding="4" VerticalScrollBarVisibility="Auto"/>
+                            <TextBlock Text="System Suffix" FontSize="11" Foreground="{DynamicResource AppSubtext0}" Margin="0,0,0,2"/>
+                            <TextBox Text="{Binding PromptLintSystemSuffix, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="60" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Background="{DynamicResource AppSurface1}"
+                                     Foreground="{DynamicResource AppText}"
+                                     BorderBrush="{DynamicResource AppSurface2}"
+                                     IsReadOnly="{Binding IsPromptReadOnly}"
+                                     Margin="0,0,0,12" Padding="4" VerticalScrollBarVisibility="Auto"/>
+
+                            <!-- Categories -->
+                            <TextBlock Text="Categories" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppText}" Margin="0,0,0,6"/>
+                            <!-- Read-only mode banner -->
+                            <Border Visibility="{Binding IsWikiReadOnly, Converter={StaticResource BoolToVis}}"
+                                    Background="{DynamicResource AppYellow}" CornerRadius="4"
+                                    Padding="8,4" Margin="0,0,0,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding WikiReadOnlyReason}"
+                                               Foreground="{DynamicResource AppBase}"
+                                               FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    <Button Content="Reload" Command="{Binding ReloadCategoriesCommand}"
+                                            Margin="8,0,0,0" Padding="6,2" FontSize="11"/>
+                                </StackPanel>
+                            </Border>
+                            <!-- AGENTS.md warning -->
+                            <Border Visibility="{Binding HasAgentsMdWarning, Converter={StaticResource BoolToVis}}"
+                                    Background="{DynamicResource AppSurface2}" CornerRadius="4"
+                                    Padding="8,4" Margin="0,0,0,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding AgentsMdCategoryWarning}"
+                                               Foreground="{DynamicResource AppYellow}"
+                                               FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="400"/>
+                                    <Button Content="Repair" Command="{Binding RepairAgentsMdCommand}"
+                                            Margin="8,0,0,0" Padding="6,2" FontSize="11"/>
+                                </StackPanel>
+                            </Border>
+                            <!-- Category list -->
+                            <ItemsControl ItemsSource="{Binding DefinedCategories}" Margin="0,0,0,4">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                                            <TextBlock Text="{Binding Name}" FontSize="12"
+                                                       Foreground="{DynamicResource AppText}"
+                                                       VerticalAlignment="Center" MinWidth="120"/>
+                                            <Button Content="Delete"
+                                                    Command="{Binding DataContext.DeleteCategoryCommand,
+                                                              RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    CommandParameter="{Binding Name}"
+                                                    Padding="4,1" FontSize="10" Margin="4,0,0,0"
+                                                    IsEnabled="{Binding IsDeletable}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- Undefined categories -->
+                            <ItemsControl ItemsSource="{Binding UndefinedCategories}" Margin="0,0,0,4">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                                            <TextBlock Text="{Binding}" FontSize="12"
+                                                       Foreground="{DynamicResource AppSubtext0}"
+                                                       VerticalAlignment="Center" MinWidth="120"/>
+                                            <TextBlock Text="(not in config — read-only)"
+                                                       FontSize="10" Foreground="{DynamicResource AppSubtext0}"
+                                                       VerticalAlignment="Center" Margin="4,0"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- Add category -->
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
+                                        Visibility="{Binding IsWikiReadOnly, Converter={StaticResource InverseBoolToVisConverter}}">
+                                <TextBox Text="{Binding NewCategoryName, UpdateSourceTrigger=PropertyChanged}"
+                                         Width="160" Padding="4,3" FontSize="12"
+                                         Background="{DynamicResource AppSurface1}"
+                                         Foreground="{DynamicResource AppText}"
+                                         BorderBrush="{DynamicResource AppSurface2}"/>
+                                <Button Content="Add Category" Command="{Binding AddCategoryCommand}"
+                                        Margin="6,0,0,0" Padding="8,3" FontSize="12"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Save / Reset buttons -->
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button Content="Save Prompt Settings"
+                                Command="{Binding SavePromptSettingsCommand}"
+                                IsEnabled="{Binding IsPromptReadOnly, Converter={StaticResource InverseBoolConverter}}"
+                                Padding="10,4" FontSize="12" Margin="0,0,8,0"/>
+                        <Button Content="Reset to Defaults"
+                                Command="{Binding ResetPromptSettingsCommand}"
+                                IsEnabled="{Binding IsPromptReadOnly, Converter={StaticResource InverseBoolConverter}}"
+                                Padding="10,4" FontSize="12"
+                                ToolTip="Clears all System Prefix and System Suffix fields for Import, Query, and Lint back to empty (no custom prompt). Click Save to apply."/>
+                        <TextBlock Text="{Binding PromptStatusText}" Margin="12,0,0,0"
+                                   FontSize="11" Foreground="{DynamicResource AppSubtext0}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
                 </Grid>
 
             </Grid>

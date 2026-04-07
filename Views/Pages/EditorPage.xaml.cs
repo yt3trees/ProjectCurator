@@ -116,6 +116,10 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
             {
                 _editor.FontSize = ViewModel.EditorFontSize;
             }
+            else if (e.PropertyName == nameof(EditorViewModel.EditorTextColor))
+            {
+                ApplyEditorTheme();
+            }
         };
     }
 
@@ -137,14 +141,12 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         try
         {
             var bg = Application.Current.Resources["EditorBackground"] as System.Windows.Media.SolidColorBrush;
-            var fg = Application.Current.Resources["EditorForeground"] as System.Windows.Media.SolidColorBrush;
+            var fg = ParseHexColor(ViewModel.EditorTextColor)
+                  ?? Application.Current.Resources["EditorForeground"] as System.Windows.Media.SolidColorBrush
+                  ?? new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#c9d1d9"));
 
-            if (bg == null)
-            {
-                bg = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0d1117"));
-                fg = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#c9d1d9"));
-            }
-            
+            bg ??= new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0d1117"));
+
             _editor.Background = bg;
             _editor.Foreground = fg;
             _editor.LineNumbersForeground = (Application.Current.Resources["AppSubtext0"] as System.Windows.Media.SolidColorBrush)
@@ -154,6 +156,13 @@ public partial class EditorPage : WpfUserControl, INavigableView<EditorViewModel
         {
             System.Diagnostics.Debug.WriteLine($"[EditorPage] テーマ適用エラー: {ex.Message}");
         }
+    }
+
+    private static System.Windows.Media.SolidColorBrush? ParseHexColor(string? hex)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return null;
+        try { return new System.Windows.Media.SolidColorBrush((MediaColor)System.Windows.Media.ColorConverter.ConvertFromString(hex)); }
+        catch { return null; }
     }
 
     // -------------------------------------------------------------------------

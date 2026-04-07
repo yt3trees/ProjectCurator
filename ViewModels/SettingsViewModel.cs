@@ -142,6 +142,19 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int markdownRenderFontSize = 13;
 
+    // Editor / Wiki 文字色 (RGB 各チャンネル 0-255)
+    [ObservableProperty] private int editorColorR = 201;
+    [ObservableProperty] private int editorColorG = 209;
+    [ObservableProperty] private int editorColorB = 217;
+
+    [ObservableProperty] private int markdownColorR = 201;
+    [ObservableProperty] private int markdownColorG = 209;
+    [ObservableProperty] private int markdownColorB = 217;
+
+    // RGB から派生する hex 文字列 (保存・メッセージ送信用)
+    public string EditorTextColor => $"#{EditorColorR:X2}{EditorColorG:X2}{EditorColorB:X2}";
+    public string MarkdownRenderTextColor => $"#{MarkdownColorR:X2}{MarkdownColorG:X2}{MarkdownColorB:X2}";
+
     // About
     public string AppVersion { get; } =
         "v" + (System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0");
@@ -219,8 +232,12 @@ public partial class SettingsViewModel : ObservableObject
             AiEnabled          = settings.AiEnabled;
             AiToggleCanEnable  = settings.AiEnabled; // 既にオンなら再テスト不要
             CaptureTaskLogEnabled = settings.CaptureTaskLogEnabled;
-            EditorFontSize = settings.EditorFontSize;
-            MarkdownRenderFontSize   = settings.MarkdownRenderFontSize;
+            EditorFontSize         = settings.EditorFontSize;
+            MarkdownRenderFontSize = settings.MarkdownRenderFontSize;
+            if (TryParseHex(settings.EditorTextColor, out var er, out var eg, out var eb))
+                { EditorColorR = er; EditorColorG = eg; EditorColorB = eb; }
+            if (TryParseHex(settings.MarkdownRenderTextColor, out var mr, out var mg, out var mb))
+                { MarkdownColorR = mr; MarkdownColorG = mg; MarkdownColorB = mb; }
         }
         finally
         {
@@ -293,11 +310,14 @@ public partial class SettingsViewModel : ObservableObject
         settings.LlmLanguage    = LlmLanguage.Trim();
         settings.AiEnabled      = AiEnabled;
         settings.CaptureTaskLogEnabled = CaptureTaskLogEnabled;
-        settings.EditorFontSize = EditorFontSize;
-        settings.MarkdownRenderFontSize   = MarkdownRenderFontSize;
+        settings.EditorFontSize          = EditorFontSize;
+        settings.MarkdownRenderFontSize  = MarkdownRenderFontSize;
+        settings.EditorTextColor         = EditorTextColor.Trim();
+        settings.MarkdownRenderTextColor = MarkdownRenderTextColor.Trim();
         _configService.SaveSettings(settings);
         UpdateWorkspacePathsWarning();
         WeakReferenceMessenger.Default.Send(new FontSizeChangedMessage(EditorFontSize, MarkdownRenderFontSize));
+        WeakReferenceMessenger.Default.Send(new TextColorChangedMessage(EditorTextColor.Trim(), MarkdownRenderTextColor.Trim()));
     }
 
     [RelayCommand]
@@ -422,6 +442,66 @@ public partial class SettingsViewModel : ObservableObject
     {
         if (_loading) return;
         UpdateWorkspacePathsWarning();
+    }
+
+    partial void OnEditorColorRChanged(int value) => OnPropertyChanged(nameof(EditorTextColor));
+    partial void OnEditorColorGChanged(int value) => OnPropertyChanged(nameof(EditorTextColor));
+    partial void OnEditorColorBChanged(int value) => OnPropertyChanged(nameof(EditorTextColor));
+    partial void OnMarkdownColorRChanged(int value) => OnPropertyChanged(nameof(MarkdownRenderTextColor));
+    partial void OnMarkdownColorGChanged(int value) => OnPropertyChanged(nameof(MarkdownRenderTextColor));
+    partial void OnMarkdownColorBChanged(int value) => OnPropertyChanged(nameof(MarkdownRenderTextColor));
+
+    private const int DefaultColorR = 201;
+    private const int DefaultColorG = 209;
+    private const int DefaultColorB = 217;
+
+    [RelayCommand]
+    void AdjustEditorColor(string param)
+    {
+        var delta = param == "+" ? 5 : -5;
+        EditorColorR = Math.Clamp(EditorColorR + delta, 0, 255);
+        EditorColorG = Math.Clamp(EditorColorG + delta, 0, 255);
+        EditorColorB = Math.Clamp(EditorColorB + delta, 0, 255);
+    }
+
+    [RelayCommand]
+    void ResetEditorColor()
+    {
+        EditorColorR = DefaultColorR;
+        EditorColorG = DefaultColorG;
+        EditorColorB = DefaultColorB;
+    }
+
+    [RelayCommand]
+    void AdjustMarkdownColor(string param)
+    {
+        var delta = param == "+" ? 5 : -5;
+        MarkdownColorR = Math.Clamp(MarkdownColorR + delta, 0, 255);
+        MarkdownColorG = Math.Clamp(MarkdownColorG + delta, 0, 255);
+        MarkdownColorB = Math.Clamp(MarkdownColorB + delta, 0, 255);
+    }
+
+    [RelayCommand]
+    void ResetMarkdownColor()
+    {
+        MarkdownColorR = DefaultColorR;
+        MarkdownColorG = DefaultColorG;
+        MarkdownColorB = DefaultColorB;
+    }
+
+    private static bool TryParseHex(string? hex, out int r, out int g, out int b)
+    {
+        r = g = b = 0;
+        var s = hex?.TrimStart('#');
+        if (s?.Length != 6) return false;
+        try
+        {
+            r = Convert.ToInt32(s[0..2], 16);
+            g = Convert.ToInt32(s[2..4], 16);
+            b = Convert.ToInt32(s[4..6], 16);
+            return true;
+        }
+        catch { return false; }
     }
 
     private static Dictionary<string, string> ParseLlmParametersText(string text)

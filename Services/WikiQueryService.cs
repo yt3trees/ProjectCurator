@@ -8,6 +8,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Curia.Models;
+using System.Collections.Generic;
 
 namespace Curia.Services;
 
@@ -145,8 +146,10 @@ public class WikiQueryService
         _lastSelectedPaths = selectedPaths;
 
         // Step 2: 回答生成 (会話履歴付き)
-        var systemPrompt = BuildAnswerSystemPrompt(schema);
-        var userPrompt = BuildAnswerUserPrompt(question, index, relevantContent);
+        var promptConfig = _wiki.LoadPrompts(wikiRoot);
+        var overrides = promptConfig.IsUnknownVersion ? null : promptConfig.Query;
+        var systemPrompt = BuildAnswerSystemPrompt(schema, overrides);
+        var userPrompt = BuildAnswerUserPrompt(question, index, relevantContent, overrides);
         _conversationHistory.Add(("user", userPrompt));
 
         // スライディングウィンドウ: MaxTurns ペアを超えたら古い user+assistant を削除
@@ -327,10 +330,22 @@ Wiki index (for context only):
 
     // ---- プロンプト構築 ----
 
-    private string BuildAnswerSystemPrompt(string schema)
+    /// <summary>UI 表示用デフォルトシステムプロンプトのプレビュー（スキーマ部分はプレースホルダ）。</summary>
+    public static string GetDefaultSystemPromptPreview(string language) => $"""
+You are a knowledgeable assistant for a project wiki.
+Answer questions based ONLY on the provided wiki content.
+If the answer is not in the wiki, say so clearly.
+Always cite the pages you referenced using [[PageName]] format.
+Write your answer in {language}.
+
+Project context:
+[wiki-schema.md is loaded from disk and injected here at runtime]
+""";
+
+    private string BuildAnswerSystemPrompt(string schema, WikiPromptOverrides? overrides = null)
     {
         var language = _configService.LoadSettings().LlmLanguage;
-        return $"""
+        var basePrompt = $"""
 You are a knowledgeable assistant for a project wiki.
 Answer questions based ONLY on the provided wiki content.
 If the answer is not in the wiki, say so clearly.
@@ -340,9 +355,17 @@ Write your answer in {language}.
 Project context:
 {schema}
 """;
+        var parts = new List<string>();
+        if (overrides != null && !string.IsNullOrEmpty(overrides.SystemPrefix)) parts.Add(overrides.SystemPrefix);
+        parts.Add(basePrompt);
+        if (overrides != null && !string.IsNullOrEmpty(overrides.SystemSuffix)) parts.Add(overrides.SystemSuffix);
+        return string.Join("\n\n", parts);
     }
 
-    private static string BuildAnswerUserPrompt(string question, string index, string pageContents) => $"""
+    private static string BuildAnswerUserPrompt(
+        string question, string index, string pageContents, WikiPromptOverrides? overrides = null)
+    {
+        var basePrompt = $"""
 ## Question
 {question}
 
@@ -355,6 +378,10 @@ Project context:
 Please provide a clear, concise answer based on the wiki content above.
 End your response with: "Referenced pages: [[page1]], [[page2]], ..."
 """;
+        if (overrides != null && !string.IsNullOrEmpty(overrides.UserSuffix))
+            return basePrompt + "\n\n" + overrides.UserSuffix;
+        return basePrompt;
+    }
 
     // ---- ユーティリティ ----
 

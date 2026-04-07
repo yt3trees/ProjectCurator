@@ -145,6 +145,157 @@ public class IngestLlmResponse
     public string LogEntry { get; set; } = "";
 }
 
+// --- Wiki Category Config (.wiki-categories.json) ---
+
+public class WikiCategoriesConfig
+{
+    [JsonPropertyName("version")]
+    public int Version { get; set; } = 1;
+
+    [JsonPropertyName("categories")]
+    public List<string> Categories { get; set; } = ["sources", "entities", "concepts", "analysis"];
+
+    [JsonIgnore]
+    public bool IsUnknownVersion { get; set; }
+
+    [JsonIgnore]
+    public bool HasNamingConflict { get; set; }
+
+    [JsonIgnore]
+    public string? ConflictDetail { get; set; }
+}
+
+// --- Wiki Prompt Config (.wiki-prompts.json) ---
+
+public class WikiPromptOverrides
+{
+    [JsonPropertyName("systemPrefix")]
+    public string SystemPrefix { get; set; } = "";
+
+    [JsonPropertyName("systemSuffix")]
+    public string SystemSuffix { get; set; } = "";
+
+    [JsonPropertyName("userSuffix")]
+    public string UserSuffix { get; set; } = "";
+}
+
+public class WikiPromptConfig
+{
+    [JsonPropertyName("version")]
+    public int Version { get; set; } = 1;
+
+    [JsonPropertyName("import")]
+    public WikiPromptOverrides Import { get; set; } = new();
+
+    [JsonPropertyName("query")]
+    public WikiPromptOverrides Query { get; set; } = new();
+
+    [JsonPropertyName("lint")]
+    public WikiPromptOverrides Lint { get; set; } = new();
+
+    [JsonIgnore]
+    public bool IsUnknownVersion { get; set; }
+}
+
+// --- Path Validation ---
+
+public record WikiPathValidationResult(bool IsValid, string? ErrorReason);
+
+// --- Transaction Models (.wiki-txn.json) ---
+
+public enum WikiTxnPhase
+{
+    Prepared,
+    Committing,
+    Committed,
+    Rollbacking,
+    RolledBack
+}
+
+public enum WikiTxnEntryType { Create, Update }
+
+public enum WikiTxnEntryState
+{
+    Prepared,
+    TempWritten,
+    Replaced,
+    RolledBack
+}
+
+public class WikiTxnEntry
+{
+    [JsonPropertyName("entryType")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public WikiTxnEntryType EntryType { get; set; }
+
+    [JsonPropertyName("targetPath")]
+    public string TargetPath { get; set; } = "";
+
+    [JsonPropertyName("tempPath")]
+    public string TempPath { get; set; } = "";
+
+    [JsonPropertyName("backupPath")]
+    public string BackupPath { get; set; } = "";
+
+    [JsonPropertyName("state")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public WikiTxnEntryState State { get; set; } = WikiTxnEntryState.Prepared;
+}
+
+public class WikiTransaction
+{
+    [JsonPropertyName("transactionId")]
+    public string TransactionId { get; set; } = Guid.NewGuid().ToString();
+
+    [JsonPropertyName("phase")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public WikiTxnPhase Phase { get; set; } = WikiTxnPhase.Prepared;
+
+    [JsonPropertyName("createdAtUtc")]
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    [JsonPropertyName("entries")]
+    public List<WikiTxnEntry> Entries { get; set; } = [];
+}
+
+// --- Rename Transaction Models (.wiki-rename-txn.json) ---
+
+public enum WikiRenameTxnPhase
+{
+    Prepared,
+    MovingToTemp,
+    MovingToNew,
+    UpdatingConfig,
+    Compensating,
+    Committed,
+    RolledBack
+}
+
+public class WikiRenameTxn
+{
+    [JsonPropertyName("oldCategory")]
+    public string OldCategory { get; set; } = "";
+
+    [JsonPropertyName("newCategory")]
+    public string NewCategory { get; set; } = "";
+
+    [JsonPropertyName("oldPath")]
+    public string OldPath { get; set; } = "";
+
+    [JsonPropertyName("newPath")]
+    public string NewPath { get; set; } = "";
+
+    [JsonPropertyName("tempPath")]
+    public string TempPath { get; set; } = "";
+
+    [JsonPropertyName("oldExistedAtStart")]
+    public bool OldExistedAtStart { get; set; }
+
+    [JsonPropertyName("phase")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public WikiRenameTxnPhase Phase { get; set; } = WikiRenameTxnPhase.Prepared;
+}
+
 // --- Query History ---
 
 public class WikiQueryRecord

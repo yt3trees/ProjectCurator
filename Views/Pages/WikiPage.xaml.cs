@@ -147,6 +147,13 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
                 SyncRenderFromViewModel();
                 UpdateQueryAnswerView();
             }
+            else if (args.PropertyName == nameof(WikiViewModel.EditorTextColor))
+                ApplyEditorTheme();
+            else if (args.PropertyName == nameof(WikiViewModel.MarkdownRenderTextColor))
+            {
+                SyncRenderFromViewModel();
+                UpdateQueryAnswerView();
+            }
         };
 
         ViewModel.ConversationLog.CollectionChanged += (_, _) =>
@@ -196,18 +203,18 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
         if (ViewModel.SessionPreviewRecords.Count > 0)
         {
             // 過去セッションの全会話を表示
-            _wikiQueryAnswerViewer.Document = BuildConversationDocument(ViewModel.SessionPreviewRecords, ViewModel.MarkdownRenderFontSize);
+            _wikiQueryAnswerViewer.Document = BuildConversationDocument(ViewModel.SessionPreviewRecords, ViewModel.MarkdownRenderFontSize, ViewModel.MarkdownRenderTextColor);
         }
         else
         {
             // 現セッションの会話ログを表示
-            _wikiQueryAnswerViewer.Document = BuildConversationDocument(ViewModel.ConversationLog, ViewModel.MarkdownRenderFontSize);
+            _wikiQueryAnswerViewer.Document = BuildConversationDocument(ViewModel.ConversationLog, ViewModel.MarkdownRenderFontSize, ViewModel.MarkdownRenderTextColor);
             var sv = FindVisualChild<ScrollViewer>(_wikiQueryAnswerViewer);
             sv?.ScrollToEnd();
         }
     }
 
-    private static FlowDocument BuildConversationDocument(IEnumerable<Curia.Models.WikiQueryRecord> records, double fontSize = 13)
+    private static FlowDocument BuildConversationDocument(IEnumerable<Curia.Models.WikiQueryRecord> records, double fontSize = 13, string? textColor = null)
     {
         var doc = new FlowDocument
         {
@@ -217,8 +224,9 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             LineHeight = Math.Max(fontSize + 6, 20)
         };
 
-        if (Application.Current?.Resources["AppText"] is System.Windows.Media.Brush appText)
-            doc.Foreground = appText;
+        doc.Foreground = ParseHexColor(textColor)
+            ?? Application.Current?.Resources["AppText"] as System.Windows.Media.Brush
+            ?? System.Windows.Media.Brushes.White;
 
         var subtext = Application.Current?.Resources["AppSubtext0"] as System.Windows.Media.Brush
                       ?? System.Windows.Media.Brushes.Gray;
@@ -253,7 +261,7 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             });
 
             // 回答 (Markdown パース)
-            var answerDoc = BuildMarkdownDocument(record.Answer ?? "", fontSize);
+            var answerDoc = BuildMarkdownDocument(record.Answer ?? "", fontSize, textColor);
             foreach (var block in answerDoc.Blocks.ToList())
             {
                 answerDoc.Blocks.Remove(block);
@@ -278,7 +286,7 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
 
     private void SyncRenderFromViewModel()
     {
-        _wikiRenderViewer.Document = BuildMarkdownDocument(ViewModel.PreviewContent ?? "", ViewModel.MarkdownRenderFontSize);
+        _wikiRenderViewer.Document = BuildMarkdownDocument(ViewModel.PreviewContent ?? "", ViewModel.MarkdownRenderFontSize, ViewModel.MarkdownRenderTextColor);
 
         // ファイルが切り替わった時のみスクロールをリセット（編集中に上に戻るのを防ぐ）
         if (_lastRenderedPath != ViewModel.SelectedPagePath)
@@ -294,11 +302,19 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
         _wikiEditor.Background = resources["EditorBackground"] as System.Windows.Media.Brush
             ?? resources["AppSurface0"] as System.Windows.Media.Brush
             ?? System.Windows.Media.Brushes.Black;
-        _wikiEditor.Foreground = resources["EditorForeground"] as System.Windows.Media.Brush
+        _wikiEditor.Foreground = ParseHexColor(ViewModel.EditorTextColor)
+            ?? resources["EditorForeground"] as System.Windows.Media.Brush
             ?? resources["AppText"] as System.Windows.Media.Brush
             ?? System.Windows.Media.Brushes.White;
         _wikiEditor.LineNumbersForeground = resources["AppSubtext0"] as System.Windows.Media.Brush
             ?? System.Windows.Media.Brushes.Gray;
+    }
+
+    private static System.Windows.Media.SolidColorBrush? ParseHexColor(string? hex)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return null;
+        try { return new System.Windows.Media.SolidColorBrush((MediaColor)System.Windows.Media.ColorConverter.ConvertFromString(hex)); }
+        catch { return null; }
     }
 
     private static void AddBottomViewportPadding(TextEditor editor)
@@ -312,7 +328,7 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             SystemParameters.HorizontalScrollBarHeight + 2);
     }
 
-    private static FlowDocument BuildMarkdownDocument(string markdown, double fontSize = 13)
+    private static FlowDocument BuildMarkdownDocument(string markdown, double fontSize = 13, string? textColor = null)
     {
         var doc = new FlowDocument
         {
@@ -322,11 +338,9 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             LineHeight = Math.Max(fontSize + 6, 20)
         };
 
-        // Set default foreground from theme
-        if (Application.Current?.Resources["AppText"] is System.Windows.Media.Brush appText)
-        {
-            doc.Foreground = appText;
-        }
+        doc.Foreground = ParseHexColor(textColor)
+            ?? Application.Current?.Resources["AppText"] as System.Windows.Media.Brush
+            ?? System.Windows.Media.Brushes.White;
 
         var lines = markdown.Replace("\r\n", "\n").Split('\n');
         var inCode = false;
@@ -613,9 +627,10 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
         var inactive = _tabInactiveBrush ?? System.Windows.Media.Brushes.Transparent;
         var tab      = ViewModel.ActiveTab;
 
-        PagesTabBtn.Background = tab == WikiTab.Pages ? active : inactive;
-        QueryTabBtn.Background = tab == WikiTab.Query ? active : inactive;
-        LintTabBtn.Background  = tab == WikiTab.Lint  ? active : inactive;
+        PagesTabBtn.Background   = tab == WikiTab.Pages   ? active : inactive;
+        QueryTabBtn.Background   = tab == WikiTab.Query   ? active : inactive;
+        LintTabBtn.Background    = tab == WikiTab.Lint    ? active : inactive;
+        PromptsTabBtn.Background = tab == WikiTab.Prompts ? active : inactive;
     }
 
     // ── Page tree selection ───────────────────────────────────────────────────
@@ -650,6 +665,17 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
         if (e.Key == WpfKey.Enter && !WpfKeyboard.Modifiers.HasFlag(WpfModifierKeys.Shift))
         {
             ViewModel.RunQueryCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    // ── Wiki Schema Ctrl+S ───────────────────────────────────────────────────
+
+    private void OnWikiSchemaKeyDown(object sender, WpfKeyEventArgs e)
+    {
+        if (e.Key == WpfKey.S && WpfKeyboard.Modifiers.HasFlag(WpfModifierKeys.Control))
+        {
+            ViewModel.SaveWikiSchemaCommand.Execute(null);
             e.Handled = true;
         }
     }

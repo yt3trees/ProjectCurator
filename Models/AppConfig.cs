@@ -76,4 +76,7 @@ public class AppSettings
     // Editor / Wiki フォントサイズ
     public int EditorFontSize { get; set; } = 14;
     public int MarkdownRenderFontSize { get; set; } = 13;
+    // Editor / Wiki 文字色 (hex 文字列、空 = テーマデフォルト)
+    public string EditorTextColor { get; set; } = "";
+    public string MarkdownRenderTextColor { get; set; } = "";
 }

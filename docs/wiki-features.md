@@ -11,7 +11,9 @@ Unless otherwise noted, paths below are relative to `wiki/<domain>/`.
 
 ### Page Categories
 
-Pages generated during Import are organized into four categories. The LLM assigns categories automatically.
+Pages generated during Import are organized into categories. The LLM assigns categories automatically based on content.
+
+Four categories are built in and cannot be removed:
 
 | Category | Location | Contents |
 |---|---|---|
@@ -22,6 +24,8 @@ Pages generated during Import are organized into four categories. The LLM assign
 | analysis | `pages/analysis/` | Q&A pages and comparative analyses saved from the Query tab |
 
 A helpful rule of thumb: "What is it (noun)?" → entities; "How does it work or why is it so (verb/policy)?" → concepts.
+
+Custom categories can be added or removed from the Prompts tab. Category definitions are stored in `.wiki-categories.json` inside the wiki domain folder. The `AGENTS.md` file in the wiki root is automatically updated to reflect the current category list.
 
 <img src="../_assets/Wiki-Pages.png" width="80%" alt="Wiki Pages tab" />
 
@@ -198,7 +202,7 @@ When AI Features is disabled, only static checks are run.
 
 The LLM check is a single `ChatCompletionAsync` call.
 
-System prompt (sent in Japanese when locale is Japanese):
+System prompt:
 - Declaration that the model is the wiki quality auditor
 - Scope: Contradiction and Missing checks only
 - Strict response format:
@@ -211,4 +215,23 @@ User prompt includes:
 - One-line summary of each page (up to 80 pages; summaries rather than full content to reduce token usage)
 
 The LLM response is parsed line by line and dispatched by `CONTRADICTION:` / `MISSING:` prefix.
+
+### Prompts (Prompt Customization)
+
+The Prompts tab lets you extend the built-in system prompts for Import, Query, and Lint without replacing them entirely.
+
+For each operation you can set:
+
+| Field | Effect |
+|---|---|
+| System Prefix | Prepended before the built-in system prompt |
+| System Suffix | Appended after the built-in system prompt |
+
+The default system prompt for each operation is displayed between the two fields as read-only text, so you can see the full composed prompt at a glance.
+
+Custom prompt settings are stored in `.wiki-prompts.json` inside the wiki domain folder. Click "Reset to Defaults" to clear all Prefix and Suffix fields (the built-in prompts themselves are not affected).
+
+The wiki-schema.md file can also be edited directly from this tab. Changes take effect on the next Import or Query operation. A dot indicator appears next to the "Save Schema" button when there are unsaved changes.
+
+Category management is also accessible from this tab: you can add custom categories or remove non-default ones. The four built-in categories (sources, entities, concepts, analysis) cannot be deleted.
 

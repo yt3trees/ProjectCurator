@@ -78,7 +78,10 @@ public class WikiIngestService
             var index = _wiki.GetIndex(wikiRoot);
             var pages = _wiki.GetAllPages(wikiRoot);
 
-            var systemPrompt = BuildSystemPrompt(schema);
+            var promptConfig = _wiki.LoadPrompts(wikiRoot);
+            var overrides = promptConfig.IsUnknownVersion ? null : promptConfig.Import;
+
+            var systemPrompt = BuildSystemPrompt(schema, overrides);
             progress?.Report("Selecting update candidates...");
             var updateCandidates = await SelectUpdateCandidates(
                 wikiRoot,
@@ -96,7 +99,8 @@ public class WikiIngestService
                 sourceContent,
                 Path.GetFileName(sourceFilePath),
                 existingPagesContent,
-                existingTags);
+                existingTags,
+                overrides);
 
             // 4. LLM 呼び出し
             progress?.Report("Calling LLM...");
@@ -142,43 +146,173 @@ public class WikiIngestService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        progress?.Report("Writing approved pages...");
-        foreach (var p in result.NewPages)
+        // ---- パスバリデーション（全件事前検証: AC-19） ----
+        var categoriesConfig = _wiki.LoadCategories(wikiRoot);
+        var validCategories = categoriesConfig.Categories;
+
+        var validationErrors = new List<string>();
+
+        // newPages/updatedPages のパス検証
+        var pagesToValidate = result.NewPages
+            .Where(p => !string.IsNullOrWhiteSpace(p.Path) && !string.IsNullOrWhiteSpace(p.Content))
+            .Select(p => (path: p.Path, isNew: true))
+            .Concat(result.UpdatedPages
+                .Where(u => !string.IsNullOrWhiteSpace(u.Path) && !string.IsNullOrWhiteSpace(u.Diff))
+                .Select(u => (path: u.Path, isNew: false)))
+            .ToList();
+
+        foreach (var (path, _) in pagesToValidate)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!string.IsNullOrWhiteSpace(p.Path) && !string.IsNullOrWhiteSpace(p.Content))
-                await _wiki.SavePage(wikiRoot, p.Path, p.Content);
+            var vr = _wiki.ValidatePagePath(wikiRoot, path, validCategories);
+            if (!vr.IsValid)
+                validationErrors.Add($"Invalid path '{path}': {vr.ErrorReason}");
         }
 
-        foreach (var u in result.UpdatedPages)
+        if (validationErrors.Count > 0)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!string.IsNullOrWhiteSpace(u.Path) && !string.IsNullOrWhiteSpace(u.Diff))
-                await _wiki.SavePage(wikiRoot, u.Path, u.Diff);
+            result.Success = false;
+            result.ErrorMessage = string.Join("\n", validationErrors);
+            return;
         }
 
+        // targetPath 重複チェック（正規化後 OrdinalIgnoreCase）
+        var allTargetPaths = new List<string>();
+        foreach (var (path, _) in pagesToValidate)
+        {
+            var normalized = WikiService.NormalizeRelativePath(path);
+            // 拡張子を .md に正規化
+            var stem = Path.GetFileNameWithoutExtension(normalized);
+            var cat  = normalized.Split('/')[1];
+            allTargetPaths.Add(Path.GetFullPath(Path.Combine(wikiRoot, $"pages/{cat}/{stem}.md")));
+        }
         if (!string.IsNullOrWhiteSpace(result.IndexUpdate))
-            await _wiki.UpdateIndex(wikiRoot, result.IndexUpdate);
-
+            allTargetPaths.Add(Path.GetFullPath(WikiService.GetIndexPath(wikiRoot)));
         if (!string.IsNullOrWhiteSpace(result.LogEntry))
-            await _wiki.AppendLog(wikiRoot, result.LogEntry);
+            allTargetPaths.Add(Path.GetFullPath(WikiService.GetLogPath(wikiRoot)));
 
-        await _wiki.UpdateMeta(wikiRoot, m =>
+        var dups = allTargetPaths.GroupBy(p => p, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).ToList();
+        if (dups.Count > 0)
         {
-            m.Stats.LastIngest = DateTime.UtcNow;
-            m.Stats.TotalSources = _wiki.GetAllSources(wikiRoot).Count;
-            m.Stats.TotalPages = _wiki.GetAllPages(wikiRoot).Count(p => !p.IsRoot);
-        });
+            result.Success = false;
+            result.ErrorMessage = $"Duplicate target paths detected: {string.Join(", ", dups.Select(g => g.Key))}";
+            return;
+        }
 
-        progress?.Report("Saved.");
+        // ---- ドメインロック取得（AC-34, AC-43） ----
+        progress?.Report("Acquiring domain lock...");
+        IDisposable? domainLock = null;
+        try
+        {
+            domainLock = await WikiService.AcquireDomainLockAsync(wikiRoot, cancellationToken);
+        }
+        catch (WikiDomainLockException ex)
+        {
+            result.Success = false;
+            result.ErrorMessage = ex.Message;
+            return;
+        }
+
+        try
+        {
+            // ---- トランザクション開始 ----
+            progress?.Report("Preparing transaction...");
+            var targets = pagesToValidate.Select(x =>
+            {
+                var norm = WikiService.NormalizeRelativePath(x.path);
+                var stem = Path.GetFileNameWithoutExtension(norm);
+                var cat  = norm.Split('/')[1];
+                return ($"pages/{cat}/{stem}.md", x.isNew);
+            }).ToList();
+
+            if (!string.IsNullOrWhiteSpace(result.IndexUpdate))
+                targets.Add(("index.md", !File.Exists(WikiService.GetIndexPath(wikiRoot))));
+            if (!string.IsNullOrWhiteSpace(result.LogEntry))
+                targets.Add(("log.md", !File.Exists(WikiService.GetLogPath(wikiRoot))));
+
+            var txn = await _wiki.BeginTransactionAsync(wikiRoot, targets);
+
+            // コンテンツマップ（normalizedRelPath → content）
+            var contentMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in result.NewPages.Where(x => !string.IsNullOrWhiteSpace(x.Path) && !string.IsNullOrWhiteSpace(x.Content)))
+            {
+                var norm = WikiService.NormalizeRelativePath(p.Path);
+                var stem = Path.GetFileNameWithoutExtension(norm);
+                var cat  = norm.Split('/')[1];
+                contentMap[$"pages/{cat}/{stem}.md"] = p.Content;
+            }
+            foreach (var u in result.UpdatedPages.Where(x => !string.IsNullOrWhiteSpace(x.Path) && !string.IsNullOrWhiteSpace(x.Diff)))
+            {
+                var norm = WikiService.NormalizeRelativePath(u.Path);
+                var stem = Path.GetFileNameWithoutExtension(norm);
+                var cat  = norm.Split('/')[1];
+                contentMap[$"pages/{cat}/{stem}.md"] = u.Diff;
+            }
+            if (!string.IsNullOrWhiteSpace(result.IndexUpdate))
+                contentMap["index.md"] = result.IndexUpdate;
+            if (!string.IsNullOrWhiteSpace(result.LogEntry))
+            {
+                // log.md は追記なので既存内容と結合
+                var existing = File.Exists(WikiService.GetLogPath(wikiRoot))
+                    ? await File.ReadAllTextAsync(WikiService.GetLogPath(wikiRoot), Encoding.UTF8)
+                    : "# Wiki Log\n";
+                contentMap["log.md"] = existing + "\n" + result.LogEntry;
+            }
+
+            // ---- コミット実行（AC-14, AC-38） ----
+            progress?.Report("Writing approved pages...");
+            try
+            {
+                // カテゴリディレクトリを事前作成
+                foreach (var (relPath, _) in targets)
+                {
+                    if (relPath is "index.md" or "log.md") continue;
+                    var catDir = Path.Combine(WikiService.GetPagesDir(wikiRoot), relPath.Split('/')[1]);
+                    Directory.CreateDirectory(catDir);
+                }
+
+                await _wiki.CommitTransactionAsync(wikiRoot, txn, entry =>
+                {
+                    var relPath = Path.GetRelativePath(wikiRoot, entry.TargetPath).Replace('\\', '/');
+                    if (contentMap.TryGetValue(relPath, out var c)) return Task.FromResult(c);
+                    return Task.FromResult("");
+                });
+            }
+            catch (Exception ex)
+            {
+                progress?.Report("Error occurred. Rolling back...");
+                try { await _wiki.RollbackTransactionAsync(wikiRoot, txn); }
+                catch { /* best effort */ }
+                result.Success = false;
+                result.ErrorMessage = $"Write failed: {ex.Message}. Changes have been rolled back.";
+                return;
+            }
+
+            // ---- メタ更新 ----
+            try
+            {
+                await _wiki.UpdateMeta(wikiRoot, m =>
+                {
+                    m.Stats.LastIngest = DateTime.UtcNow;
+                    m.Stats.TotalSources = _wiki.GetAllSources(wikiRoot).Count;
+                    m.Stats.TotalPages = _wiki.GetAllPages(wikiRoot).Count(p => !p.IsRoot);
+                });
+            }
+            catch { /* メタ更新失敗はエラーとしない */ }
+
+            progress?.Report("Saved.");
+        }
+        finally
+        {
+            domainLock?.Dispose();
+        }
     }
 
     // ---- プロンプト構築 ----
 
-    private string BuildSystemPrompt(string schema)
+    private string BuildSystemPrompt(string schema, WikiPromptOverrides? overrides = null)
     {
         var language = _configService.LoadSettings().LlmLanguage;
-        return $$"""
+        var basePrompt = $$"""
 You are the Wiki maintainer for Curia.
 Follow the wiki-schema.md below exactly.
 
@@ -208,6 +342,51 @@ Response JSON schema:
   "logEntry": "markdown log entry to append"
 }
 """;
+        return ApplySystemOverrides(basePrompt, overrides);
+    }
+
+    /// <summary>UI 表示用デフォルトシステムプロンプトのプレビュー（スキーマ部分はプレースホルダ）。</summary>
+    public static string GetDefaultSystemPromptPreview(string language) =>
+        $"""
+You are the Wiki maintainer for Curia.
+Follow the wiki-schema.md below exactly.
+
+[wiki-schema.md is loaded from disk and injected here at runtime]
+
+IMPORTANT:
+- Always respond with valid JSON matching the schema below.
+- For updatedPages, return the FULL updated content in the "diff" field (not a patch).
+- Keep pages concise and well-structured in Markdown.
+- Use [[PageName]] wikilink format for cross-references.
+- Write all page content in {language}.
+- Include YAML frontmatter at the top of each page:
+  ---
+  title: "..."
+  created: "YYYY-MM-DD"
+  updated: "YYYY-MM-DD"
+  sources: ["filename"]
+  tags: [tag1, tag2]
+  ---
+
+Response JSON schema:
+""" + """
+{
+  "summary": "string — brief description of what was done",
+  "newPages": [{ "path": "pages/category/filename.md", "content": "full markdown" }],
+  "updatedPages": [{ "path": "pages/category/filename.md", "diff": "full updated markdown" }],
+  "indexUpdate": "full updated index.md content",
+  "logEntry": "markdown log entry to append"
+}
+""";
+
+    private static string ApplySystemOverrides(string basePrompt, WikiPromptOverrides? overrides)
+    {
+        if (overrides == null) return basePrompt;
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(overrides.SystemPrefix)) parts.Add(overrides.SystemPrefix);
+        parts.Add(basePrompt);
+        if (!string.IsNullOrEmpty(overrides.SystemSuffix)) parts.Add(overrides.SystemSuffix);
+        return string.Join("\n\n", parts);
     }
 
     private static string BuildUserPrompt(
@@ -215,7 +394,10 @@ Response JSON schema:
         string sourceContent,
         string fileName,
         string existingPagesContent,
-        IReadOnlyList<string> existingTags) => $"""
+        IReadOnlyList<string> existingTags,
+        WikiPromptOverrides? overrides = null)
+    {
+        var basePrompt = $"""
 Please ingest the following source into the Wiki.
 
 ## Current index.md
@@ -240,6 +422,10 @@ Please ingest the following source into the Wiki.
 
 Respond with JSON only (no markdown code fences).
 """;
+        if (overrides != null && !string.IsNullOrEmpty(overrides.UserSuffix))
+            return basePrompt + "\n\n" + overrides.UserSuffix;
+        return basePrompt;
+    }
 
     private async Task<IReadOnlyList<string>> SelectUpdateCandidates(
         string wikiRoot,

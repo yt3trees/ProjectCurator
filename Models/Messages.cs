@@ -24,8 +24,17 @@ public class AiEnabledChangedMessage(bool enabled)
 /// <summary>
 /// Editor / Wiki のフォントサイズが変わったときのメッセージ。
 /// </summary>
-public class FontSizeChangedMessage(int editorFontSize, int wikiFontSize)
+public class FontSizeChangedMessage(int editorFontSize, int markdownRenderFontSize)
 {
     public int EditorFontSize { get; } = editorFontSize;
-    public int MarkdownRenderFontSize { get; } = wikiFontSize;
+    public int MarkdownRenderFontSize { get; } = markdownRenderFontSize;
+}
+
+/// <summary>
+/// Editor / Wiki の文字色が変わったときのメッセージ。
+/// </summary>
+public class TextColorChangedMessage(string editorTextColor, string markdownRenderTextColor)
+{
+    public string EditorTextColor { get; } = editorTextColor;
+    public string MarkdownRenderTextColor { get; } = markdownRenderTextColor;
 }

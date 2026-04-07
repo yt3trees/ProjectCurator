@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Curia.Models;
+using System.Collections.Generic;
 
 namespace Curia.Services;
 
@@ -205,18 +206,7 @@ public class WikiLintService
             sb.AppendLine($"- {page.RelativePath}: {page.Title} — {firstLine[..Math.Min(100, firstLine.Length)]}");
         }
 
-        var language = _configService.LoadSettings().LlmLanguage;
-        var systemPrompt = language.Equals("Japanese", StringComparison.OrdinalIgnoreCase) ? """
-あなたはWikiの品質監査担当です。以下の2点についてWikiページを分析してください:
-1. 矛盾: 同じ事実について異なる記述があるページ
-2. ページ不足: 3ページ以上で言及されているがページが存在しないトピック
-
-必ず以下の形式で回答してください(プレーンテキスト、JSONなし):
-CONTRADICTION: [ページ1] vs [ページ2] — [説明]
-MISSING: [トピック] — [ページ1]、[ページ2]、[ページ3] で言及
-
-該当なしの場合は "CONTRADICTION: none" または "MISSING: none" と書いてください
-""" : """
+        const string baseSystemPrompt = """
 You are a wiki quality auditor. Analyze the wiki pages for:
 1. Contradictions: pages with conflicting descriptions of the same fact
 2. Missing pages: topics mentioned in 3+ pages but with no dedicated page
@@ -228,7 +218,16 @@ MISSING: [topic] — mentioned in [page1], [page2], [page3]
 If no issues found for a category, write "CONTRADICTION: none" or "MISSING: none"
 """;
 
-        var userPrompt = $"""
+        var promptConfig = _wiki.LoadPrompts(wikiRoot);
+        var overrides = promptConfig.IsUnknownVersion ? null : promptConfig.Lint;
+
+        var systemPromptParts = new List<string>();
+        if (overrides != null && !string.IsNullOrEmpty(overrides.SystemPrefix)) systemPromptParts.Add(overrides.SystemPrefix);
+        systemPromptParts.Add(baseSystemPrompt);
+        if (overrides != null && !string.IsNullOrEmpty(overrides.SystemSuffix)) systemPromptParts.Add(overrides.SystemSuffix);
+        var systemPrompt = string.Join("\n\n", systemPromptParts);
+
+        var baseUserPrompt = $"""
 Wiki index:
 {index}
 
@@ -237,6 +236,9 @@ Page summaries:
 
 Identify contradictions and missing pages.
 """;
+        var userPrompt = (overrides != null && !string.IsNullOrEmpty(overrides.UserSuffix))
+            ? baseUserPrompt + "\n\n" + overrides.UserSuffix
+            : baseUserPrompt;
 
         var raw = await _llm.ChatCompletionAsync(systemPrompt, userPrompt, cancellationToken);
         return ParseLlmLintResponse(raw);
@@ -270,6 +272,19 @@ Identify contradictions and missing pages.
             }
         }
     }
+
+    /// <summary>UI 表示用デフォルトシステムプロンプトのプレビュー。</summary>
+    public static string GetDefaultSystemPromptPreview(string language) => """
+You are a wiki quality auditor. Analyze the wiki pages for:
+1. Contradictions: pages with conflicting descriptions of the same fact
+2. Missing pages: topics mentioned in 3+ pages but with no dedicated page
+
+Respond in this exact format (plain text, no JSON):
+CONTRADICTION: [page1] vs [page2] — [description]
+MISSING: [topic] — mentioned in [page1], [page2], [page3]
+
+If no issues found for a category, write "CONTRADICTION: none" or "MISSING: none"
+""";
 
     // ---- ヘルパー ----
 

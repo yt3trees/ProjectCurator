@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using Wpf.Ui.Controls;
@@ -35,7 +36,25 @@ public partial class SettingsPage : WpfUserControl, INavigableView<SettingsViewM
         // PasswordBox はバインディング非対応のため、ロード後に手動でセット
         LlmApiKeyBox.Password = ViewModel.LlmApiKey;
         AsanaTokenBox.Password = ViewModel.AsanaToken;
+        UpdateColorPreviews();
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(SettingsViewModel.EditorTextColor)
+                           or nameof(SettingsViewModel.MarkdownRenderTextColor))
+            UpdateColorPreviews();
+    }
+
+    private void UpdateColorPreviews()
+    {
+        EditorColorPreview.Background   = MakeBrush(ViewModel.EditorColorR,   ViewModel.EditorColorG,   ViewModel.EditorColorB);
+        MarkdownColorPreview.Background = MakeBrush(ViewModel.MarkdownColorR, ViewModel.MarkdownColorG, ViewModel.MarkdownColorB);
+    }
+
+    private static System.Windows.Media.SolidColorBrush MakeBrush(int r, int g, int b)
+        => new(System.Windows.Media.Color.FromRgb((byte)r, (byte)g, (byte)b));
 
     private void InitAutoRefreshCombo()
     {
@@ -76,4 +95,5 @@ public partial class SettingsPage : WpfUserControl, INavigableView<SettingsViewM
         // PasswordBox → ViewModel に手動同期
         ViewModel.AsanaToken = AsanaTokenBox.Password;
     }
+
 }

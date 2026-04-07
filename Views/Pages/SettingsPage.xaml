@@ -221,7 +221,7 @@
                     <Separator Background="{DynamicResource AppSurface2}" Margin="0,0,0,14"/>
 
                     <!-- Wiki Font Size -->
-                    <Grid>
+                    <Grid Margin="0,0,0,14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -243,6 +243,72 @@
                                        VerticalAlignment="Center"
                                        Margin="10,0,0,0" Width="28"
                                        TextAlignment="Right"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Separator Background="{DynamicResource AppSurface2}" Margin="0,0,0,14"/>
+
+                    <!-- Editor Text Color -->
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Editor text color" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppText}"/>
+                            <TextBlock Text="Applies to editor pane and Wiki editor" FontSize="11"
+                                       Foreground="{DynamicResource AppSubtext0}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border x:Name="EditorColorPreview" Width="22" Height="22" CornerRadius="4"
+                                    BorderBrush="{DynamicResource AppSurface2}" BorderThickness="1"
+                                    Margin="0,0,8,0"/>
+                            <ui:Button Content="−" Padding="10,4" FontSize="13"
+                                       Command="{Binding AdjustEditorColorCommand}" CommandParameter="-"
+                                       Margin="0,0,4,0"/>
+                            <TextBlock Text="{Binding EditorTextColor}" Width="62" TextAlignment="Center"
+                                       VerticalAlignment="Center" FontSize="11"
+                                       FontFamily="Consolas, Courier New"
+                                       Foreground="{DynamicResource AppSubtext0}"/>
+                            <ui:Button Content="+" Padding="10,4" FontSize="13"
+                                       Command="{Binding AdjustEditorColorCommand}" CommandParameter="+"
+                                       Margin="4,0,4,0"/>
+                            <ui:Button Content="↺" Padding="8,4" FontSize="13"
+                                       Command="{Binding ResetEditorColorCommand}"
+                                       ToolTip="#C9D1D9"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Markdown Render Text Color -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Markdown rendering text color" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppText}"/>
+                            <TextBlock Text="Applies to Wiki Markdown preview" FontSize="11"
+                                       Foreground="{DynamicResource AppSubtext0}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border x:Name="MarkdownColorPreview" Width="22" Height="22" CornerRadius="4"
+                                    BorderBrush="{DynamicResource AppSurface2}" BorderThickness="1"
+                                    Margin="0,0,8,0"/>
+                            <ui:Button Content="−" Padding="10,4" FontSize="13"
+                                       Command="{Binding AdjustMarkdownColorCommand}" CommandParameter="-"
+                                       Margin="0,0,4,0"/>
+                            <TextBlock Text="{Binding MarkdownRenderTextColor}" Width="62" TextAlignment="Center"
+                                       VerticalAlignment="Center" FontSize="11"
+                                       FontFamily="Consolas, Courier New"
+                                       Foreground="{DynamicResource AppSubtext0}"/>
+                            <ui:Button Content="+" Padding="10,4" FontSize="13"
+                                       Command="{Binding AdjustMarkdownColorCommand}" CommandParameter="+"
+                                       Margin="4,0,4,0"/>
+                            <ui:Button Content="↺" Padding="8,4" FontSize="13"
+                                       Command="{Binding ResetMarkdownColorCommand}"
+                                       ToolTip="#C9D1D9"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>
