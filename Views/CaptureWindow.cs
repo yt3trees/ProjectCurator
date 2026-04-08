@@ -885,10 +885,12 @@ public class CaptureWindow : Window
         if (!settings.AiEnabled)
             _categoryCombo.Visibility = Visibility.Visible;
 
-        // プロジェクト一覧を非同期で取得
+        // プロジェクト一覧を非同期で取得 (非表示プロジェクトを除外)
         try
         {
-            _projects = await _discoveryService.GetProjectInfoListAsync();
+            var all = await _discoveryService.GetProjectInfoListAsync();
+            var hiddenKeys = _configService.LoadHiddenProjects();
+            _projects = all.Where(p => !hiddenKeys.Contains(p.HiddenKey)).ToList();
         }
         catch
         {
@@ -1057,8 +1059,7 @@ public class CaptureWindow : Window
 
     private async Task HandleTensionWithReviewAsync(CaptureClassification classification, CancellationToken ct)
     {
-        var projects = await _discoveryService.GetProjectInfoListAsync(ct: ct);
-        var project  = projects.FirstOrDefault(p =>
+        var project  = _projects.FirstOrDefault(p =>
             string.Equals(p.Name, classification.ProjectName, StringComparison.OrdinalIgnoreCase));
 
         if (project == null)
