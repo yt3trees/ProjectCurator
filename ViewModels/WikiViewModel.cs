@@ -179,6 +179,9 @@ public partial class WikiViewModel : ObservableObject
     [ObservableProperty] private string newWikiDomain = "";
     [ObservableProperty] private bool isCreatingNewDomain;
 
+    public bool IsProjectSelected => SelectedProject != null;
+    public bool IsDomainSelected  => !string.IsNullOrEmpty(SelectedDomain);
+
     public WikiViewModel(
         ProjectDiscoveryService discovery,
         ConfigService config,
@@ -233,7 +236,7 @@ public partial class WikiViewModel : ObservableObject
 
             Projects.Clear();
             foreach (var p in visible) Projects.Add(p);
-            if (Projects.Count > 0) SelectedProject = Projects[0];
+            // SelectedProject = Projects[0]; // 自動選択を停止 (AC-68)
         }
         finally { IsLoading = false; }
     }
@@ -253,16 +256,10 @@ public partial class WikiViewModel : ObservableObject
         Domains.Clear();
         foreach (var d in domainList) Domains.Add(d);
 
-        if (Domains.Count > 0)
-        {
-            SelectedDomain = Domains[0];
-        }
-        else
-        {
-            SelectedDomain = null;
-            HasWiki = false;
-            WikiRoot = "";
-        }
+        // 常に SelectedDomain を null にして、ユーザーに選択させる (AC-68)
+        SelectedDomain = null;
+        HasWiki = false;
+        WikiRoot = "";
     }
 
     partial void OnSelectedDomainChanged(string? value)
@@ -439,7 +436,7 @@ public partial class WikiViewModel : ObservableObject
     {
         PageTree.Clear();
 
-        // ルートページ (index.md / log.md)
+        // 1. ルートファイル (index.md / log.md)
         var rootItems = pages.Where(p => p.IsRoot).OrderBy(p => p.RelativePath).ToList();
         if (rootItems.Count > 0)
         {
@@ -449,25 +446,77 @@ public partial class WikiViewModel : ObservableObject
             PageTree.Add(rootNode);
         }
 
+        // 2. カテゴリ別のツリー構築
         // 表示順: sources 先頭 → 設定ファイル順（DefinedCategories） → 未定義（名前昇順）
         var definedNames = DefinedCategories.Select(x => x.Name).ToList();
-        var allCategoryNames = definedNames.Concat(UndefinedCategories).ToList();
+        var allCategoryNames = definedNames.Concat(UndefinedCategories).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-        foreach (var cat in allCategoryNames)
+        foreach (var catName in allCategoryNames)
         {
-            var catLower = cat.ToLowerInvariant();
+            var catLower = catName.ToLowerInvariant();
             var catPages = pages.Where(p => p.Category.Equals(catLower, StringComparison.OrdinalIgnoreCase))
-                                .OrderBy(p => p.Title).ToList();
-            var isUndefined = UndefinedCategories.Contains(cat);
-            var title = isUndefined ? $"{catLower} (read-only)" : catLower;
+                                .OrderBy(p => p.RelativePath).ToList();
 
-            if (catPages.Count == 0 && !Directory.Exists(Path.Combine(WikiService.GetPagesDir(WikiRoot), cat)))
+            if (catPages.Count == 0 && !Directory.Exists(Path.Combine(WikiService.GetPagesDir(WikiRoot), catLower)))
                 continue;
 
-            var node = new WikiTreeItem { Title = title, IsCategory = true, IsExpanded = true };
-            foreach (var p in catPages)
-                node.Children.Add(new WikiTreeItem { Title = p.Title, RelativePath = p.RelativePath });
-            PageTree.Add(node);
+            // カテゴリのトップレベルノード
+            var isUndefined = UndefinedCategories.Contains(catName, StringComparer.OrdinalIgnoreCase);
+            var displayTitle = isUndefined ? $"{catLower} (read-only)" : catLower;
+            
+            // sources はデフォルトで閉じる (AC-68)
+            bool isSources = string.Equals(catLower, "sources", StringComparison.OrdinalIgnoreCase);
+            var categoryNode = new WikiTreeItem 
+            { 
+                Title = displayTitle, 
+                IsCategory = true, 
+                IsExpanded = !isSources 
+            };
+
+            // 階層構造の構築
+            BuildRecursiveTree(categoryNode, catPages, $"pages/{catLower}/");
+
+            if (categoryNode.Children.Count > 0)
+            {
+                PageTree.Add(categoryNode);
+            }
+        }
+    }
+
+    /// <summary>
+    /// ファイルパスのリストから再帰的なツリー構造を構築する。
+    /// </summary>
+    private void BuildRecursiveTree(WikiTreeItem parent, List<WikiPageItem> pages, string basePrefix)
+    {
+        var folders = new Dictionary<string, WikiTreeItem>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var page in pages)
+        {
+            var relPath = page.RelativePath;
+            if (!relPath.StartsWith(basePrefix, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var subPath = relPath[basePrefix.Length..];
+            var segments = subPath.Split('/');
+
+            var currentParent = parent;
+            for (int i = 0; i < segments.Length - 1; i++)
+            {
+                var folderName = segments[i];
+                if (!folders.TryGetValue(folderName, out var folderNode))
+                {
+                    folderNode = new WikiTreeItem { Title = folderName, IsCategory = true, IsExpanded = true };
+                    currentParent.Children.Add(folderNode);
+                    folders[folderName] = folderNode;
+                }
+                currentParent = folderNode;
+            }
+
+            // ファイルを追加
+            currentParent.Children.Add(new WikiTreeItem 
+            { 
+                Title = page.Title, 
+                RelativePath = page.RelativePath 
+            });
         }
     }
 

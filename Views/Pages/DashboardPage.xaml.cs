@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -25,6 +26,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     private readonly DecisionLogService _decisionLogService;
     private readonly AsanaSyncService _asanaSyncService;
     private readonly TeamTaskParser _teamTaskParser;
+    private readonly AsanaTaskParser _asanaTaskParser;
 
     public DashboardPage(
         DashboardViewModel viewModel,
@@ -33,7 +35,8 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         ConfigService configService,
         DecisionLogService decisionLogService,
         AsanaSyncService asanaSyncService,
-        TeamTaskParser teamTaskParser)
+        TeamTaskParser teamTaskParser,
+        AsanaTaskParser asanaTaskParser)
     {
         ViewModel = viewModel;
         _llmClientService = llmClientService;
@@ -42,6 +45,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         _decisionLogService = decisionLogService;
         _asanaSyncService = asanaSyncService;
         _teamTaskParser = teamTaskParser;
+        _asanaTaskParser = asanaTaskParser;
         DataContext = ViewModel;
 
         ViewModel.OnOpenInEditor = project =>
@@ -2499,8 +2503,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         var surface = (System.Windows.Media.Brush)appResources["AppSurface0"];
         var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
         var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
-        var text = (System.Windows.Media.Brush)appResources["AppText"];
-        var subtext = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var (text, subtext) = ResolveDashboardMarkdownTextBrushes(surface, appResources);
 
         var titleBar = new Grid { Background = surface1, Height = 38 };
         titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -2706,8 +2709,8 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     private FrameworkElement BuildBriefingMarkdownPanel(string markdown)
     {
         var appResources = Application.Current.Resources;
-        var text = (System.Windows.Media.Brush)appResources["AppText"];
-        var subtext = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var surface = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var (text, subtext) = ResolveDashboardMarkdownTextBrushes(surface, appResources);
         var sectionBg = (System.Windows.Media.Brush)appResources["AppSurface1"];
         var sectionBorder = (System.Windows.Media.Brush)appResources["AppSurface2"];
         var itemBg = appResources.Contains("AppSurface0")
@@ -2759,16 +2762,22 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             var isSuggestedStepsSection = currentSectionTitle.Contains("Suggested next steps", StringComparison.OrdinalIgnoreCase)
                 || currentSectionTitle.Contains("次にやること", StringComparison.Ordinal)
                 || currentSectionTitle.Contains("次のステップ", StringComparison.Ordinal);
+            var isWhereOrKeyContextSection = currentSectionTitle.Contains("Where you left off", StringComparison.OrdinalIgnoreCase)
+                || currentSectionTitle.Contains("Key context", StringComparison.OrdinalIgnoreCase)
+                || currentSectionTitle.Contains("直近の状況", StringComparison.Ordinal)
+                || currentSectionTitle.Contains("重要コンテキスト", StringComparison.Ordinal);
 
             if (isSuggestedStepsSection && MarkdownNumberedRx.IsMatch(cleanLine))
             {
                 var stepText = FormatSuggestedStepLine(cleanLine);
+                var stepPriority = GetDuePriority(stepText);
+                var stepDisplay = stepPriority == 2 ? $"⚠ {stepText}" : stepText;
                 var stepBlock = new System.Windows.Controls.TextBlock
                 {
-                    Text = stepText,
+                    Text = stepDisplay,
                     TextWrapping = TextWrapping.Wrap,
                     FontSize = 12,
-                    FontWeight = FontWeights.SemiBold,
+                    FontWeight = FontWeights.Normal,
                     LineHeight = 20,
                     Foreground = ResolveDueBrush(stepText, text, yellow, red),
                 };
@@ -2832,6 +2841,11 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
                 block.Text = $"• {cleanLine[2..]}";
                 block.Margin = new Thickness(10, 0, 0, 2);
                 block.Foreground = ResolveDueBrush(cleanLine, text, yellow, red);
+                if (isWhereOrKeyContextSection)
+                {
+                    block.FontSize = 13;
+                    block.LineHeight = 20;
+                }
             }
             else if (MarkdownNumberedRx.IsMatch(cleanLine))
             {
@@ -2839,12 +2853,22 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
                 block.Text = cleanLine;
                 block.Margin = new Thickness(10, 0, 0, 2);
                 block.Foreground = ResolveDueBrush(cleanLine, text, yellow, red);
+                if (isWhereOrKeyContextSection)
+                {
+                    block.FontSize = 13;
+                    block.LineHeight = 20;
+                }
             }
             else
             {
                 block.Text = cleanLine;
                 block.Margin = new Thickness(0, 0, 0, 2);
                 block.Foreground = text;
+                if (isWhereOrKeyContextSection)
+                {
+                    block.FontSize = 13;
+                    block.LineHeight = 20;
+                }
             }
 
             sectionStack.Children.Add(block);
@@ -2884,18 +2908,23 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         return cleaned;
     }
 
+    private static int GetDuePriority(string line)
+    {
+        var lower = line.ToLowerInvariant();
+        if (lower.Contains("due: today") || lower.Contains("overdue"))
+            return 2;
+        if (lower.Contains("due: in ") || lower.Contains("due: tomorrow"))
+            return 1;
+        return 0;
+    }
+
     private static System.Windows.Media.Brush ResolveDueBrush(
         string line,
         System.Windows.Media.Brush normal,
         System.Windows.Media.Brush yellow,
-        System.Windows.Media.Brush red)
+        System.Windows.Media.Brush _red)
     {
-        var lowered = line.ToLowerInvariant();
-        if (lowered.Contains("due: today", StringComparison.Ordinal) || lowered.Contains("overdue", StringComparison.Ordinal))
-            return red;
-        if (lowered.Contains("due: in ", StringComparison.Ordinal) || lowered.Contains("due: tomorrow", StringComparison.Ordinal))
-            return yellow;
-        return normal;
+        return GetDuePriority(line) >= 1 ? yellow : normal;
     }
 
     // ===== What's Next =====
@@ -2971,7 +3000,8 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         {
             var focusPreviews = await CollectFocusPreviewsAsync(projects, cts.Token);
             var tasks = ViewModel.GetTopTasksForAi(30);
-            var userPrompt = BuildWhatsNextUserPrompt(projects, tasks, focusPreviews);
+            var tasksDetail = await CollectAsanaTasksDetailAsync(projects, cts.Token);
+            var userPrompt = BuildWhatsNextUserPrompt(projects, tasks, focusPreviews, tasksDetail);
 
             var language = _configService.LoadSettings().LlmLanguage;
             var systemPrompt = language.Equals("English", StringComparison.OrdinalIgnoreCase)
@@ -3036,10 +3066,68 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         return result;
     }
 
+    /// <summary>
+    /// プロジェクトごとに tasks.md を解析し、InProgress タスク (+ description) を返す。
+    /// key = project.Name, value = 整形済みテキスト
+    /// </summary>
+    private async Task<Dictionary<string, string>> CollectAsanaTasksDetailAsync(
+        List<ProjectInfo> projects, System.Threading.CancellationToken ct)
+    {
+        var result = new Dictionary<string, string>();
+        foreach (var proj in projects)
+        {
+            ct.ThrowIfCancellationRequested();
+            var obsidianNotes = Path.Combine(proj.AiContextPath, "obsidian_notes");
+            var sb = new StringBuilder();
+
+            // root tasks.md
+            var rootTasksPath = Path.Combine(obsidianNotes, "tasks.md");
+            if (File.Exists(rootTasksPath))
+                AppendParsedInProgress(rootTasksPath, null, sb);
+
+            // workstream tasks.md
+            foreach (var ws in proj.Workstreams.Where(w => !w.IsClosed))
+            {
+                var wsTasksPath = Path.Combine(obsidianNotes, "workstreams", ws.Id, "tasks.md");
+                if (File.Exists(wsTasksPath))
+                    AppendParsedInProgress(wsTasksPath, string.IsNullOrWhiteSpace(ws.Label) ? ws.Id : ws.Label, sb);
+            }
+
+            var text = sb.ToString().Trim();
+            if (!string.IsNullOrWhiteSpace(text))
+                result[proj.Name] = text;
+        }
+        return await Task.FromResult(result);
+    }
+
+    private void AppendParsedInProgress(string tasksPath, string? workstreamLabel, StringBuilder sb)
+    {
+        try
+        {
+            var parsed = _asanaTaskParser.ParseFile(tasksPath);
+            if (parsed.InProgress.Count == 0) return;
+
+            var header = workstreamLabel != null ? $"In Progress [{workstreamLabel}]:" : "In Progress:";
+            sb.AppendLine(header);
+            foreach (var t in parsed.InProgress)
+            {
+                var due = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
+                sb.AppendLine($"  - {t.Title}{due}");
+                if (!string.IsNullOrWhiteSpace(t.Description))
+                    sb.AppendLine($"    (notes: {t.Description})");
+            }
+        }
+        catch
+        {
+            // best effort
+        }
+    }
+
     private static string BuildWhatsNextUserPrompt(
         List<ProjectInfo> projects,
         List<TodayQueueTask> tasks,
-        Dictionary<string, string> focusPreviews)
+        Dictionary<string, string> focusPreviews,
+        Dictionary<string, string> tasksDetail)
     {
         var sb = new StringBuilder();
         var today = DateTime.Today;
@@ -3089,6 +3177,12 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             sb.AppendLine($"- Recent decisions: {latestDecision}");
             if (focusPreviews.TryGetValue(proj.Name, out var preview) && !string.IsNullOrWhiteSpace(preview))
                 sb.AppendLine($"- Focus preview: {preview}");
+            if (tasksDetail.TryGetValue(proj.Name, out var detail) && !string.IsNullOrWhiteSpace(detail))
+            {
+                sb.AppendLine($"- Active tasks (from tasks.md):");
+                foreach (var line in detail.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                    sb.AppendLine($"  {line}");
+            }
             sb.AppendLine();
         }
 
@@ -3236,8 +3330,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         var surface = (System.Windows.Media.Brush)appResources["AppSurface0"];
         var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
         var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
-        var text = (System.Windows.Media.Brush)appResources["AppText"];
-        var subtext = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var (text, subtext) = ResolveDashboardMarkdownTextBrushes(surface, appResources);
         var accent = appResources.Contains("AppBlue")
             ? (System.Windows.Media.Brush)appResources["AppBlue"]
             : text;
@@ -3800,9 +3893,9 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         var userPrompt = "";
         try
         {
-            var (tasks, focusPreviews, projects, yesterdayStandup) = await CollectPlanMyDayDataAsync(cts.Token);
+            var (tasks, focusPreviews, projects, yesterdayStandup, tasksDetail) = await CollectPlanMyDayDataAsync(cts.Token);
 
-            userPrompt = BuildPlanMyDayUserPrompt(tasks, focusPreviews, projects, scheduleHint, yesterdayStandup);
+            userPrompt = BuildPlanMyDayUserPrompt(tasks, focusPreviews, projects, scheduleHint, yesterdayStandup, tasksDetail);
             var response = await _llmClientService.ChatCompletionAsync(
                 PlanMyDaySystemPrompt, userPrompt, cts.Token);
 
@@ -3835,14 +3928,15 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         }
     }
 
-    private async Task<(List<TodayQueueTask> Tasks, Dictionary<string, string> FocusPreviews, List<ProjectInfo> Projects, string YesterdayStandup)> CollectPlanMyDayDataAsync(
+    private async Task<(List<TodayQueueTask> Tasks, Dictionary<string, string> FocusPreviews, List<ProjectInfo> Projects, string YesterdayStandup, Dictionary<string, string> TasksDetail)> CollectPlanMyDayDataAsync(
         System.Threading.CancellationToken ct)
     {
         var tasks = ViewModel.GetTopTasksForAi(30);
         var projects = ViewModel.Projects.Select(c => c.Info).ToList();
         var focusPreviews = await CollectFocusPreviewsAsync(projects, ct);
         var yesterdayStandup = await ReadYesterdayStandupAsync(ct);
-        return (tasks, focusPreviews, projects, yesterdayStandup);
+        var tasksDetail = await CollectAsanaTasksDetailAsync(projects, ct);
+        return (tasks, focusPreviews, projects, yesterdayStandup, tasksDetail);
     }
 
     private async Task<string> ReadYesterdayStandupAsync(System.Threading.CancellationToken ct)
@@ -3872,7 +3966,8 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         Dictionary<string, string> focusPreviews,
         List<ProjectInfo> projects,
         string scheduleHint,
-        string yesterdayStandup)
+        string yesterdayStandup,
+        Dictionary<string, string> tasksDetail)
     {
         var today = DateTime.Today;
         var sb = new StringBuilder();
@@ -3932,6 +4027,12 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
             sb.AppendLine($"- Active workstreams: {proj.Workstreams.Count}");
             if (focusPreviews.TryGetValue(proj.Name, out var preview) && !string.IsNullOrWhiteSpace(preview))
                 sb.AppendLine($"- Focus preview: {preview}");
+            if (tasksDetail.TryGetValue(proj.Name, out var detail) && !string.IsNullOrWhiteSpace(detail))
+            {
+                sb.AppendLine($"- Active tasks (from tasks.md):");
+                foreach (var line in detail.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                    sb.AppendLine($"  {line}");
+            }
             sb.AppendLine();
         }
 
@@ -4099,8 +4200,7 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
         var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
         var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
-        var text     = (System.Windows.Media.Brush)appResources["AppText"];
-        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var (text, subtext) = ResolveDashboardMarkdownTextBrushes(surface, appResources);
         var accent   = appResources.Contains("AppPeach")
             ? (System.Windows.Media.Brush)appResources["AppPeach"]
             : text;
@@ -4531,6 +4631,102 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         }
 
         return sb.ToString().TrimEnd();
+    }
+
+    private (System.Windows.Media.Brush text, System.Windows.Media.Brush subtext) ResolveDashboardMarkdownTextBrushes(
+        System.Windows.Media.Brush surfaceBrush,
+        ResourceDictionary resources)
+    {
+        var fallbackText = (System.Windows.Media.Brush)resources["AppText"];
+        var fallbackSubtext = (System.Windows.Media.Brush)resources["AppSubtext0"];
+
+        var settings = _configService.LoadSettings();
+        if (!TryParseHexColor(settings.MarkdownRenderTextColor, out var markdownColor))
+            return (fallbackText, fallbackSubtext);
+
+        var text = FreezeBrush(new SolidColorBrush(markdownColor));
+
+        var backgroundColor = surfaceBrush is SolidColorBrush sb
+            ? sb.Color
+            : Colors.Black;
+        var subtextColor = BuildRelativeSubtextColor(markdownColor, backgroundColor);
+        var subtext = FreezeBrush(new SolidColorBrush(subtextColor));
+        return (text, subtext);
+    }
+
+    private static SolidColorBrush FreezeBrush(SolidColorBrush brush)
+    {
+        if (brush.CanFreeze) brush.Freeze();
+        return brush;
+    }
+
+    private static bool TryParseHexColor(string? hex, out System.Windows.Media.Color color)
+    {
+        color = default;
+        if (string.IsNullOrWhiteSpace(hex)) return false;
+
+        var raw = hex.Trim();
+        if (raw.StartsWith('#')) raw = raw[1..];
+        if (raw.Length != 6) return false;
+
+        if (!byte.TryParse(raw[..2], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var r)) return false;
+        if (!byte.TryParse(raw.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var g)) return false;
+        if (!byte.TryParse(raw.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var b)) return false;
+
+        color = System.Windows.Media.Color.FromRgb(r, g, b);
+        return true;
+    }
+
+    private static System.Windows.Media.Color BuildRelativeSubtextColor(
+        System.Windows.Media.Color baseTextColor,
+        System.Windows.Media.Color backgroundColor)
+    {
+        const double initialBlend = 0.28; // 少しだけ背景側へ寄せる
+        const double minContrast = 2.4;   // 薄すぎ回避
+
+        var candidate = Blend(baseTextColor, backgroundColor, initialBlend);
+        if (GetContrastRatio(candidate, backgroundColor) >= minContrast)
+            return candidate;
+
+        // 薄くなりすぎる場合はベース色へ戻してコントラストを確保
+        for (var t = 0.24; t >= 0.08; t -= 0.04)
+        {
+            candidate = Blend(baseTextColor, backgroundColor, t);
+            if (GetContrastRatio(candidate, backgroundColor) >= minContrast)
+                return candidate;
+        }
+
+        return baseTextColor;
+    }
+
+    private static System.Windows.Media.Color Blend(
+        System.Windows.Media.Color from,
+        System.Windows.Media.Color to,
+        double t)
+    {
+        t = Math.Clamp(t, 0.0, 1.0);
+        byte Mix(byte a, byte b) => (byte)Math.Clamp((int)Math.Round(a + ((b - a) * t)), 0, 255);
+        return System.Windows.Media.Color.FromRgb(Mix(from.R, to.R), Mix(from.G, to.G), Mix(from.B, to.B));
+    }
+
+    private static double GetContrastRatio(System.Windows.Media.Color a, System.Windows.Media.Color b)
+    {
+        var la = RelativeLuminance(a);
+        var lb = RelativeLuminance(b);
+        var bright = Math.Max(la, lb);
+        var dark = Math.Min(la, lb);
+        return (bright + 0.05) / (dark + 0.05);
+    }
+
+    private static double RelativeLuminance(System.Windows.Media.Color color)
+    {
+        static double Channel(byte c)
+        {
+            var v = c / 255.0;
+            return v <= 0.03928 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4);
+        }
+
+        return (0.2126 * Channel(color.R)) + (0.7152 * Channel(color.G)) + (0.0722 * Channel(color.B));
     }
 
     private Task<string?> ShowScheduleHintDialogAsync()

@@ -4,6 +4,7 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:helpers="clr-namespace:Curia.Helpers"
         mc:Ignorable="d"
         d:DesignHeight="750" d:DesignWidth="1100"
         Loaded="OnLoaded"
@@ -13,6 +14,9 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <helpers:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <helpers:IntToVisibilityConverter x:Key="IntToVisibilityConverter"/>
+        <helpers:InverseBoolConverter x:Key="InverseBoolConverter"/>
 
         <Style x:Key="PromptExpanderStyle" TargetType="Expander">
             <Setter Property="Background" Value="Transparent"/>
@@ -287,7 +291,76 @@
                         </Style.Triggers>
                     </Style>
                 </Grid.Style>
+
+                <!-- Case 1: No project selected -->
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsProjectSelected}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <ui:SymbolIcon Symbol="Library24" FontSize="48"
+                                   Foreground="{DynamicResource AppSurface2}"
+                                   HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                    <TextBlock Text="No Project Selected"
+                               FontSize="14" Foreground="{DynamicResource AppSubtext0}"
+                               HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="Select a project from the dropdown above to start."
+                               FontSize="11" Foreground="{DynamicResource AppOverlay1}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Case 2: Project selected but no domain selected -->
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsProjectSelected}" Value="True"/>
+                                        <Condition Binding="{Binding IsDomainSelected}" Value="False"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <ui:SymbolIcon Symbol="FolderOpen24" FontSize="48"
+                                   Foreground="{DynamicResource AppSurface2}"
+                                   HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                    <TextBlock Text="Select a Wiki Domain"
+                               FontSize="14" Foreground="{DynamicResource AppSubtext0}"
+                               HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="Choose a domain (e.g., ERP, Web) or create a new one."
+                               FontSize="11" Foreground="{DynamicResource AppOverlay1}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Case 3: Project and Domain selected, but Wiki folder doesn't exist (Initialize) -->
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsDomainSelected}" Value="True"/>
+                                        <Condition Binding="{Binding HasWiki}" Value="False"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                                <DataTrigger Binding="{Binding IsCreatingNewDomain}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <ui:SymbolIcon Symbol="BookDatabase24" FontSize="48"
                                    Foreground="{DynamicResource AppSurface2}"
                                    HorizontalAlignment="Center" Margin="0,0,0,12"/>
@@ -396,37 +469,113 @@
                         </Border>
 
                         <Grid Grid.Row="1">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled">
-                                <ItemsControl ItemsSource="{Binding PageTree}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel>
-                                                <Border Background="{DynamicResource AppSurface1}"
-                                                        Padding="6,3" Margin="0,4,0,0">
-                                                    <TextBlock Text="{Binding Title}"
-                                                               FontSize="10" FontWeight="SemiBold"
-                                                               Foreground="{DynamicResource AppSubtext0}"/>
-                                                </Border>
-                                                <ListBox ItemsSource="{Binding Children}"
-                                                         SelectionChanged="OnPageItemSelected"
-                                                         ItemContainerStyle="{StaticResource WikiListItemStyle}"
-                                                         BorderThickness="0"
-                                                         Background="Transparent"
-                                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                                    <ListBox.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <TextBlock Text="{Binding Title}"
-                                                                       FontSize="12"
-                                                                       TextTrimming="CharacterEllipsis"/>
-                                                        </DataTemplate>
-                                                    </ListBox.ItemTemplate>
-                                                </ListBox>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
+                            <Grid.Resources>
+                                <!-- TreeViewItem のカスタムスタイル: デフォルトの選択色などを消す -->
+                                <Style x:Key="WikiTreeViewItemStyle" TargetType="TreeViewItem">
+                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                    <Setter Property="Padding" Value="4,2"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="TreeViewItem">
+                                                <StackPanel>
+                                                    <Grid Name="HeaderGrid" Background="Transparent" Margin="0,1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        
+                                                        <!-- Toggle Button (Expander) -->
+                                                        <ToggleButton x:Name="Expander" 
+                                                                      IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                                                      ClickMode="Press">
+                                                            <ToggleButton.Style>
+                                                                <Style TargetType="ToggleButton">
+                                                                    <Setter Property="Template">
+                                                                        <Setter.Value>
+                                                                            <ControlTemplate TargetType="ToggleButton">
+                                                                                <Border Background="Transparent" Width="16" Height="16">
+                                                                                    <TextBlock x:Name="Arrow" Text="▶" FontSize="8" 
+                                                                                               VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                                                               Foreground="{DynamicResource AppSubtext0}"/>
+                                                                                </Border>
+                                                                                <ControlTemplate.Triggers>
+                                                                                    <Trigger Property="IsChecked" Value="True">
+                                                                                        <Setter TargetName="Arrow" Property="Text" Value="▼"/>
+                                                                                    </Trigger>
+                                                                                </ControlTemplate.Triggers>
+                                                                            </ControlTemplate>
+                                                                        </Setter.Value>
+                                                                    </Setter>
+                                                                </Style>
+                                                            </ToggleButton.Style>
+                                                        </ToggleButton>
+
+                                                        <ContentPresenter x:Name="PART_Header" Grid.Column="1" 
+                                                                          ContentSource="Header" VerticalAlignment="Center"
+                                                                          RecognizesAccessKey="True"/>
+                                                    </Grid>
+                                                    <ItemsPresenter x:Name="ItemsHost" Margin="14,0,0,0" Visibility="Collapsed"/>
+                                                </StackPanel>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsExpanded" Value="True">
+                                                        <Setter TargetName="ItemsHost" Property="Visibility" Value="Visible"/>
+                                                    </Trigger>
+                                                    <Trigger Property="HasItems" Value="False">
+                                                        <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="HeaderGrid" Property="Background" Value="{DynamicResource AppSurface2}"/>
+                                                    </Trigger>
+                                                    <MultiTrigger>
+                                                        <MultiTrigger.Conditions>
+                                                            <Condition SourceName="HeaderGrid" Property="IsMouseOver" Value="True"/>
+                                                            <Condition Property="IsSelected" Value="False"/>
+                                                        </MultiTrigger.Conditions>
+                                                        <Setter TargetName="HeaderGrid" Property="Background" Value="{DynamicResource AppSurface1}"/>
+                                                    </MultiTrigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Grid.Resources>
+
+                            <!-- 再帰的な TreeView -->
+                            <TreeView ItemsSource="{Binding PageTree}"
+                                      SelectedItemChanged="OnTreeViewSelectedItemChanged"
+                                      ItemContainerStyle="{StaticResource WikiTreeViewItemStyle}"
+                                      Background="Transparent"
+                                      BorderThickness="0"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <TreeView.ItemTemplate>
+                                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                        <Grid Margin="0,1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <!-- Folder/File Icon -->
+                                            <ui:SymbolIcon Symbol="Folder24" FontSize="14" Margin="0,0,6,0"
+                                                          Foreground="{DynamicResource AppSubtext1}"
+                                                          Visibility="{Binding IsCategory, Converter={StaticResource BoolToVis}}"/>
+                                            <ui:SymbolIcon Symbol="Document24" FontSize="14" Margin="0,0,6,0"
+                                                          Foreground="{DynamicResource AppSubtext0}"
+                                                          Visibility="{Binding IsCategory, Converter={StaticResource InverseBoolToVis}}"/>
+
+                                            <TextBlock Grid.Column="1" Text="{Binding Title}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource AppText}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
 
                             <!-- Page tree loading overlay -->
                             <Border Background="{DynamicResource AppSurface0}"

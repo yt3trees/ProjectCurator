@@ -344,8 +344,30 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
 
         var lines = markdown.Replace("\r\n", "\n").Split('\n');
         var inCode = false;
+        var startIdx = 0;
 
-        for (int i = 0; i < lines.Length; i++)
+        // --- Front Matter Parsing ---
+        if (lines.Length > 0 && lines[0].Trim() == "---")
+        {
+            var endIdx = -1;
+            for (int j = 1; j < lines.Length; j++)
+            {
+                if (lines[j].Trim() == "---") { endIdx = j; break; }
+            }
+
+            if (endIdx != -1)
+            {
+                var frontMatterLines = lines.Skip(1).Take(endIdx - 1).ToList();
+                var metadata = ParseFrontMatter(frontMatterLines);
+                if (metadata.Count > 0)
+                {
+                    doc.Blocks.Add(BuildFrontMatterCard(metadata, fontSize));
+                }
+                startIdx = endIdx + 1;
+            }
+        }
+
+        for (int i = startIdx; i < lines.Length; i++)
         {
             var line = lines[i] ?? string.Empty;
             var trimmed = line.Trim();
@@ -412,9 +434,13 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
 
             if (trimmed.StartsWith("- ", StringComparison.Ordinal) || trimmed.StartsWith("* ", StringComparison.Ordinal))
             {
-                doc.Blocks.Add(new Paragraph(new Run("• " + trimmed[2..].Trim()))
+                var indentLen = line.Length - line.TrimStart().Length;
+                var depth = indentLen / 2;
+                var bullet = depth == 0 ? "•" : depth == 1 ? "◦" : "▪";
+                var leftMargin = 10 + depth * 16;
+                doc.Blocks.Add(new Paragraph(new Run(bullet + " " + trimmed[2..].Trim()))
                 {
-                    Margin = new Thickness(10, 0, 0, 3)
+                    Margin = new Thickness(leftMargin, 0, 0, 3)
                 });
                 continue;
             }
@@ -422,9 +448,12 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             var ordered = ParseOrderedListLine(trimmed);
             if (ordered != null)
             {
+                var indentLen = line.Length - line.TrimStart().Length;
+                var depth = indentLen / 2;
+                var leftMargin = 10 + depth * 16;
                 doc.Blocks.Add(new Paragraph(new Run(ordered))
                 {
-                    Margin = new Thickness(10, 0, 0, 3)
+                    Margin = new Thickness(leftMargin, 0, 0, 3)
                 });
                 continue;
             }
@@ -635,6 +664,14 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
 
     // ── Page tree selection ───────────────────────────────────────────────────
 
+    private void OnTreeViewSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    {
+        if (e.NewValue is WikiTreeItem item)
+        {
+            ViewModel.SelectedTreeItem = item;
+        }
+    }
+
     private void OnPageItemSelected(object sender, SelectionChangedEventArgs e)
     {
         if (e.AddedItems.Count > 0 && e.AddedItems[0] is WikiTreeItem item)
@@ -733,5 +770,108 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
             ViewModel.StatusText = "No supported files found in drop.";
         }
         e.Handled = true;
+    }
+
+    // ── Front Matter Helpers ──────────────────────────────────────────────────
+
+    private static Dictionary<string, string> ParseFrontMatter(List<string> lines)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var line in lines)
+        {
+            var parts = line.Split(':', 2);
+            if (parts.Length != 2) continue;
+
+            var key = parts[0].Trim();
+            var val = parts[1].Trim();
+
+            // シンプルなクォート除去
+            if (val.StartsWith("\"") && val.EndsWith("\"")) val = val[1..^1];
+            if (val.StartsWith("'") && val.EndsWith("'")) val = val[1..^1];
+
+            result[key] = val;
+        }
+        return result;
+    }
+
+    private static BlockUIContainer BuildFrontMatterCard(Dictionary<string, string> metadata, double fontSize)
+    {
+        var border = new Border
+        {
+            Background = Application.Current?.Resources["AppSurface1"] as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.Transparent,
+            BorderBrush = Application.Current?.Resources["AppSurface2"] as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.Gray,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(14, 10, 14, 10),
+            Margin = new Thickness(0, 4, 0, 12)
+        };
+
+        var grid = new Grid();
+        // 1列目はAutoに、2列目との間に固定のスペース(40px)を設ける
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) }); 
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var leftStack = new StackPanel { Orientation = Orientation.Vertical };
+        var rightStack = new StackPanel { Orientation = Orientation.Vertical };
+        Grid.SetColumn(leftStack, 0);
+        Grid.SetColumn(rightStack, 2);
+        grid.Children.Add(leftStack);
+        grid.Children.Add(rightStack);
+
+        var subtextBrush = Application.Current?.Resources["AppSubtext0"] as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.Gray;
+        var textBrush = Application.Current?.Resources["AppText"] as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.White;
+
+        void AddInfo(StackPanel panel, string icon, string label, string key)
+        {
+            if (!metadata.TryGetValue(key, out var val)) return;
+
+            var sp = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
+            
+            // アイコン
+            sp.Children.Add(new System.Windows.Controls.TextBlock { 
+                Text = icon, 
+                FontSize = fontSize, 
+                Width = 22, 
+                Foreground = subtextBrush,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center
+            });
+
+            // ラベル (上部に少しマージンを入れて視覚的な高さを調整)
+            sp.Children.Add(new System.Windows.Controls.TextBlock { 
+                Text = label + ":  ", 
+                FontSize = fontSize - 2, 
+                Foreground = subtextBrush, 
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 1.5, 0, 0) 
+            });
+            
+            // 値の整形
+            var displayVal = val;
+            if (displayVal.StartsWith("[") && displayVal.EndsWith("]"))
+                displayVal = displayVal[1..^1].Replace("\"", "").Replace("'", "");
+
+            // 値 (ラベルと同様に高さを調整)
+            sp.Children.Add(new System.Windows.Controls.TextBlock { 
+                Text = displayVal, 
+                FontSize = fontSize - 1, 
+                Foreground = textBrush, 
+                FontWeight = FontWeights.Medium,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 400,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 1.5, 0, 0)
+            });
+            panel.Children.Add(sp);
+        }
+
+        AddInfo(leftStack, "📅", "Created", "created");
+        AddInfo(leftStack, "📝", "Updated", "updated");
+        AddInfo(rightStack, "🔗", "Sources", "sources");
+        AddInfo(rightStack, "🏷️", "Tags", "tags");
+
+        border.Child = grid;
+        return new BlockUIContainer(border);
     }
 }

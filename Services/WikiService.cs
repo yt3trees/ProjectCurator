@@ -153,6 +153,7 @@ public class WikiService
         var pagesDir = GetPagesDir(wikiRoot);
         if (!Directory.Exists(pagesDir)) return result;
 
+        // SearchOption.AllDirectories でサブディレクトリも含めて取得
         foreach (var file in Directory.EnumerateFiles(pagesDir, "*.md", SearchOption.AllDirectories))
         {
             var rel = Path.GetRelativePath(wikiRoot, file).Replace('\\', '/');

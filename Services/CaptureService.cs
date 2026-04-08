@@ -868,7 +868,12 @@ identify which project it belongs to, and generate a concise summary.
             var focusSnippet = p.FocusFile != null && File.Exists(p.FocusFile)
                 ? ReadFirstChars(p.FocusFile, 100)
                 : "no focus file";
-            sb.AppendLine($"- {p.Name} (Tier: {p.Tier}) - Focus: {focusSnippet}");
+            var tasksPath = Path.Combine(p.AiContextPath, "obsidian_notes", "tasks.md");
+            var tasksSnippet = File.Exists(tasksPath)
+                ? ReadFirstChars(tasksPath, 150)
+                : "";
+            var tasksInfo = string.IsNullOrWhiteSpace(tasksSnippet) ? "" : $" / Tasks: {tasksSnippet}";
+            sb.AppendLine($"- {p.Name} (Tier: {p.Tier}) - Focus: {focusSnippet}{tasksInfo}");
         }
         sb.AppendLine();
         sb.AppendLine("## User Input");

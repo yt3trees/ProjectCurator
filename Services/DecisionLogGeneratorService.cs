@@ -16,12 +16,14 @@ public class DecisionLogGeneratorService
     private readonly LlmClientService    _llm;
     private readonly FileEncodingService _encoding;
     private readonly ConfigService       _configService;
+    private readonly AsanaTaskParser     _asanaParser;
 
-    public DecisionLogGeneratorService(LlmClientService llm, FileEncodingService encoding, ConfigService configService)
+    public DecisionLogGeneratorService(LlmClientService llm, FileEncodingService encoding, ConfigService configService, AsanaTaskParser asanaParser)
     {
         _llm           = llm;
         _encoding      = encoding;
         _configService = configService;
+        _asanaParser   = asanaParser;
     }
 
     // -----------------------------------------------------------------------
@@ -221,6 +223,42 @@ public class DecisionLogGeneratorService
             sb.AppendLine();
         }
 
+        // tasks.md (任意) — current_focus.md が古い場合の補完コンテキスト
+        var asanaTasksPath = ResolveAsanaTasksPath(project, workstreamId);
+        if (File.Exists(asanaTasksPath))
+        {
+            var parsed = _asanaParser.ParseFile(asanaTasksPath);
+            var tasksSb = new StringBuilder();
+            if (parsed.InProgress.Count > 0)
+            {
+                tasksSb.AppendLine("In-progress [Owner]:");
+                foreach (var t in parsed.InProgress)
+                {
+                    var due = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
+                    tasksSb.AppendLine($"- {t.Title}{due}");
+                    if (!string.IsNullOrWhiteSpace(t.Description))
+                        tasksSb.AppendLine($"  (notes: {t.Description})");
+                }
+            }
+            var highPrio = parsed.NotStarted.Where(t => t.Priority is "High").ToList();
+            if (highPrio.Count > 0)
+            {
+                tasksSb.AppendLine("Not started, high priority [Owner]:");
+                foreach (var t in highPrio)
+                {
+                    var due = t.DueDate != null ? $"  [due: {t.DueDate}]" : "";
+                    tasksSb.AppendLine($"- {t.Title}{due}");
+                }
+            }
+            var tasksText = tasksSb.ToString().Trim();
+            if (!string.IsNullOrWhiteSpace(tasksText))
+            {
+                sb.AppendLine("### tasks.md (current task state — use to supplement stale current_focus.md)");
+                sb.AppendLine(tasksText);
+                sb.AppendLine();
+            }
+        }
+
         // 直近 decision_log 1-2件 (任意)
         var decisionLogDir = ResolveDecisionLogDir(project, workstreamId);
         if (Directory.Exists(decisionLogDir))
@@ -378,6 +416,17 @@ public class DecisionLogGeneratorService
         }
         var rootPath = Path.Combine(project.AiContextContentPath, "open_issues.md");
         return File.Exists(rootPath) ? rootPath : null;
+    }
+
+    private static string ResolveAsanaTasksPath(ProjectInfo project, string? workstreamId)
+    {
+        var obsidianNotes = Path.Combine(project.AiContextPath, "obsidian_notes");
+        if (!string.IsNullOrWhiteSpace(workstreamId))
+        {
+            var wsPath = Path.Combine(obsidianNotes, "workstreams", workstreamId, "tasks.md");
+            if (File.Exists(wsPath)) return wsPath;
+        }
+        return Path.Combine(obsidianNotes, "tasks.md");
     }
 
     private static string ResolveDecisionLogDir(ProjectInfo project, string? workstreamId) =>
