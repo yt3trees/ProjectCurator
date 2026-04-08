@@ -861,7 +861,16 @@ public partial class WikiPage : WpfUserControl, INavigableView<WikiViewModel>
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 MaxWidth = 400,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 1.5, 0, 0)
+                Margin = new Thickness(0, 1.5, 0, 0),
+                ToolTip = new System.Windows.Controls.ToolTip
+                {
+                    Content = new System.Windows.Controls.TextBlock
+                    {
+                        Text = displayVal,
+                        TextWrapping = TextWrapping.Wrap,
+                        MaxWidth = 600
+                    }
+                }
             });
             panel.Children.Add(sp);
         }
