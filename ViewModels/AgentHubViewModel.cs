@@ -674,6 +674,26 @@ public partial class AgentHubViewModel : ObservableObject
     // ── Commands ──────────────────────────────────────────────────────────
 
     [RelayCommand]
+    private async Task ReloadLibrary()
+    {
+        IsRefreshing = true;
+        StatusMessage = "Reloading library...";
+        try
+        {
+            await LoadLibraryAsync();
+            StatusMessage = ScopeStatusLabel;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Reload error: {ex.Message}";
+        }
+        finally
+        {
+            IsRefreshing = false;
+        }
+    }
+
+    [RelayCommand]
     private async Task SyncStatus()
     {
         IsRefreshing = true;

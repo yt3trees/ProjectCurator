@@ -62,15 +62,30 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-            <TextBlock Text="Agent Hub" FontSize="18" FontWeight="SemiBold"
-                       Foreground="{DynamicResource AppText}" VerticalAlignment="Center"/>
-            <Border Background="{DynamicResource AppSurface1}" CornerRadius="4"
-                    Padding="8,2" Margin="12,0,0,0" VerticalAlignment="Center">
-                <TextBlock Text="Cl = Claude  Cx = Codex  Cp = Copilot  Gm = Gemini"
-                           FontSize="10" Foreground="{DynamicResource AppSubtext0}"/>
-            </Border>
-        </StackPanel>
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Agent Hub" FontSize="18" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppText}" VerticalAlignment="Center"/>
+                <Border Background="{DynamicResource AppSurface1}" CornerRadius="4"
+                        Padding="8,2" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Cl = Claude  Cx = Codex  Cp = Copilot  Gm = Gemini"
+                               FontSize="10" Foreground="{DynamicResource AppSubtext0}"/>
+                </Border>
+                <!-- Loading indicator -->
+                <StackPanel Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center"
+                            Visibility="{Binding IsRefreshing, Converter={StaticResource BoolToVis}}">
+                    <ui:ProgressRing IsIndeterminate="True" Width="16" Height="16" Margin="0,0,6,0"/>
+                    <TextBlock Text="Loading..." FontSize="11"
+                               Foreground="{DynamicResource AppSubtext0}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+            <ui:Button HorizontalAlignment="Right" VerticalAlignment="Center"
+                       Command="{Binding ReloadLibraryCommand}"
+                       IsEnabled="{Binding IsRefreshing, Converter={StaticResource InverseBoolConverter}}"
+                       Appearance="Secondary" Padding="6,3" ToolTip="Reload library">
+                <ui:SymbolIcon Symbol="ArrowCounterclockwise20" FontSize="14"/>
+            </ui:Button>
+        </Grid>
 
         <!-- Main Content: Left + Right panels -->
         <Grid Grid.Row="1">
@@ -397,7 +412,7 @@
 
                 <!-- Deployment lists -->
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
+                    <StackPanel Margin="0,0,12,0">
 
                         <!-- ── Agents deployment list ── -->
                         <Border Background="{DynamicResource AppSurface0}"
