@@ -56,9 +56,36 @@ public partial class TimelinePage : WpfUserControl, INavigableView<TimelineViewM
     {
         if (TimelineListBox.SelectedItem is TimelineEntryItem entry)
         {
-            ViewModel.OpenEntry(entry);
-            TimelineListBox.SelectedItem = null; // 選択解除
+            _ = ViewModel.ToggleEntryAsync(entry);
+            TimelineListBox.SelectedItem = null;
         }
+    }
+
+    private void OnOpenEntryInEditor(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: TimelineEntryItem entry })
+            ViewModel.OpenEntryInEditor(entry);
+    }
+
+    private void OnTimelineListPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        // OriginalSource から ListBox に当たるまで親を辿り、途中で ScrollViewer があれば内側のものとみなす
+        var sv = FindInnerScrollViewer(e.OriginalSource as DependencyObject);
+        if (sv == null) return;
+
+        sv.ScrollToVerticalOffset(sv.VerticalOffset - e.Delta / 3.0);
+        e.Handled = true;
+    }
+
+    private static ScrollViewer? FindInnerScrollViewer(DependencyObject? element)
+    {
+        while (element != null)
+        {
+            if (element is System.Windows.Controls.ListBox) return null;
+            if (element is ScrollViewer sv) return sv;
+            element = System.Windows.Media.VisualTreeHelper.GetParent(element);
+        }
+        return null;
     }
 
     private void OnHeatmapBodyScrollChanged(object sender, ScrollChangedEventArgs e)
@@ -93,8 +120,20 @@ public partial class TimelinePage : WpfUserControl, INavigableView<TimelineViewM
             ViewModel.OpenHeatmapCell(cell);
     }
 
+    private void OnClearProjectFilter(object sender, RoutedEventArgs e)
+        => ViewModel.SelectedProject = null;
+
     private void OnToggleShowHidden(object sender, RoutedEventArgs e)
         => ViewModel.ShowHidden = !ViewModel.ShowHidden;
+
+    private void OnToggleFocus(object sender, RoutedEventArgs e)
+        => ViewModel.ShowFocus = !ViewModel.ShowFocus;
+
+    private void OnToggleDecision(object sender, RoutedEventArgs e)
+        => ViewModel.ShowDecision = !ViewModel.ShowDecision;
+
+    private void OnToggleWork(object sender, RoutedEventArgs e)
+        => ViewModel.ShowWork = !ViewModel.ShowWork;
 
     private void OnHeatmapBodyPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {

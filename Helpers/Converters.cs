@@ -98,3 +98,32 @@ public class IntToVisibilityConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotImplementedException();
 }
+
+/// <summary>タイプ別色分けヒートマップセルコンバーター。Values[0]=Intensity(double 0..1), Values[1]=DominantType(string)。</summary>
+public class HeatmapTypedCellConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        var intensity = values.Length > 0 && values[0] is double v ? Math.Clamp(v, 0d, 1d) : 0d;
+        var type = values.Length > 1 ? values[1] as string ?? "" : "";
+
+        var surface = Application.Current.TryFindResource("AppSurface1") as SolidColorBrush;
+        if (intensity <= 0.001 || surface == null)
+            return surface?.CloneCurrentValue() ?? new SolidColorBrush(MediaColor.FromRgb(48, 54, 61));
+
+        var colorKey = type switch
+        {
+            "Decision" => "AppGreen",
+            "Work"     => "AppPeach",
+            _          => "AppBlue",
+        };
+        var accent = Application.Current.TryFindResource(colorKey) as SolidColorBrush;
+        var accentColor = accent?.Color ?? MediaColor.FromRgb(88, 166, 255);
+
+        var alpha = (byte)(45 + (int)(intensity * 185));
+        return new SolidColorBrush(MediaColor.FromArgb(alpha, accentColor.R, accentColor.G, accentColor.B));
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}

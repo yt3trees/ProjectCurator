@@ -12,6 +12,7 @@
 
     <UserControl.Resources>
         <helpers:HeatmapIntensityToBrushConverter x:Key="HeatmapIntensityToBrushConverter" />
+        <helpers:HeatmapTypedCellConverter x:Key="HeatmapTypedCellConverter" />
 
         <DataTemplate x:Key="TimelineEntryTemplate" DataType="{x:Type vm:TimelineEntryItem}">
             <Grid>
@@ -32,24 +33,74 @@
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="140"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="{Binding DateText}"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource AppBlue}"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding Preview}"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource AppText}"
-                                   TextTrimming="CharacterEllipsis"
-                                   VerticalAlignment="Center"/>
-                    </Grid>
+                    <StackPanel>
+                        <!-- ヘッダー行 -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding DateText}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppBlue}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding ProjectName}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource AppSubtext1}"
+                                       VerticalAlignment="Center"
+                                       Width="110"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,8,0"
+                                       Visibility="{Binding DataContext.IsCrossProjectMode,
+                                           RelativeSource={RelativeSource AncestorType=ListBox},
+                                           Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding Preview}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource AppText}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- 展開パネル -->
+                        <Border Margin="0,6,0,0"
+                                CornerRadius="3"
+                                Background="{DynamicResource AppSurface0}"
+                                Padding="10,8">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <ScrollViewer MaxHeight="160"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <TextBlock Text="{Binding ExpandedContent}"
+                                               FontFamily="Cascadia Mono, Consolas, monospace"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource AppSubtext1}"
+                                               TextWrapping="Wrap"/>
+                                </ScrollViewer>
+                                <ui:Button Content="{Binding OpenButtonLabel}"
+                                           Height="26" Padding="10,0" Margin="0,6,0,0"
+                                           HorizontalAlignment="Right"
+                                           Appearance="Secondary"
+                                           FontSize="11"
+                                           Tag="{Binding}"
+                                           Click="OnOpenEntryInEditor"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                 </Border>
 
                 <TextBlock x:Name="GapText"
@@ -87,6 +138,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
@@ -113,19 +165,28 @@
                           SelectedItem="{Binding SelectedProject}"
                           DisplayMemberPath="DisplayName"
                           MinWidth="200" MaxWidth="320"
-                          Margin="0,0,12,0"
                           Background="{DynamicResource AppSurface1}"
                           Foreground="{DynamicResource AppText}"/>
 
-                <TextBlock Grid.Column="3"
+                <ui:Button Grid.Column="3"
+                           Margin="4,0,8,0" Height="34" Padding="8,0"
+                           Appearance="Secondary"
+                           ToolTip="Clear project filter (show all)"
+                           Click="OnClearProjectFilter"
+                           Visibility="{Binding IsCrossProjectMode,
+                               Converter={StaticResource InverseBoolToVisConverter}}">
+                    <ui:SymbolIcon Symbol="Dismiss24"/>
+                </ui:Button>
+
+                <TextBlock Grid.Column="4"
                            Text="Period:"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource AppSubtext0}"
                            FontSize="12"
-                           Margin="0,0,4,0"/>
+                           Margin="12,0,4,0"/>
 
                 <ComboBox x:Name="PeriodComboBox"
-                          Grid.Column="4"
+                          Grid.Column="5"
                           Width="112"
                           FontSize="12"
                           HorizontalAlignment="Left"
@@ -137,14 +198,14 @@
                     <ComboBoxItem Tag="0" Content="All"/>
                 </ComboBox>
 
-                <TextBlock Grid.Column="5"
+                <TextBlock Grid.Column="6"
                            Text="Graph scope:"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource AppSubtext0}"
                            FontSize="12"
                            Margin="12,0,4,0"/>
 
-                <ComboBox Grid.Column="6"
+                <ComboBox Grid.Column="7"
                           Width="150"
                           FontSize="12"
                           ItemsSource="{Binding GraphScopes}"
@@ -152,7 +213,7 @@
                           Background="{DynamicResource AppSurface1}"
                           Foreground="{DynamicResource AppText}"/>
 
-                <ui:Button Grid.Column="7"
+                <ui:Button Grid.Column="8"
                            Margin="8,0,0,0" Height="34" Padding="8,0"
                            ToolTip="Toggle hidden projects"
                            Click="OnToggleShowHidden">
@@ -228,6 +289,75 @@
 
             <TabItem Header="Entries">
                 <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 検索 + タイプフィルタ -->
+                    <Border Grid.Row="0"
+                            Background="{DynamicResource AppSurface0}"
+                            BorderBrush="{DynamicResource AppSurface1}"
+                            BorderThickness="0,0,0,1"
+                            Padding="6,5"
+                            Margin="0,0,0,4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ui:TextBox Grid.Column="0"
+                                        Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                        PlaceholderText="Search entries..."
+                                        FontSize="12"/>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
+                                <ui:Button Content="Focus" Height="28" Padding="8,0" Margin="0,0,4,0"
+                                           Click="OnToggleFocus">
+                                    <ui:Button.Style>
+                                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                            <Setter Property="Appearance" Value="Secondary"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowFocus}" Value="True">
+                                                    <Setter Property="Appearance" Value="Primary"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ui:Button.Style>
+                                </ui:Button>
+                                <ui:Button Content="Decision" Height="28" Padding="8,0" Margin="0,0,4,0"
+                                           Click="OnToggleDecision">
+                                    <ui:Button.Style>
+                                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                            <Setter Property="Appearance" Value="Secondary"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowDecision}" Value="True">
+                                                    <Setter Property="Appearance" Value="Primary"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ui:Button.Style>
+                                </ui:Button>
+                                <ui:Button Content="Work" Height="28" Padding="8,0"
+                                           Click="OnToggleWork">
+                                    <ui:Button.Style>
+                                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                            <Setter Property="Appearance" Value="Secondary"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowWork}" Value="True">
+                                                    <Setter Property="Appearance" Value="Primary"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ui:Button.Style>
+                                </ui:Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- エントリリスト -->
+                    <Grid Grid.Row="1">
                         <ListBox x:Name="TimelineListBox"
                                  ItemsSource="{Binding Entries}"
                                  ItemTemplate="{StaticResource TimelineEntryTemplate}"
@@ -238,6 +368,7 @@
                                  VirtualizingStackPanel.VirtualizationMode="Recycling"
                                  SelectionMode="Single"
                                  SelectionChanged="OnEntrySelected"
+                                 PreviewMouseWheel="OnTimelineListPreviewMouseWheel"
                                  Padding="0,4">
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
@@ -264,23 +395,7 @@
                                              HorizontalAlignment="Center"
                                              VerticalAlignment="Center"/>
                         </Grid>
-
-                        <TextBlock Text="Select a project"
-                                   FontSize="14"
-                                   Foreground="{DynamicResource AppSubtext0}"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SelectedProject}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                    </Grid>
                 </Grid>
             </TabItem>
 
@@ -394,10 +509,16 @@
                                                                     Height="14"
                                                                     Margin="1"
                                                                     CornerRadius="2"
-                                                                    Background="{Binding Intensity, Converter={StaticResource HeatmapIntensityToBrushConverter}}"
                                                                     Cursor="Hand"
                                                                     MouseLeftButtonUp="OnHeatmapCellClicked"
-                                                                    ToolTip="{Binding ToolTipText}"/>
+                                                                    ToolTip="{Binding ToolTipText}">
+                                                                    <Border.Background>
+                                                                        <MultiBinding Converter="{StaticResource HeatmapTypedCellConverter}">
+                                                                            <Binding Path="Intensity"/>
+                                                                            <Binding Path="DominantType"/>
+                                                                        </MultiBinding>
+                                                                    </Border.Background>
+                                                                </Border>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
@@ -429,12 +550,14 @@
                                        VerticalAlignment="Center"/>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Low" Foreground="{DynamicResource AppSubtext1}" FontSize="10" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <Border Width="12" Height="12" Margin="0,0,2,0" CornerRadius="2" Background="{DynamicResource AppSurface1}"/>
-                                <Border Width="12" Height="12" Margin="0,0,2,0" CornerRadius="2" Background="{DynamicResource AppBlue}" Opacity="0.3"/>
-                                <Border Width="12" Height="12" Margin="0,0,2,0" CornerRadius="2" Background="{DynamicResource AppBlue}" Opacity="0.6"/>
-                                <Border Width="12" Height="12" Margin="0,0,6,0" CornerRadius="2" Background="{DynamicResource AppBlue}"/>
-                                <TextBlock Text="High" Foreground="{DynamicResource AppSubtext1}" FontSize="10" VerticalAlignment="Center"/>
+                                <Border Width="12" Height="12" Margin="0,0,3,0" CornerRadius="2" Background="{DynamicResource AppSurface1}"/>
+                                <TextBlock Text="None" Foreground="{DynamicResource AppSubtext1}" FontSize="10" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <Border Width="12" Height="12" Margin="0,0,3,0" CornerRadius="2" Background="{DynamicResource AppBlue}" Opacity="0.8"/>
+                                <TextBlock Text="Focus" Foreground="{DynamicResource AppSubtext1}" FontSize="10" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <Border Width="12" Height="12" Margin="0,0,3,0" CornerRadius="2" Background="{DynamicResource AppGreen}" Opacity="0.8"/>
+                                <TextBlock Text="Decision" Foreground="{DynamicResource AppSubtext1}" FontSize="10" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <Border Width="12" Height="12" Margin="0,0,3,0" CornerRadius="2" Background="{DynamicResource AppPeach}" Opacity="0.8"/>
+                                <TextBlock Text="Work" Foreground="{DynamicResource AppSubtext1}" FontSize="10" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Grid>
                     </Border>

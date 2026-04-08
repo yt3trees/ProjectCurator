@@ -12,16 +12,22 @@ using Curia.Services;
 namespace Curia.ViewModels;
 
 /// <summary>タイムラインの1エントリ (通常行 or ギャップ行)</summary>
-public class TimelineEntryItem
+public partial class TimelineEntryItem : ObservableObject
 {
     public bool IsGap { get; init; }
     public int GapDays { get; init; }           // IsGap == true のとき有効
     public DateTime Date { get; init; }          // IsGap == false のとき有効
-    public string EntryType { get; init; } = ""; // "Focus" | "Decision"
+    public string EntryType { get; init; } = ""; // "Focus" | "Decision" | "Work"
     public string Preview { get; init; } = "";
     public string FilePath { get; init; } = "";
     public string ProjectName { get; init; } = "";
     public string ProjectHiddenKey { get; init; } = "";
+
+    [ObservableProperty]
+    private bool isExpanded;
+
+    [ObservableProperty]
+    private string expandedContent = "";
 
     public string GapText => GapDays == 1 ? "-- 1 day gap --" : $"-- {GapDays} days gap --";
     public string DateText => Date.ToString("yyyy-MM-dd (ddd)");
@@ -31,6 +37,7 @@ public class TimelineEntryItem
         "Work" => "[Work]",
         _ => "[Focus]",
     };
+    public string OpenButtonLabel => EntryType == "Work" ? "Open in Explorer" : "Open in Editor";
 }
 
 public class TimelineHeatmapCellItem
@@ -41,6 +48,10 @@ public class TimelineHeatmapCellItem
     public int Count { get; init; }
     public double Intensity { get; init; }
     public string ToolTipText { get; init; } = "";
+    public string DominantType { get; init; } = "";  // "Focus" | "Decision" | "Work"
+    public int FocusCount { get; init; }
+    public int DecisionCount { get; init; }
+    public int WorkCount { get; init; }
 }
 
 public class TimelineHeatmapBucketItem
@@ -63,6 +74,7 @@ public partial class TimelineViewModel : ObservableObject
     private readonly ConfigService _configService;
     private List<ProjectInfo> _allProjects = [];
     private List<string> _hiddenKeys = [];
+    private List<TimelineRawEntry> _cachedRawEntries = [];
 
     [ObservableProperty]
     private ObservableCollection<ProjectInfo> projects = [];
@@ -85,7 +97,7 @@ public partial class TimelineViewModel : ObservableObject
     private bool isGraphLoading;
 
     [ObservableProperty]
-    private string statsText = "No project selected";
+    private string statsText = "Loading...";
 
     [ObservableProperty]
     private string graphStatsText = "";
@@ -95,6 +107,21 @@ public partial class TimelineViewModel : ObservableObject
 
     [ObservableProperty]
     private string selectedGraphScope = "All projects";
+
+    [ObservableProperty]
+    private bool showFocus = true;
+
+    [ObservableProperty]
+    private bool showDecision = true;
+
+    [ObservableProperty]
+    private bool showWork = true;
+
+    [ObservableProperty]
+    private string searchText = "";
+
+    /// <summary>プロジェクト未選択時は全プロジェクト横断表示モード。</summary>
+    public bool IsCrossProjectMode => SelectedProject == null;
 
     public ObservableCollection<TimelineEntryItem> Entries { get; } = [];
     public ObservableCollection<TimelineHeatmapBucketItem> HeatmapBuckets { get; } = [];
@@ -134,7 +161,7 @@ public partial class TimelineViewModel : ObservableObject
             IsLoading = false;
         }
 
-        await LoadHeatmapAsync();
+        await Task.WhenAll(LoadEntriesAsync(), LoadHeatmapAsync());
     }
 
     partial void OnShowHiddenChanged(bool value)
@@ -156,6 +183,7 @@ public partial class TimelineViewModel : ObservableObject
 
     partial void OnSelectedProjectChanged(ProjectInfo? value)
     {
+        OnPropertyChanged(nameof(IsCrossProjectMode));
         _ = LoadEntriesAsync();
         _ = LoadHeatmapAsync();
     }
@@ -169,29 +197,42 @@ public partial class TimelineViewModel : ObservableObject
     partial void OnSelectedGraphScopeChanged(string value)
         => _ = LoadHeatmapAsync();
 
-    /// <summary>タイムラインエントリを非同期で読み込む。</summary>
+    partial void OnShowFocusChanged(bool value)    => ApplyEntryFilters();
+    partial void OnShowDecisionChanged(bool value) => ApplyEntryFilters();
+    partial void OnShowWorkChanged(bool value)     => ApplyEntryFilters();
+    partial void OnSearchTextChanged(string value) => ApplyEntryFilters();
+
+    /// <summary>ファイルIOを行い rawEntries をキャッシュしてフィルタを適用する。</summary>
     public async Task LoadEntriesAsync()
     {
         Entries.Clear();
-
-        if (SelectedProject == null)
-        {
-            StatsText = "No project selected";
-            return;
-        }
-
         StatsText = "Loading...";
         IsLoading = true;
-        var project = SelectedProject;
+
+        var projectList = Projects.ToList();
+        var selectedProject = SelectedProject;
         var daysBack = DaysBack;
 
         try
         {
-            var (entries, stats) = await Task.Run(() => BuildEntries(project, daysBack));
+            _cachedRawEntries = await Task.Run(() =>
+            {
+                var cutoff = daysBack > 0 ? DateTime.Today.AddDays(-daysBack) : DateTime.MinValue;
+                var raw = new List<TimelineRawEntry>();
 
-            foreach (var e in entries)
-                Entries.Add(e);
-            StatsText = stats;
+                if (selectedProject != null)
+                {
+                    raw.AddRange(BuildRawEntries(selectedProject, cutoff));
+                }
+                else
+                {
+                    foreach (var p in projectList)
+                        raw.AddRange(BuildRawEntries(p, cutoff));
+                }
+                return raw;
+            });
+
+            ApplyEntryFilters();
         }
         catch (Exception ex)
         {
@@ -201,6 +242,89 @@ public partial class TimelineViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>キャッシュ済み rawEntries にタイプ/検索フィルタを適用してエントリリストを再構築する (ファイルIO なし)。</summary>
+    private void ApplyEntryFilters()
+    {
+        var filtered = _cachedRawEntries.AsEnumerable();
+
+        if (!ShowFocus)    filtered = filtered.Where(e => e.Type != "Focus");
+        if (!ShowDecision) filtered = filtered.Where(e => e.Type != "Decision");
+        if (!ShowWork)     filtered = filtered.Where(e => e.Type != "Work");
+
+        var search = SearchText.Trim();
+        if (!string.IsNullOrEmpty(search))
+        {
+            filtered = filtered.Where(e =>
+                e.Topic.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                e.PreviewText.Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var rawList = filtered
+            .OrderByDescending(e => e.Date)
+            .ThenBy(e => e.Type, StringComparer.Ordinal)
+            .ToList();
+
+        var result = new List<TimelineEntryItem>();
+        DateTime? prevDate = null;
+
+        foreach (var raw in rawList)
+        {
+            if (prevDate.HasValue && prevDate.Value.Date != raw.Date.Date)
+            {
+                int gap = (int)(prevDate.Value.Date - raw.Date.Date).TotalDays - 1;
+                if (gap > 0)
+                    result.Add(new TimelineEntryItem { IsGap = true, GapDays = gap });
+            }
+
+            string preview = raw.Type switch
+            {
+                "Focus"    => "[Focus] " + raw.PreviewText,
+                "Decision" => "[Decision] " + raw.Topic,
+                "Work"     => "[Work] " + raw.Topic,
+                _          => raw.Topic,
+            };
+
+            result.Add(new TimelineEntryItem
+            {
+                Date             = raw.Date,
+                EntryType        = raw.Type,
+                Preview          = preview,
+                FilePath         = raw.Path,
+                ProjectName      = raw.ProjectName,
+                ProjectHiddenKey = raw.ProjectHiddenKey,
+            });
+
+            prevDate = raw.Date;
+        }
+
+        Entries.Clear();
+        foreach (var e in result) Entries.Add(e);
+
+        if (rawList.Count == 0)
+        {
+            StatsText = "Total: 0 entries";
+            return;
+        }
+
+        int focusCount    = rawList.Count(e => e.Type == "Focus");
+        int decisionCount = rawList.Count(e => e.Type == "Decision");
+        int workCount     = rawList.Count(e => e.Type == "Work");
+        var uniqueDays    = rawList.Select(e => e.Date.Date).Distinct().Count();
+        var newest = rawList.First().Date.ToString("yyyy-MM-dd");
+        var oldest = rawList.Last().Date.ToString("yyyy-MM-dd");
+        string typeSummary = $"Focus: {focusCount}  Decision: {decisionCount}  Work: {workCount}";
+
+        if (DaysBack > 0)
+        {
+            double activeRate = uniqueDays * 100.0 / DaysBack;
+            StatsText = $"Total: {rawList.Count} entries  ({typeSummary}) | Active: {uniqueDays} days | Period: {oldest} ~ {newest} | Rate: {activeRate:F1}%";
+        }
+        else
+        {
+            StatsText = $"Total: {rawList.Count} entries  ({typeSummary}) | Active: {uniqueDays} days | Period: {oldest} ~ {newest}";
         }
     }
 
@@ -245,8 +369,44 @@ public partial class TimelineViewModel : ObservableObject
         }
     }
 
-    /// <summary>エントリクリック時に呼ぶ。</summary>
-    public void OpenEntry(TimelineEntryItem entry)
+    /// <summary>エントリクリック時に呼ぶ。展開/折りたたみをトグルし、展開時はファイル内容を読み込む。</summary>
+    public async Task ToggleEntryAsync(TimelineEntryItem entry)
+    {
+        if (entry.IsGap || string.IsNullOrEmpty(entry.FilePath))
+            return;
+
+        if (entry.IsExpanded)
+        {
+            entry.IsExpanded = false;
+            return;
+        }
+
+        if (entry.EntryType == "Work")
+        {
+            entry.ExpandedContent = entry.FilePath;
+            entry.IsExpanded = true;
+            return;
+        }
+
+        try
+        {
+            var content = await Task.Run(() =>
+            {
+                var (text, _) = EncodingDetector.ReadFile(entry.FilePath);
+                var lines = text.Split('\n').Take(30);
+                return string.Join("\n", lines).TrimEnd();
+            });
+            entry.ExpandedContent = content;
+        }
+        catch (Exception ex)
+        {
+            entry.ExpandedContent = $"(Failed to load: {ex.Message})";
+        }
+        entry.IsExpanded = true;
+    }
+
+    /// <summary>エディタ/エクスプローラーで開くボタン押下時に呼ぶ。</summary>
+    public void OpenEntryInEditor(TimelineEntryItem entry)
     {
         if (entry.IsGap || string.IsNullOrEmpty(entry.FilePath))
             return;
@@ -295,84 +455,6 @@ public partial class TimelineViewModel : ObservableObject
     }
 
     // ----- プライベート -----
-
-    private static (List<TimelineEntryItem> entries, string stats) BuildEntries(ProjectInfo project, int daysBack)
-    {
-        var cutoff = daysBack > 0
-            ? DateTime.Today.AddDays(-daysBack)
-            : DateTime.MinValue;
-
-        var rawEntries = BuildRawEntries(project, cutoff);
-
-        if (rawEntries.Count == 0)
-            return ([], "Total: 0 entries");
-
-        // 降順ソート (新しい順)
-        rawEntries.Sort((a, b) =>
-        {
-            int cmp = b.Date.CompareTo(a.Date);
-            if (cmp != 0)
-                return cmp;
-            return string.Compare(a.Type, b.Type, StringComparison.Ordinal);
-        });
-
-        // エントリ + ギャップ構築
-        var result = new List<TimelineEntryItem>();
-        DateTime? prevDate = null;
-
-        foreach (var raw in rawEntries)
-        {
-            // ギャップ挿入 (日付が変わっている場合)
-            if (prevDate.HasValue && prevDate.Value.Date != raw.Date.Date)
-            {
-                int gap = (int)(prevDate.Value.Date - raw.Date.Date).TotalDays - 1;
-                if (gap > 0)
-                    result.Add(new TimelineEntryItem { IsGap = true, GapDays = gap });
-            }
-
-            string preview = raw.Type switch
-            {
-                "Focus" => "[Focus] " + GetFocusPreview(raw.Path),
-                "Decision" => "[Decision] " + raw.Topic,
-                "Work" => "[Work] " + raw.Topic,
-                _ => raw.Topic,
-            };
-
-            result.Add(new TimelineEntryItem
-            {
-                IsGap = false,
-                Date = raw.Date,
-                EntryType = raw.Type,
-                Preview = preview,
-                FilePath = raw.Path,
-                ProjectName = raw.ProjectName,
-                ProjectHiddenKey = raw.ProjectHiddenKey,
-            });
-
-            prevDate = raw.Date;
-        }
-
-        // 統計
-        int totalEntries = rawEntries.Count;
-        int focusCount = rawEntries.Count(e => e.Type == "Focus");
-        int decisionCount = rawEntries.Count(e => e.Type == "Decision");
-        int workCount = rawEntries.Count(e => e.Type == "Work");
-        var uniqueDays = rawEntries.Select(e => e.Date.Date).Distinct().Count();
-        var newest = rawEntries.First().Date.ToString("yyyy-MM-dd");
-        var oldest = rawEntries.Last().Date.ToString("yyyy-MM-dd");
-
-        double activeRate = 0;
-        if (daysBack > 0)
-            activeRate = uniqueDays * 100.0 / daysBack;
-
-        string typeSummary = $"Focus: {focusCount}  Decision: {decisionCount}  Work: {workCount}";
-
-        string stats = daysBack > 0
-            ? $"Total: {totalEntries} entries  ({typeSummary}) | Active: {uniqueDays} days | Period: {oldest} ~ {newest} | Rate: {activeRate:F1}%"
-            : $"Total: {totalEntries} entries  ({typeSummary}) | Active: {uniqueDays} days | Period: {oldest} ~ {newest}";
-
-        return (result, stats);
-    }
 
     private static TimelineHeatmapBuildResult BuildHeatmap(
         IReadOnlyList<ProjectInfo> allProjects,
@@ -438,11 +520,18 @@ public partial class TimelineViewModel : ObservableObject
             })
             .ToList();
 
-        var counts = rawEntries
+        // タイプ別集計
+        var grouped = rawEntries
             .GroupBy(e => (e.ProjectHiddenKey, Date: e.Date.Date))
-            .ToDictionary(g => g.Key, g => g.Count());
+            .ToDictionary(g => g.Key, g => new
+            {
+                Total    = g.Count(),
+                Focus    = g.Count(e => e.Type == "Focus"),
+                Decision = g.Count(e => e.Type == "Decision"),
+                Work     = g.Count(e => e.Type == "Work"),
+            });
 
-        int maxCount = counts.Count > 0 ? counts.Values.Max() : 0;
+        int maxCount = grouped.Count > 0 ? grouped.Values.Max(v => v.Total) : 0;
 
         var projectsWithEntries = rawEntries
             .Select(e => e.ProjectHiddenKey)
@@ -461,18 +550,34 @@ public partial class TimelineViewModel : ObservableObject
 
                 foreach (var bucket in buckets)
                 {
-                    counts.TryGetValue((project.HiddenKey, bucket.Date.Date), out int count);
+                    grouped.TryGetValue((project.HiddenKey, bucket.Date.Date), out var counts);
+                    int count    = counts?.Total    ?? 0;
+                    int focus    = counts?.Focus    ?? 0;
+                    int decision = counts?.Decision ?? 0;
+                    int work     = counts?.Work     ?? 0;
+
+                    string dominantType = "";
+                    if (count > 0)
+                    {
+                        if (focus >= decision && focus >= work)  dominantType = "Focus";
+                        else if (decision >= work)               dominantType = "Decision";
+                        else                                     dominantType = "Work";
+                    }
 
                     var intensity = maxCount > 0 ? (double)count / maxCount : 0d;
                     row.Cells.Add(new TimelineHeatmapCellItem
                     {
                         ProjectHiddenKey = project.HiddenKey,
-                        BucketLabel = bucket.Label,
-                        BucketDate = bucket.Date,
-                        Count = count,
-                        Intensity = intensity,
-                        ToolTipText = count > 0
-                            ? $"{project.DisplayName}\n{bucket.Label}\nEvents: {count}\nClick to open file"
+                        BucketLabel      = bucket.Label,
+                        BucketDate       = bucket.Date,
+                        Count            = count,
+                        Intensity        = intensity,
+                        DominantType     = dominantType,
+                        FocusCount       = focus,
+                        DecisionCount    = decision,
+                        WorkCount        = work,
+                        ToolTipText      = count > 0
+                            ? $"{project.DisplayName}\n{bucket.Label}\nFocus: {focus}  Decision: {decision}  Work: {work}\nClick to open file"
                             : $"{project.DisplayName}\n{bucket.Label}\nEvents: 0",
                     });
                 }
@@ -522,11 +627,12 @@ public partial class TimelineViewModel : ObservableObject
                 {
                     rawEntries.Add(new TimelineRawEntry
                     {
-                        Date = date,
-                        Path = file,
-                        Type = "Focus",
-                        Topic = "",
-                        ProjectName = project.Name,
+                        Date             = date,
+                        Path             = file,
+                        Type             = "Focus",
+                        Topic            = "",
+                        PreviewText      = GetFocusPreview(file),
+                        ProjectName      = project.Name,
                         ProjectHiddenKey = project.HiddenKey,
                     });
                 }
@@ -553,11 +659,12 @@ public partial class TimelineViewModel : ObservableObject
                 {
                     rawEntries.Add(new TimelineRawEntry
                     {
-                        Date = date,
-                        Path = file,
-                        Type = "Decision",
-                        Topic = match.Groups[2].Value,
-                        ProjectName = project.Name,
+                        Date             = date,
+                        Path             = file,
+                        Type             = "Decision",
+                        Topic            = match.Groups[2].Value,
+                        PreviewText      = "",
+                        ProjectName      = project.Name,
                         ProjectHiddenKey = project.HiddenKey,
                     });
                 }
@@ -565,8 +672,6 @@ public partial class TimelineViewModel : ObservableObject
         }
 
         // Work folders under shared/_work/
-        // General:    _work/{year(4d)}/{yearMonth(6d)}/{yyyyMMdd}_{name}
-        // Workstream: _work/{workstreamId}/{yearMonth(6d)}/{yyyyMMdd}_{name}
         var workRoot = Path.Combine(project.Path, "shared", "_work");
         if (Directory.Exists(workRoot))
             ScanWorkFolders(workRoot, project, cutoff, rawEntries);
@@ -587,10 +692,6 @@ public partial class TimelineViewModel : ObservableObject
 
         foreach (var l1 in l1Dirs)
         {
-            var l1Name = Path.GetFileName(l1)!;
-
-            // year dir (4 digits) → get yearMonth dirs inside it
-            // workstream dir (other) → treat its subdirs as yearMonth dirs
             string[] l2Dirs;
             try { l2Dirs = Directory.GetDirectories(l1); }
             catch { continue; }
@@ -618,11 +719,12 @@ public partial class TimelineViewModel : ObservableObject
 
                     rawEntries.Add(new TimelineRawEntry
                     {
-                        Date = date,
-                        Path = l3,
-                        Type = "Work",
-                        Topic = name[9..],
-                        ProjectName = project.Name,
+                        Date             = date,
+                        Path             = l3,
+                        Type             = "Work",
+                        Topic            = name[9..],
+                        PreviewText      = "",
+                        ProjectName      = project.Name,
                         ProjectHiddenKey = project.HiddenKey,
                     });
                 }
@@ -685,6 +787,7 @@ public partial class TimelineViewModel : ObservableObject
         public string Path { get; init; } = "";
         public string Type { get; init; } = "";
         public string Topic { get; init; } = "";
+        public string PreviewText { get; init; } = "";
         public string ProjectName { get; init; } = "";
         public string ProjectHiddenKey { get; init; } = "";
     }
