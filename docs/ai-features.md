@@ -2,7 +2,7 @@
 
 [< Back to README](../README.md)
 
-All AI features require `Enable AI Features` to be on (Settings > LLM API). Supported providers: OpenAI and Azure OpenAI.
+All AI features require `Enable AI Features` to be on (Settings > LLM API). Supported providers: OpenAI, Azure OpenAI, Claude Code CLI, Gemini CLI, Codex CLI, and GitHub Copilot CLI.
 
 <a id="ai-features-overview"></a>
 ## AI Features Overview
@@ -50,10 +50,77 @@ flowchart LR
 <a id="setup"></a>
 ## Setup
 
+### API-based providers (OpenAI / Azure OpenAI)
+
 1. Open `Settings > LLM API`
-2. Choose provider, enter API Key and Model (and Endpoint / API Version for Azure)
+2. Choose `OpenAI` or `Azure OpenAI`, enter API Key and Model (Azure also needs Endpoint / API Version)
 3. Click `Test Connection`
 4. Once the test passes, toggle `Enable AI Features` on and save
+
+### CLI-based providers (Claude Code CLI / Gemini CLI / Codex CLI)
+
+These providers delegate authentication to the CLI tool itself — no API Key is required in Curia settings.
+
+| Provider | CLI tool | Auth setup |
+|---|---|---|
+| Claude Code CLI | `claude` | Run `claude` once to authenticate |
+| Gemini CLI | `gemini` | Run `gemini auth login` |
+| Codex CLI | `codex` | Set `OPENAI_API_KEY` env var, or enter the key in Settings to have Curia pass it automatically |
+| GitHub Copilot CLI | `copilot` | Sign in via `gh auth login` with Copilot access |
+
+1. Install and authenticate the CLI tool (see table above)
+2. Open `Settings > LLM API`, choose the CLI provider, and optionally set Model
+3. Click `Test Connection`
+4. Once the test passes, toggle `Enable AI Features` on and save
+
+The API Key field remains visible when switching to a CLI provider so you can switch back to an API-based provider at any time without re-entering the key.
+
+### CLI invocation details
+
+Curia runs each CLI tool as a subprocess via `cmd.exe /c` on Windows (so `.cmd` scripts are resolved correctly). The prompt text is formatted as a single block combining the system prompt and conversation history before being passed to the CLI.
+
+Model selection is not supported for CLI-based providers — each CLI uses its own default model.
+
+#### Claude Code CLI
+
+```
+claude --print --output-format json
+```
+
+- Prompt is passed via **stdin**
+- `--print` enables non-interactive (headless) mode
+- `--output-format json` returns structured JSON; Curia extracts the `result` field
+
+#### Gemini CLI
+
+```
+gemini --prompt "TEXT" --yolo --output-format text
+```
+
+- Prompt is passed as the `--prompt` argument value (not stdin)
+- `--yolo` auto-approves all tool actions (required to prevent interactive approval prompts)
+- `--output-format text` returns plain text output
+
+#### Codex CLI
+
+```
+codex exec --skip-git-repo-check --json
+```
+
+- Prompt is passed via **stdin** (same as Claude Code CLI)
+- `--skip-git-repo-check` allows execution outside a Git repository
+- `--json` enables NDJSON structured output; Curia extracts `item.completed` / `agent_message` entries
+- If API Key is set in Settings, it is passed as the `OPENAI_API_KEY` environment variable
+- stdin is used instead of a positional argument to avoid Windows command-line length limits on large prompts
+
+#### GitHub Copilot CLI
+
+```
+copilot -p "TEXT"
+```
+
+- Prompt is passed as the `-p` argument value
+- Output is plain text; no additional parsing needed
 
 <a id="user-profile"></a>
 ## User Profile

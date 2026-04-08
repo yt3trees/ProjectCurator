@@ -98,7 +98,7 @@ Runtime config is loaded from `%USERPROFILE%\.curia\` (new default) or `%USERPRO
 - `settings.json` - workspace roots, hotkey, auto-refresh, Asana sync settings, and LLM/AI settings (`LlmProvider`, `LlmApiKey`, `LlmModel`, `LlmEndpoint`, `LlmApiVersion`, `AiEnabled`)
 - `asana_global.json` - Asana token, workspace/user GIDs, personal project GIDs
 
-LLM settings are configured in `Settings > LLM API`. Supported providers are `openai` and `azure_openai`. "Enable AI Features" can only be turned on after a successful Test Connection.
+LLM settings are configured in `Settings > LLM API`. Supported providers are `openai`, `azure_openai`, `claude_code` (Claude Code CLI), `gemini_cli` (Gemini CLI), `codex_cli` (Codex CLI), and `github_copilot` (GitHub Copilot CLI). CLI-based providers delegate authentication to the CLI tool itself; the API Key field is retained in settings for easy switching back to an API-based provider. "Enable AI Features" can only be turned on after a successful Test Connection.
 
 ### Managed Folder Layout
 

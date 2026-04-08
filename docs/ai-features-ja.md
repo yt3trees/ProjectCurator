@@ -2,7 +2,7 @@
 
 [< READMEに戻る](../README-ja.md)
 
-すべての AI 機能は `Settings > LLM API` で `Enable AI Features` をオンにする必要があります。対応プロバイダー: OpenAI / Azure OpenAI。
+すべての AI 機能は `Settings > LLM API` で `Enable AI Features` をオンにする必要があります。対応プロバイダー: OpenAI / Azure OpenAI / Claude Code CLI / Gemini CLI / Codex CLI / GitHub Copilot CLI。
 
 <a id="ai-features-overview-ja"></a>
 ## AI機能の全体像
@@ -50,10 +50,77 @@ flowchart LR
 <a id="setup-ja"></a>
 ## 初期設定
 
+### API型プロバイダー (OpenAI / Azure OpenAI)
+
 1. `Settings > LLM API` を開く
-2. プロバイダーを選択し、API Key と Model を入力 (Azure の場合は Endpoint / API Version も)
+2. `OpenAI` または `Azure OpenAI` を選択し、API Key と Model を入力 (Azure は Endpoint / API Version も必要)
 3. `Test Connection` をクリック
 4. テスト成功後、`Enable AI Features` をオンにして保存
+
+### CLI型プロバイダー (Claude Code CLI / Gemini CLI / Codex CLI)
+
+認証は各 CLI ツール側で管理するため、Curia の設定画面に API Key の入力は不要です。
+
+| プロバイダー | CLIツール | 認証方法 |
+|---|---|---|
+| Claude Code CLI | `claude` | `claude` を一度起動して認証 |
+| Gemini CLI | `gemini` | `gemini auth login` を実行 |
+| Codex CLI | `codex` | `OPENAI_API_KEY` 環境変数を設定、または Settings に API Key を入力すると Curia が自動で渡す |
+| GitHub Copilot CLI | `copilot` | `gh auth login` でサインイン (Copilot アクセス権が必要) |
+
+1. 各 CLI ツールをインストールし、認証を完了させる (上表参照)
+2. `Settings > LLM API` で CLI プロバイダーを選択し、必要に応じて Model を設定
+3. `Test Connection` をクリック
+4. テスト成功後、`Enable AI Features` をオンにして保存
+
+CLIプロバイダーに切り替えても API Key フィールドは残るため、APIプロバイダーに戻したいときに再入力は不要です。
+
+### CLIの呼び出し詳細
+
+Curia は各 CLI を Windows では `cmd.exe /c` 経由でサブプロセスとして実行します (`.cmd` スクリプトを正しく解決するため)。プロンプトはシステムプロンプトと会話履歴を1つのテキストブロックにまとめてから CLI に渡します。
+
+CLIプロバイダーはモデル指定に非対応です。各 CLI のデフォルトモデルが使用されます。
+
+#### Claude Code CLI
+
+```
+claude --print --output-format json
+```
+
+- プロンプトは **stdin** 経由で渡す
+- `--print` で非対話 (ヘッドレス) モードに切り替え
+- `--output-format json` で構造化 JSON を受け取り、`result` フィールドを抽出
+
+#### Gemini CLI
+
+```
+gemini --prompt "TEXT" --yolo --output-format text
+```
+
+- プロンプトは `--prompt` の引数値として渡す (stdin は使わない)
+- `--yolo` でツール実行の承認待ちをスキップ (非対話モードに必須)
+- `--output-format text` でプレーンテキスト出力
+
+#### Codex CLI
+
+```
+codex exec --skip-git-repo-check --json
+```
+
+- プロンプトは **stdin** 経由で渡す (Claude Code CLI と同方式)
+- `--skip-git-repo-check` で Git リポジトリ外でも実行可能
+- `--json` で NDJSON 構造化出力を有効化; `item.completed` / `agent_message` エントリから本文を抽出
+- Settings に API Key が入力されている場合は `OPENAI_API_KEY` 環境変数として自動で渡す
+- 位置引数ではなく stdin を使うことで、長いプロンプトの Windows コマンドライン長制限 (32767 文字) を回避
+
+#### GitHub Copilot CLI
+
+```
+copilot -p "TEXT"
+```
+
+- プロンプトは `-p` の引数値として渡す
+- 出力はプレーンテキストのためパース処理なし
 
 <a id="user-profile-ja"></a>
 ## ユーザープロフィール

@@ -125,6 +125,9 @@ public partial class SettingsViewModel : ObservableObject
     private bool llmIsAzure;
 
     [ObservableProperty]
+    private bool isCliProvider;
+
+    [ObservableProperty]
     private bool aiEnabled;
 
     // Test Connection が成功するまでトグルを有効化できない
@@ -228,6 +231,7 @@ public partial class SettingsViewModel : ObservableObject
             LlmUserProfile     = settings.LlmUserProfile;
             LlmLanguage        = string.IsNullOrWhiteSpace(settings.LlmLanguage) ? "English" : settings.LlmLanguage;
             LlmIsAzure         = settings.LlmProvider.Equals("azure_openai", StringComparison.OrdinalIgnoreCase);
+            IsCliProvider      = LlmClientService.IsCliProvider(settings.LlmProvider);
             LlmStatus          = "";
             AiEnabled          = settings.AiEnabled;
             AiToggleCanEnable  = settings.AiEnabled; // 既にオンなら再テスト不要
@@ -367,7 +371,8 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnLlmProviderChanged(string value)
     {
         if (_loading) return;
-        LlmIsAzure = value.Equals("azure_openai", StringComparison.OrdinalIgnoreCase);
+        LlmIsAzure    = value.Equals("azure_openai", StringComparison.OrdinalIgnoreCase);
+        IsCliProvider  = LlmClientService.IsCliProvider(value);
     }
 
     [RelayCommand]

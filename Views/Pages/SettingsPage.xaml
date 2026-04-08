@@ -463,9 +463,31 @@
                               Background="{DynamicResource AppSurface1}"
                               Foreground="{DynamicResource AppText}"
                               BorderBrush="{DynamicResource AppSurface2}">
-                        <ComboBoxItem Tag="openai" Content="OpenAI"/>
+                        <ComboBoxItem Tag="openai"       Content="OpenAI"/>
                         <ComboBoxItem Tag="azure_openai" Content="Azure OpenAI (Microsoft Foundry)"/>
+                        <ComboBoxItem Tag="claude_code"    Content="Claude Code CLI (claude)"/>
+                        <ComboBoxItem Tag="gemini_cli"     Content="Gemini CLI (gemini)"/>
+                        <ComboBoxItem Tag="codex_cli"      Content="Codex CLI (codex)"/>
+                        <ComboBoxItem Tag="github_copilot" Content="GitHub Copilot CLI (copilot)"/>
                     </ComboBox>
+
+                    <!-- CLI プロバイダの案内 -->
+                    <TextBlock FontSize="11" Margin="0,0,0,8" TextWrapping="Wrap">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AppSubtext0}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsCliProvider}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                        Auth is managed by the CLI tool itself (login with the CLI separately).
+                        API Key below is optional — leave it set to switch back to an API-based provider quickly.
+                        For Codex CLI, the key is passed as OPENAI_API_KEY if provided.
+                    </TextBlock>
 
                     <TextBlock Text="API Key" FontSize="12" Foreground="{DynamicResource AppSubtext0}"/>
                     <ui:PasswordBox x:Name="LlmApiKeyBox"
