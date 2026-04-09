@@ -116,6 +116,7 @@ public class WikiIngestService
             if (llmResp == null)
                 return Fail("Failed to parse LLM response as JSON.");
             CanonicalizeResultTags(llmResp, existingTags);
+            RescueSpecialPaths(llmResp);
 
             progress?.Report("Proposal generated. Awaiting review.");
             AppendLog(wikiRoot, $"[GenerateProposal] OK — newPages={llmResp.NewPages.Count}, updatedPages={llmResp.UpdatedPages.Count}, summary={llmResp.Summary}");
@@ -660,6 +661,53 @@ Select up to {MaxUpdateCandidates} existing pages that most likely need updates.
     }
 
     // ---- JSON パース ----
+
+    /// <summary>
+    /// LLMが index.md / log.md を newPages / updatedPages に誤って含めた場合に
+    /// 専用フィールド (IndexUpdate / LogEntry) へ移し替える。
+    /// </summary>
+    private static void RescueSpecialPaths(IngestLlmResponse resp)
+    {
+        // index.md を newPages から救済
+        var indexNew = resp.NewPages.FirstOrDefault(p =>
+            p.Path.Equals("index.md", StringComparison.OrdinalIgnoreCase));
+        if (indexNew != null)
+        {
+            if (string.IsNullOrWhiteSpace(resp.IndexUpdate))
+                resp.IndexUpdate = indexNew.Content;
+            resp.NewPages.Remove(indexNew);
+        }
+
+        // index.md を updatedPages から救済
+        var indexUpd = resp.UpdatedPages.FirstOrDefault(p =>
+            p.Path.Equals("index.md", StringComparison.OrdinalIgnoreCase));
+        if (indexUpd != null)
+        {
+            if (string.IsNullOrWhiteSpace(resp.IndexUpdate))
+                resp.IndexUpdate = indexUpd.Diff;
+            resp.UpdatedPages.Remove(indexUpd);
+        }
+
+        // log.md を newPages から救済
+        var logNew = resp.NewPages.FirstOrDefault(p =>
+            p.Path.Equals("log.md", StringComparison.OrdinalIgnoreCase));
+        if (logNew != null)
+        {
+            if (string.IsNullOrWhiteSpace(resp.LogEntry))
+                resp.LogEntry = logNew.Content;
+            resp.NewPages.Remove(logNew);
+        }
+
+        // log.md を updatedPages から救済
+        var logUpd = resp.UpdatedPages.FirstOrDefault(p =>
+            p.Path.Equals("log.md", StringComparison.OrdinalIgnoreCase));
+        if (logUpd != null)
+        {
+            if (string.IsNullOrWhiteSpace(resp.LogEntry))
+                resp.LogEntry = logUpd.Diff;
+            resp.UpdatedPages.Remove(logUpd);
+        }
+    }
 
     private static IngestLlmResponse? ParseLlmResponse(string raw)
     {
