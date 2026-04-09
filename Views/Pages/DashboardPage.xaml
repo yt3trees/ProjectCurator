@@ -879,7 +879,7 @@
                                   VerticalAlignment="Center"/>
 
                         <ui:Button Grid.Column="3"
-                                   Content="{Binding ShowAllTasks, Converter={StaticResource ShowAllLabelConverter}}"
+                                   Content="{Binding ShowAllButtonLabel}"
                                    Command="{Binding ToggleShowAllCommand}"
                                    Height="34" Padding="10,0" FontSize="11" Margin="0,0,6,0"
                                    Appearance="Secondary"/>

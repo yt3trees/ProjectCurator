@@ -397,7 +397,7 @@ public partial class DashboardViewModel : ObservableObject
                 .ToList();
         }
 
-        var limit = ShowAllTasks ? 100 : TodayQueueLimit;
+        var limit = ShowAllTasks ? int.MaxValue : TodayQueueLimit;
         var visible = tasks.Where(t => !_todayQueueService.IsSnoozed(t.SnoozeKey)).Take(limit).ToList();
         var snoozed = tasks.Count(t => _todayQueueService.IsSnoozed(t.SnoozeKey));
 
@@ -764,10 +764,13 @@ public partial class DashboardViewModel : ObservableObject
 
     public void OpenInTimeline(ProjectCardViewModel card) => OnOpenInTimeline?.Invoke(card.Info);
 
+    public string ShowAllButtonLabel => ShowAllTasks ? $"Show Top {TodayQueueLimit}" : "Show All";
+
     [RelayCommand]
     private void ToggleShowAll()
     {
         ShowAllTasks = !ShowAllTasks;
+        OnPropertyChanged(nameof(ShowAllButtonLabel));
         ApplyProjectFilter();
     }
 }
