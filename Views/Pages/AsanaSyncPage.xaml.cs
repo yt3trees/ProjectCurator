@@ -1,5 +1,6 @@
+using System.Collections.Specialized;
 using System.Windows;
-using System.Windows.Controls;
+using System.Windows.Threading;
 using Wpf.Ui.Controls;
 using Curia.ViewModels;
 using WpfUserControl = System.Windows.Controls.UserControl;
@@ -19,11 +20,15 @@ public partial class AsanaSyncPage : WpfUserControl, INavigableView<AsanaSyncVie
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        ViewModel.LogEntries.CollectionChanged += OnLogEntriesChanged;
         await ViewModel.InitAsync();
     }
 
-    private void OnOutputTextChanged(object sender, TextChangedEventArgs e)
+    private void OnLogEntriesChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        OutputTextBox.ScrollToEnd();
+        if (e.Action == NotifyCollectionChangedAction.Add)
+            Dispatcher.InvokeAsync(() => LogScrollViewer.ScrollToBottom(), DispatcherPriority.Background);
+        else if (e.Action == NotifyCollectionChangedAction.Reset)
+            Dispatcher.InvokeAsync(() => LogScrollViewer.ScrollToTop(), DispatcherPriority.Background);
     }
 }

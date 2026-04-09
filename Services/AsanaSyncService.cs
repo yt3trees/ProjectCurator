@@ -100,6 +100,8 @@ public class AsanaSyncService
             Log($"  --- {proj.Name} ---");
 
             var sections = new List<ProjectSection>();
+            if (proj.AsanaProjectGids.Count == 0)
+                Log("    (no Asana GIDs configured)");
             foreach (var gid in proj.AsanaProjectGids)
             {
                 var asanaProjectName = await FetchProjectNameAsync(gid, token, Log, ct);
@@ -109,7 +111,7 @@ public class AsanaSyncService
                 tasks = tasks.Where(t => IsOwnedOrCollaborating(t, userGid)).ToList();
                 foreach (var task in tasks)
                     task.SourceProjectGid = gid;
-                Log($"    -> {tasks.Count} tasks (担当/コラボのみ)");
+                Log($"    -> {tasks.Count} tasks (assignee/collaborator only)");
 
                 foreach (var task in tasks.Where(t => t.NumSubtasks > 0))
                     task.SubtasksData = await FetchSubtasksAsync(task.Gid, token, Log, ct);
@@ -134,7 +136,7 @@ public class AsanaSyncService
             tasks = tasks.Where(t => IsOwnedOrCollaborating(t, userGid)).ToList();
             foreach (var task in tasks)
                 task.SourceProjectGid = gid;
-            Log($"  -> {tasks.Count} tasks (担当/コラボのみ)");
+            Log($"  -> {tasks.Count} tasks (assignee/collaborator only)");
 
             foreach (var task in tasks)
             {

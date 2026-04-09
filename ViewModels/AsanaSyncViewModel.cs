@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -36,8 +37,9 @@ public partial class AsanaSyncViewModel : ObservableObject
     [ObservableProperty]
     private string lastSyncTime = "--";
 
-    [ObservableProperty]
-    private string outputLog = "";
+    public ObservableCollection<SyncLogEntry> LogEntries { get; } = [];
+
+    private string _lineBuffer = "";
 
     [ObservableProperty]
     private string asanaConfigGids = "";
@@ -105,7 +107,11 @@ public partial class AsanaSyncViewModel : ObservableObject
     private async Task Sync() => await RunSyncAsync();
 
     [RelayCommand]
-    private void ClearOutput() => OutputLog = "";
+    private void ClearOutput()
+    {
+        LogEntries.Clear();
+        _lineBuffer = "";
+    }
 
     [RelayCommand]
     private void SaveSchedule()
@@ -266,12 +272,83 @@ public partial class AsanaSyncViewModel : ObservableObject
 
     // ----- プライベート -----
 
+    private static readonly Regex StepRx        = new(@"^\[(\d+/\d+)\]\s+(.+)$",                RegexOptions.Compiled);
+    private static readonly Regex SectionRx      = new(@"^\s*---\s+(.+?)\s+---\s*$",             RegexOptions.Compiled);
+    private static readonly Regex SectionEqRx    = new(@"^\s*===\s+(.+?)\s+===\s*$",             RegexOptions.Compiled);
+    private static readonly Regex FetchingRx     = new(@"^Fetching:\s+(.+)\s+\((\d{10,})\)$",   RegexOptions.Compiled);
+    private static readonly Regex FetchResultRx  = new(@"^->\s+(\d+)\s+tasks\s+\((.+?)\)$",     RegexOptions.Compiled);
+    private static readonly Regex FoundRx        = new(@"^Found:\s+(.+?)\s+\((.+?)\)$",          RegexOptions.Compiled);
+    private static readonly Regex OutputRx       = new(@"^\s*Output:\s+(.+)$",                    RegexOptions.Compiled);
+
+    private static SyncLogEntry ParseLine(string line)
+    {
+        var trimmed = line.Trim();
+
+        if (string.IsNullOrEmpty(trimmed))
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Empty };
+
+        if (trimmed == "---")
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Separator };
+
+        if (trimmed.StartsWith(">>> "))
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Header, Text = trimmed[4..] };
+
+        var stepM = StepRx.Match(trimmed);
+        if (stepM.Success)
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Step, Badge = stepM.Groups[1].Value, Text = stepM.Groups[2].Value };
+
+        var secM = SectionRx.Match(trimmed);
+        if (secM.Success)
+        {
+            var name = secM.Groups[1].Value;
+            return name.StartsWith("Done", StringComparison.OrdinalIgnoreCase)
+                ? new SyncLogEntry { Kind = SyncLogEntryKind.Done, Text = name }
+                : new SyncLogEntry { Kind = SyncLogEntryKind.Section, Text = name };
+        }
+
+        var secEqM = SectionEqRx.Match(trimmed);
+        if (secEqM.Success)
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Section, Text = secEqM.Groups[1].Value };
+
+        if (trimmed.StartsWith("(no ", StringComparison.OrdinalIgnoreCase) && trimmed.EndsWith(")"))
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Skipped, Text = trimmed.Trim('(', ')') };
+
+        if (trimmed.StartsWith("[ERROR]", StringComparison.OrdinalIgnoreCase))
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Error, Text = trimmed };
+
+        if (trimmed.Contains("Sync complete", StringComparison.OrdinalIgnoreCase))
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Done, Text = trimmed };
+
+        var outputM = OutputRx.Match(trimmed);
+        if (outputM.Success)
+        {
+            var path = outputM.Groups[1].Value.Trim();
+            var parts = path.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var display = parts.Length >= 2 ? string.Join("/", parts[^2..]) : Path.GetFileName(path);
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Output, Text = display, SubText = path };
+        }
+
+        var fetchingM = FetchingRx.Match(trimmed);
+        if (fetchingM.Success)
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Fetching, Text = fetchingM.Groups[1].Value, SubText = fetchingM.Groups[2].Value };
+
+        var fetchResultM = FetchResultRx.Match(trimmed);
+        if (fetchResultM.Success)
+            return new SyncLogEntry { Kind = SyncLogEntryKind.FetchResult, Text = $"{fetchResultM.Groups[1].Value} tasks", SubText = fetchResultM.Groups[2].Value };
+
+        var foundM = FoundRx.Match(trimmed);
+        if (foundM.Success)
+            return new SyncLogEntry { Kind = SyncLogEntryKind.Found, Text = foundM.Groups[1].Value, SubText = foundM.Groups[2].Value };
+
+        return new SyncLogEntry { Kind = SyncLogEntryKind.Info, Text = trimmed };
+    }
+
     private async Task RunSyncAsync()
     {
         if (IsSyncing) return;
 
         IsSyncing = true;
-        AppendOutput($">>> Asana Sync (C#)\n---\n");
+        AppendOutput($">>> Asana Sync\n---\n");
 
         try
         {
@@ -309,7 +386,17 @@ public partial class AsanaSyncViewModel : ObservableObject
 
     private void AppendOutput(string text)
     {
-        Application.Current.Dispatcher.InvokeAsync(() => OutputLog += text);
+        Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            _lineBuffer += text;
+            int newlineIdx;
+            while ((newlineIdx = _lineBuffer.IndexOf('\n')) >= 0)
+            {
+                var line = _lineBuffer[..newlineIdx].TrimEnd('\r');
+                _lineBuffer = _lineBuffer[(newlineIdx + 1)..];
+                LogEntries.Add(ParseLine(line));
+            }
+        });
     }
 
     private static (string ProjectGid, string WorkstreamId)? ParseWorkstreamMapLine(string line)

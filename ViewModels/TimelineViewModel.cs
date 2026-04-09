@@ -75,6 +75,7 @@ public partial class TimelineViewModel : ObservableObject
     private List<ProjectInfo> _allProjects = [];
     private List<string> _hiddenKeys = [];
     private List<TimelineRawEntry> _cachedRawEntries = [];
+    private CancellationTokenSource? _heatmapCts;
 
     [ObservableProperty]
     private ObservableCollection<ProjectInfo> projects = [];
@@ -330,6 +331,12 @@ public partial class TimelineViewModel : ObservableObject
 
     public async Task LoadHeatmapAsync()
     {
+        // 前回の実行をキャンセルして重複ロードを防ぐ
+        _heatmapCts?.Cancel();
+        _heatmapCts?.Dispose();
+        _heatmapCts = new CancellationTokenSource();
+        var cts = _heatmapCts;
+
         HeatmapBuckets.Clear();
         HeatmapRows.Clear();
         GraphStatsText = "";
@@ -344,11 +351,15 @@ public partial class TimelineViewModel : ObservableObject
         IsGraphLoading = true;
         try
         {
+            var snapshot = Projects.ToList();
             var result = await Task.Run(() => BuildHeatmap(
-                [.. Projects],
+                snapshot,
                 SelectedProject,
                 DaysBack,
-                SelectedGraphScope));
+                SelectedGraphScope), cts.Token);
+
+            if (cts.IsCancellationRequested)
+                return;
 
             foreach (var bucket in result.Buckets)
                 HeatmapBuckets.Add(bucket);
@@ -358,6 +369,10 @@ public partial class TimelineViewModel : ObservableObject
             GraphStatsText = result.Stats;
             GraphEmptyText = result.EmptyText;
         }
+        catch (OperationCanceledException)
+        {
+            // 後続の呼び出しがあるため無視
+        }
         catch (Exception ex)
         {
             Debug.WriteLine($"[Timeline] LoadHeatmapAsync failed: {ex}");
@@ -365,7 +380,8 @@ public partial class TimelineViewModel : ObservableObject
         }
         finally
         {
-            IsGraphLoading = false;
+            if (!cts.IsCancellationRequested)
+                IsGraphLoading = false;
         }
     }
 
@@ -533,13 +549,7 @@ public partial class TimelineViewModel : ObservableObject
 
         int maxCount = grouped.Count > 0 ? grouped.Values.Max(v => v.Total) : 0;
 
-        var projectsWithEntries = rawEntries
-            .Select(e => e.ProjectHiddenKey)
-            .Distinct()
-            .ToHashSet(StringComparer.Ordinal);
-
         var rows = scopeProjects
-            .Where(p => projectsWithEntries.Contains(p.HiddenKey))
             .Select(project =>
             {
                 var row = new TimelineHeatmapRowItem

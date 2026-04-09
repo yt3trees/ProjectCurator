@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
+using Curia.Models;
 using MediaBrush = System.Windows.Media.Brush;
 using MediaColor = System.Windows.Media.Color;
 
@@ -125,5 +126,84 @@ public class HeatmapTypedCellConverter : IMultiValueConverter
     }
 
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+
+/// <summary>null または空文字列を Collapsed、それ以外を Visible に変換する。</summary>
+public class NullOrEmptyToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => string.IsNullOrEmpty(value as string) ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+
+/// <summary>SyncLogEntryKind をアイコン文字に変換する。</summary>
+public class SyncLogKindToIconConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not SyncLogEntryKind kind) return "";
+        return kind switch
+        {
+            SyncLogEntryKind.Found       => "✓",
+            SyncLogEntryKind.Fetching    => "↓",
+            SyncLogEntryKind.FetchResult => "→",
+            SyncLogEntryKind.Output      => "▸",
+            SyncLogEntryKind.Done        => "✔",
+            SyncLogEntryKind.Error       => "✗",
+            SyncLogEntryKind.Skipped     => "–",
+            _                            => "",
+        };
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+
+/// <summary>SyncLogEntryKind をテキスト色ブラシに変換する。</summary>
+public class SyncLogKindToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not SyncLogEntryKind kind) return DependencyProperty.UnsetValue;
+        var key = kind switch
+        {
+            SyncLogEntryKind.Found       => "AppGreen",
+            SyncLogEntryKind.Fetching    => "AppBlue",
+            SyncLogEntryKind.FetchResult => "AppSubtext0",
+            SyncLogEntryKind.Output      => "AppYellow",
+            SyncLogEntryKind.Done        => "AppGreen",
+            SyncLogEntryKind.Error       => "AppRed",
+            SyncLogEntryKind.Info        => "AppSubtext0",
+            SyncLogEntryKind.Skipped     => "AppOverlay0",
+            _                            => "AppText",
+        };
+        return Application.Current.TryFindResource(key) ?? System.Windows.Media.Brushes.White;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+
+/// <summary>SyncLogEntryKind を左インデント用 Thickness に変換する。</summary>
+public class SyncLogKindToMarginConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not SyncLogEntryKind kind) return new Thickness(8, 0, 8, 0);
+        return kind switch
+        {
+            SyncLogEntryKind.Found       => new Thickness(16, 0, 8, 0),
+            SyncLogEntryKind.Output      => new Thickness(16, 0, 8, 0),
+            SyncLogEntryKind.Fetching    => new Thickness(24, 0, 8, 0),
+            SyncLogEntryKind.FetchResult => new Thickness(32, 0, 8, 0),
+            SyncLogEntryKind.Skipped     => new Thickness(16, 0, 8, 0),
+            _                            => new Thickness(8, 0, 8, 0),
+        };
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotImplementedException();
 }

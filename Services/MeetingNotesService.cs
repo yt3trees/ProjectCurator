@@ -685,12 +685,30 @@ public class MeetingNotesService
 
         if (sectionIdx < 0)
         {
-            // セクションが存在しない場合は末尾に追加
-            if (lines.Count > 0 && !string.IsNullOrWhiteSpace(lines[^1]))
-                lines.Add("");
-            lines.Add(sectionCandidates[0]); // 日本語見出し
-            foreach (var item in items)
-                lines.Add($"- {item}");
+            // セクションが存在しない場合: Last Update 行の前に挿入 (後ろにならないように)
+            var lastUpdatePattern = new Regex(@"^(Last Update|Last Updated|更新)[:：]", RegexOptions.IgnoreCase);
+            int lastUpdateIdx = -1;
+            for (int i = lines.Count - 1; i >= 0; i--)
+            {
+                if (lastUpdatePattern.IsMatch(lines[i].TrimEnd()))
+                {
+                    lastUpdateIdx = i;
+                    break;
+                }
+            }
+
+            // 挿入位置: Last Update 行の前 (前後の空行を除いた位置)、なければ末尾
+            int insertAt = lastUpdateIdx >= 0 ? lastUpdateIdx : lines.Count;
+            while (insertAt > 0 && string.IsNullOrWhiteSpace(lines[insertAt - 1]))
+                insertAt--;
+
+            var toInsert = new List<string>();
+            if (insertAt > 0 && !string.IsNullOrWhiteSpace(lines[insertAt - 1]))
+                toInsert.Add("");
+            toInsert.Add(sectionCandidates[0]);
+            toInsert.AddRange(items.Select(it => $"- {it}"));
+
+            lines.InsertRange(insertAt, toInsert);
             return lines;
         }
 

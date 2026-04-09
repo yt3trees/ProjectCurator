@@ -678,7 +678,7 @@ public partial class EditorViewModel : ObservableObject
         if (SelectedProject == null) return;
 
         var settings = _configService.LoadSettings();
-        if (string.IsNullOrWhiteSpace(settings.LlmApiKey))
+        if (!LlmClientService.IsCliProvider(settings.LlmProvider) && string.IsNullOrWhiteSpace(settings.LlmApiKey))
         {
             MessageBox.Show(
                 "LLM API key is not configured.\nPlease open Settings and set the API key under \"LLM API\".",
