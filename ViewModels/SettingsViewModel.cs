@@ -50,6 +50,22 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string captureHotkeyKey = "C";
 
+    // コマンドパレットホットキー
+    [ObservableProperty]
+    private bool commandPaletteHotkeyCtrl = true;
+
+    [ObservableProperty]
+    private bool commandPaletteHotkeyShift = true;
+
+    [ObservableProperty]
+    private bool commandPaletteHotkeyAlt;
+
+    [ObservableProperty]
+    private bool commandPaletteHotkeyWin;
+
+    [ObservableProperty]
+    private string commandPaletteHotkeyKey = "K";
+
     // スタートアップ
     [ObservableProperty]
     private bool startupEnabled;
@@ -211,6 +227,15 @@ public partial class SettingsViewModel : ObservableObject
             CaptureHotkeyWin = capMods.Contains("Win", StringComparer.OrdinalIgnoreCase);
             CaptureHotkeyKey = chk.Key;
 
+            var cpk = settings.CommandPaletteHotkey ?? new HotkeyConfig { Modifiers = "Ctrl+Shift", Key = "K" };
+            var cpMods = cpk.Modifiers.Split('+',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            CommandPaletteHotkeyCtrl = cpMods.Contains("Ctrl", StringComparer.OrdinalIgnoreCase);
+            CommandPaletteHotkeyShift = cpMods.Contains("Shift", StringComparer.OrdinalIgnoreCase);
+            CommandPaletteHotkeyAlt = cpMods.Contains("Alt", StringComparer.OrdinalIgnoreCase);
+            CommandPaletteHotkeyWin = cpMods.Contains("Win", StringComparer.OrdinalIgnoreCase);
+            CommandPaletteHotkeyKey = cpk.Key;
+
             StartupEnabled = File.Exists(GetStartupShortcutPath());
 
             var asana = _configService.LoadAsanaGlobalConfig();
@@ -291,6 +316,24 @@ public partial class SettingsViewModel : ObservableObject
 
         var settings = _configService.LoadSettings();
         settings.CaptureHotkey = new HotkeyConfig { Modifiers = modStr, Key = CaptureHotkeyKey.Trim() };
+        _configService.SaveSettings(settings);
+    }
+
+    [RelayCommand]
+    public void ApplyCommandPaletteHotkey()
+    {
+        var mods = new List<string>();
+        if (CommandPaletteHotkeyCtrl) mods.Add("Ctrl");
+        if (CommandPaletteHotkeyShift) mods.Add("Shift");
+        if (CommandPaletteHotkeyAlt) mods.Add("Alt");
+        if (CommandPaletteHotkeyWin) mods.Add("Win");
+        var modStr = string.Join("+", mods);
+        if (string.IsNullOrWhiteSpace(CommandPaletteHotkeyKey)) return;
+
+        _hotkeyService.ReRegisterCommandPalette(modStr, CommandPaletteHotkeyKey.Trim());
+
+        var settings = _configService.LoadSettings();
+        settings.CommandPaletteHotkey = new HotkeyConfig { Modifiers = modStr, Key = CommandPaletteHotkeyKey.Trim() };
         _configService.SaveSettings(settings);
     }
 

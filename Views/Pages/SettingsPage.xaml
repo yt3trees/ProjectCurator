@@ -90,6 +90,39 @@
 
                     <Separator Background="{DynamicResource AppSurface2}" Margin="0,0,0,12"/>
 
+                    <TextBlock Text="Command Palette hotkey" FontSize="13" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AppText}" Margin="0,0,0,6"/>
+                    <TextBlock Text="Global shortcut to open the Command Palette window" FontSize="11"
+                               Foreground="{DynamicResource AppSubtext0}" Margin="0,0,0,10"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <CheckBox Content="Ctrl" IsChecked="{Binding CommandPaletteHotkeyCtrl}"
+                                  Foreground="{DynamicResource AppText}" Margin="0,0,12,0"
+                                  VerticalAlignment="Center"/>
+                        <CheckBox Content="Shift" IsChecked="{Binding CommandPaletteHotkeyShift}"
+                                  Foreground="{DynamicResource AppText}" Margin="0,0,12,0"
+                                  VerticalAlignment="Center"/>
+                        <CheckBox Content="Alt" IsChecked="{Binding CommandPaletteHotkeyAlt}"
+                                  Foreground="{DynamicResource AppText}" Margin="0,0,12,0"
+                                  VerticalAlignment="Center"/>
+                        <CheckBox Content="Win" IsChecked="{Binding CommandPaletteHotkeyWin}"
+                                  Foreground="{DynamicResource AppText}" Margin="0,0,12,0"
+                                  VerticalAlignment="Center"/>
+                        <TextBlock Text="+" Foreground="{DynamicResource AppSubtext0}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox Text="{Binding CommandPaletteHotkeyKey, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="48" MaxLength="10"
+                                 Foreground="{DynamicResource AppText}"
+                                 Background="{DynamicResource AppSurface1}"
+                                 BorderBrush="{DynamicResource AppSurface2}"
+                                 VerticalContentAlignment="Center"
+                                 Padding="4,2"/>
+                    </StackPanel>
+                    <ui:Button Content="Apply" Click="OnApplyCommandPaletteHotkey"
+                               Padding="16,6" FontSize="12" HorizontalAlignment="Left"
+                               Margin="0,0,0,12"/>
+
+                    <Separator Background="{DynamicResource AppSurface2}" Margin="0,0,0,12"/>
+
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>

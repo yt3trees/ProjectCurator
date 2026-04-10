@@ -7,6 +7,7 @@ internal static class Win32Interop
     public const int WM_HOTKEY = 0x0312;
     public const int HOTKEY_ID = 9000;
     public const int CAPTURE_HOTKEY_ID = 9001;
+    public const int COMMAND_PALETTE_HOTKEY_ID = 9002;
 
     public const uint MOD_ALT = 0x0001;
     public const uint MOD_CONTROL = 0x0002;
@@ -21,5 +22,6 @@ internal static class Win32Interop
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
 
 }

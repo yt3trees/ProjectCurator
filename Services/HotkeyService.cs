@@ -11,24 +11,29 @@ public interface IHotkeyService
     string HotkeyDisplayText { get; }
     Action? OnActivated { get; set; }
     Action? OnCaptureActivated { get; set; }
+    Action? OnCommandPaletteActivated { get; set; }
     void Register(Window window);
     void Unregister();
     void UpdateDisplay(string modifiers, string key);
     void ReRegister(string modifiers, string key);
     void ReRegisterCapture(string modifiers, string key);
+    void ReRegisterCommandPalette(string modifiers, string key);
 }
 
 public class HotkeyService : IHotkeyService
 {
     private HotkeyConfig _config;
     private HotkeyConfig _captureConfig;
+    private HotkeyConfig _commandPaletteConfig;
     private HwndSource? _hwndSource;
     private IntPtr _hwnd = IntPtr.Zero;
 
     public bool HotkeyRegistered { get; private set; }
     public bool CaptureHotkeyRegistered { get; private set; }
+    public bool CommandPaletteHotkeyRegistered { get; private set; }
     public Action? OnActivated { get; set; }
     public Action? OnCaptureActivated { get; set; }
+    public Action? OnCommandPaletteActivated { get; set; }
 
     /// <summary>現在のホットキー表示文字列 (例: "Ctrl+Shift+P")</summary>
     public string HotkeyDisplayText { get; private set; } = "";
@@ -38,6 +43,7 @@ public class HotkeyService : IHotkeyService
         var settings = configService.LoadSettings();
         _config = settings.Hotkey ?? new HotkeyConfig();
         _captureConfig = settings.CaptureHotkey ?? new HotkeyConfig { Modifiers = "Ctrl+Shift", Key = "C" };
+        _commandPaletteConfig = settings.CommandPaletteHotkey ?? new HotkeyConfig { Modifiers = "Ctrl+Shift", Key = "K" };
         HotkeyDisplayText = BuildDisplayText(_config.Modifiers, _config.Key);
     }
 
@@ -77,6 +83,20 @@ public class HotkeyService : IHotkeyService
         }
     }
 
+    public void ReRegisterCommandPalette(string modifiers, string key)
+    {
+        _commandPaletteConfig.Modifiers = modifiers;
+        _commandPaletteConfig.Key = key;
+
+        if (_hwnd != IntPtr.Zero)
+        {
+            Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.COMMAND_PALETTE_HOTKEY_ID);
+            var mods = ConvertModifiers(modifiers);
+            var vk = ConvertVirtualKey(key);
+            CommandPaletteHotkeyRegistered = Win32Interop.RegisterHotKey(_hwnd, Win32Interop.COMMAND_PALETTE_HOTKEY_ID, mods, vk);
+        }
+    }
+
     public void Register(Window window)
     {
         _hwnd = new WindowInteropHelper(window).Handle;
@@ -92,6 +112,11 @@ public class HotkeyService : IHotkeyService
         var captureVk = ConvertVirtualKey(_captureConfig.Key);
         Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.CAPTURE_HOTKEY_ID);
         CaptureHotkeyRegistered = Win32Interop.RegisterHotKey(_hwnd, Win32Interop.CAPTURE_HOTKEY_ID, captureMods, captureVk);
+
+        var paletteMods = ConvertModifiers(_commandPaletteConfig.Modifiers);
+        var paletteVk = ConvertVirtualKey(_commandPaletteConfig.Key);
+        Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.COMMAND_PALETTE_HOTKEY_ID);
+        CommandPaletteHotkeyRegistered = Win32Interop.RegisterHotKey(_hwnd, Win32Interop.COMMAND_PALETTE_HOTKEY_ID, paletteMods, paletteVk);
     }
 
     public void Unregister()
@@ -100,8 +125,10 @@ public class HotkeyService : IHotkeyService
         {
             Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.HOTKEY_ID);
             Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.CAPTURE_HOTKEY_ID);
+            Win32Interop.UnregisterHotKey(_hwnd, Win32Interop.COMMAND_PALETTE_HOTKEY_ID);
             HotkeyRegistered = false;
             CaptureHotkeyRegistered = false;
+            CommandPaletteHotkeyRegistered = false;
         }
         _hwndSource?.RemoveHook(WndProc);
         _hwndSource = null;
@@ -127,6 +154,11 @@ public class HotkeyService : IHotkeyService
             else if (id == Win32Interop.CAPTURE_HOTKEY_ID)
             {
                 OnCaptureActivated?.Invoke();
+                handled = true;
+            }
+            else if (id == Win32Interop.COMMAND_PALETTE_HOTKEY_ID)
+            {
+                OnCommandPaletteActivated?.Invoke();
                 handled = true;
             }
         }

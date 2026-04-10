@@ -30,9 +30,6 @@ public partial class CommandPaletteViewModel : ObservableObject
     private readonly IContentDialogService _contentDialogService;
 
     [ObservableProperty]
-    private bool isVisible;
-
-    [ObservableProperty]
     private string searchText = "";
 
     [ObservableProperty]
@@ -61,17 +58,20 @@ public partial class CommandPaletteViewModel : ObservableObject
         _contentDialogService = contentDialogService;
     }
 
-    public void Show()
+    public void Prepare()
     {
         BuildCommands();
         SearchText = "";
         UpdateFilter();
-        IsVisible = true;
     }
 
-    public void Hide()
+    /// <summary>
+    /// 選択中のコマンドを実行する。Window 側から呼ぶ。
+    /// </summary>
+    public void ExecuteSelected(Action<CommandItem> executor)
     {
-        IsVisible = false;
+        if (SelectedCommand != null)
+            executor(SelectedCommand);
     }
 
     partial void OnSearchTextChanged(string value)
@@ -87,89 +87,16 @@ public partial class CommandPaletteViewModel : ObservableObject
         AddTabCommand(commands, "Dashboard", typeof(DashboardPage));
         AddTabCommand(commands, "Editor", typeof(EditorPage));
         AddTabCommand(commands, "Timeline", typeof(TimelinePage));
+        AddTabCommand(commands, "Wiki", typeof(WikiPage));
         AddTabCommand(commands, "Git Repos", typeof(GitReposPage));
         AddTabCommand(commands, "Asana Sync", typeof(AsanaSyncPage));
+        AddTabCommand(commands, "Agent Hub", typeof(AgentHubPage));
         AddTabCommand(commands, "Setup", typeof(SetupPage));
         AddTabCommand(commands, "Settings", typeof(SettingsPage));
 
         // --- Global commands ---
-        commands.Add(new CommandItem
-        {
-            Label = "update focus",
-            Category = "project",
-            Display = "[>]  update focus (Update Focus from Asana)",
-            Action = async (w) =>
-            {
-                w.RootNavigation.Navigate(typeof(EditorPage));
-                await Task.Delay(50);
-                if (_editorViewModel.UpdateFocusCommand.CanExecute(null))
-                    await _editorViewModel.UpdateFocusCommand.ExecuteAsync(null);
-            }
-        });
-
         var settings = _configService.LoadSettings();
-        if (settings.AiEnabled)
-        {
-            commands.Add(new CommandItem
-            {
-                Label = "briefing",
-                Category = "project",
-                Display = "[>]  briefing (Context Briefing)",
-                Action = async (w) =>
-                {
-                    var selected = _editorViewModel.SelectedProject;
-                    if (selected != null)
-                    {
-                        await w.NavigateToDashboardAndShowBriefingAsync(selected);
-                        return;
-                    }
 
-                    w.RootNavigation.Navigate(typeof(DashboardPage));
-                    System.Windows.MessageBox.Show(
-                        "Select a project in Editor first, then run 'briefing'.",
-                        "Briefing",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                }
-            });
-
-            commands.Add(new CommandItem
-            {
-                Label = "meeting",
-                Category = "project",
-                Display = "[>]  meeting (Import Meeting Notes)",
-                Action = async (w) =>
-                {
-                    w.RootNavigation.Navigate(typeof(EditorPage));
-                    await Task.Delay(50);
-                    if (_editorViewModel.ImportMeetingNotesCommand.CanExecute(null))
-                        await _editorViewModel.ImportMeetingNotesCommand.ExecuteAsync(null);
-                }
-            });
-        }
-
-        commands.Add(new CommandItem
-        {
-            Label = "standup",
-            Category = "project",
-            Display = "[>]  standup (Daily Standup)",
-            Action = async (w) =>
-            {
-                try
-                {
-                    await _standupGeneratorService.TryGenerateTodayAsync();
-                    var standupPath = _standupGeneratorService.GetTodayStandupPath();
-                    if (!string.IsNullOrEmpty(standupPath) && File.Exists(standupPath))
-                        w.NavigateToEditorAndOpenFile(
-                            new ProjectInfo { Name = "Standup", Path = Path.GetDirectoryName(standupPath) ?? "" },
-                            standupPath);
-                }
-                catch (Exception ex)
-                {
-                    System.Windows.MessageBox.Show($"Standup error: {ex.Message}");
-                }
-            }
-        });
 
         // --- Project commands ---
         var projects = _discoveryService.GetProjectInfoList();
@@ -213,19 +140,36 @@ public partial class CommandPaletteViewModel : ObservableObject
                 Action = (w) => OpenTerminalAtPath(localPath)
             });
 
-            // > dir ProjectName
+            // > dir ProjectName (root)
             commands.Add(new CommandItem
             {
                 Label = $"dir {localName}",
-                Category = "project",
-                Display = $"[>]  dir {displayName}",
-                Action = (w) => {
-                    if (Directory.Exists(localPath))
-                    {
-                        Process.Start(new ProcessStartInfo("explorer.exe", localPath) { UseShellExecute = true });
-                    }
-                }
+                Category = "dir",
+                Display = $"[dir]  {displayName}",
+                Action = (_) => { if (Directory.Exists(localPath)) OpenExplorer(localPath); }
             });
+
+            // dir <subfolder> ProjectName
+            var subFolders = new (string Tag, string Path)[]
+            {
+                ("docs",    System.IO.Path.Combine(localPath, "shared", "docs")),
+                ("work",    System.IO.Path.Combine(localPath, "shared", "_work")),
+                ("develop", System.IO.Path.Combine(localPath, "development", "source")),
+                ("shared",  System.IO.Path.Combine(localPath, "shared")),
+                ("ai",      System.IO.Path.Combine(localPath, "_ai-context")),
+            };
+            foreach (var (tag, folderPath) in subFolders)
+            {
+                if (!Directory.Exists(folderPath)) continue;
+                var capturedPath = folderPath;
+                commands.Add(new CommandItem
+                {
+                    Label = $"dir {tag} {localName}",
+                    Category = "dir",
+                    Display = $"[dir]  {tag} / {displayName}",
+                    Action = (_) => OpenExplorer(capturedPath)
+                });
+            }
 
             // @ ProjectName (editor shortcut)
             commands.Add(new CommandItem
@@ -276,7 +220,11 @@ public partial class CommandPaletteViewModel : ObservableObject
             Label = label,
             Category = "tab",
             Display = $"[Tab]  {label}",
-            Action = (w) => w.RootNavigation.Navigate(pageType)
+            Action = (w) =>
+            {
+                w.RootNavigation.Navigate(pageType);
+                w.BringToFront();
+            }
         });
     }
 
@@ -294,6 +242,11 @@ public partial class CommandPaletteViewModel : ObservableObject
         else if (rawText.StartsWith("@"))
         {
             categoryFilter = "editor";
+            searchText = rawText.Substring(1).Trim().ToLower();
+        }
+        else if (rawText.StartsWith("/"))
+        {
+            categoryFilter = "dir";
             searchText = rawText.Substring(1).Trim().ToLower();
         }
 
@@ -337,16 +290,9 @@ public partial class CommandPaletteViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    public void ExecuteCommand(MainWindow window)
-    {
-        if (SelectedCommand != null)
-        {
-            var action = SelectedCommand.Action;
-            Hide();
-            action?.Invoke(window);
-        }
-    }
+
+    private static void OpenExplorer(string folderPath)
+        => Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folderPath}\"") { UseShellExecute = true });
 
     private void OpenTerminalAtPath(string path)
     {
@@ -433,7 +379,7 @@ public partial class CommandPaletteViewModel : ObservableObject
             Directory.CreateDirectory(workDir);
         }
 
-        Process.Start(new ProcessStartInfo("explorer.exe", workDir) { UseShellExecute = true });
+        OpenExplorer(workDir);
         OpenTerminalAtPath(workDir);
     }
 }

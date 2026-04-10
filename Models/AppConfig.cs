@@ -58,6 +58,7 @@ public class AppSettings
     public string ObsidianVaultRoot { get; set; } = "";
     public HotkeyConfig? Hotkey { get; set; }
     public HotkeyConfig? CaptureHotkey { get; set; }
+    public HotkeyConfig? CommandPaletteHotkey { get; set; }
     public AsanaSyncConfig? AsanaSync { get; set; }
 
     // LLM API 設定 (Update Focus from Asana 機能用)

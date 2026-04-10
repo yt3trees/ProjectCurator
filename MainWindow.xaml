@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:pages="clr-namespace:Curia.Views.Pages"
-    xmlns:controls="clr-namespace:Curia.Views.Controls"
+
     Title="Curia"
     Width="1150" Height="850"
     MinWidth="800" MinHeight="500"
@@ -109,9 +109,6 @@
                 </ui:NavigationView.ContentOverlay>
 
             </ui:NavigationView>
-
-            <!-- コマンドパレット・オーバーレイ -->
-            <controls:CommandPaletteOverlay x:Name="CommandPalette" DataContext="{Binding CommandPaletteViewModel}" />
 
             <!-- ContentDialog Host (overlay over entire window) -->
             <ContentPresenter x:Name="RootContentDialogPresenter"

@@ -84,6 +84,9 @@ public partial class SettingsPage : WpfUserControl, INavigableView<SettingsViewM
     private void OnApplyCaptureHotkey(object sender, RoutedEventArgs e)
         => ViewModel.ApplyCaptureHotkeyCommand.Execute(null);
 
+    private void OnApplyCommandPaletteHotkey(object sender, RoutedEventArgs e)
+        => ViewModel.ApplyCommandPaletteHotkeyCommand.Execute(null);
+
     private void OnLlmApiKeyChanged(object sender, RoutedEventArgs e)
     {
         // PasswordBox → ViewModel に手動同期

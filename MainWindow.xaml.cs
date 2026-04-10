@@ -30,6 +30,7 @@ public partial class MainWindow : FluentWindow
     private readonly CaptureService _captureService;
     private IntPtr _hwnd;
     private CaptureWindow? _activeCaptureWindow;
+    private CommandPaletteWindow? _activeCommandPaletteWindow;
 
     // ウィンドウが画面上に表示されているかのフラグ (Hide() を使わない方式)
     private bool _isShownOnScreen = false;
@@ -294,6 +295,7 @@ public partial class MainWindow : FluentWindow
         // ホットキー登録
         _hotkeyService.OnActivated = ToggleVisibility;
         _hotkeyService.OnCaptureActivated = ShowCaptureWindow;
+        _hotkeyService.OnCommandPaletteActivated = ShowCommandPaletteWindow;
         _hotkeyService.Register(this);
 
         // トレイアイコン初期化
@@ -389,7 +391,7 @@ public partial class MainWindow : FluentWindow
                     e.Handled = true;
                     break;
                 case WpfKey.K:
-                    _viewModel.CommandPaletteViewModel.Show();
+                    ShowCommandPaletteWindow();
                     e.Handled = true;
                     break;
             }
@@ -407,6 +409,20 @@ public partial class MainWindow : FluentWindow
         {
             // ウィンドウを画面中央に移動し、次フレームで FlashBlocker を非表示
             MoveOnScreen();
+        }
+    }
+
+    /// <summary>
+    /// アプリ本体を前面に表示する（非表示の場合は表示、既に表示中の場合はアクティブ化のみ）。
+    /// </summary>
+    public void BringToFront()
+    {
+        if (!_isShownOnScreen)
+            MoveOnScreen();
+        else
+        {
+            Activate();
+            Focus();
         }
     }
 
@@ -539,6 +555,27 @@ public partial class MainWindow : FluentWindow
         };
 
         captureWindow.ShowDialog();
+    }
+
+    /// <summary>
+    /// Command Palette ウィンドウを表示する。Ctrl+K および Ctrl+Shift+K グローバルホットキーから呼ばれる。
+    /// </summary>
+    public void ShowCommandPaletteWindow()
+    {
+        if (_activeCommandPaletteWindow != null)
+        {
+            _activeCommandPaletteWindow.Activate();
+            return;
+        }
+
+        var vm = _viewModel.CommandPaletteViewModel;
+        vm.Prepare();
+
+        var window = new CommandPaletteWindow(vm, this);
+        window.Closed += (_, _) => _activeCommandPaletteWindow = null;
+        _activeCommandPaletteWindow = window;
+        window.Show();
+        window.Activate();
     }
 
     /// <summary>
