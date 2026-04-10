@@ -1089,8 +1089,9 @@ Prefer updating existing pages over creating duplicates.
 
         foreach (var entry in txn.Entries)
         {
-            // 既存ファイルをバックアップ (Update のみ)
-            if (entry.EntryType == WikiTxnEntryType.Update && File.Exists(entry.TargetPath))
+            // 既存ファイルをバックアップ (実際にファイルが存在する場合。LLM が isNew を誤判定しても安全に上書きできるよう EntryType に依存しない)
+            bool targetExists = File.Exists(entry.TargetPath);
+            if (targetExists)
             {
                 File.Copy(entry.TargetPath, entry.BackupPath, overwrite: true);
             }
@@ -1103,10 +1104,10 @@ Prefer updating existing pages over creating duplicates.
 
             // 本番へ適用
             Directory.CreateDirectory(Path.GetDirectoryName(entry.TargetPath)!);
-            if (entry.EntryType == WikiTxnEntryType.Update && File.Exists(entry.TargetPath))
+            if (targetExists)
                 File.Replace(entry.TempPath, entry.TargetPath, null);
             else
-                File.Move(entry.TempPath, entry.TargetPath, overwrite: false);
+                File.Move(entry.TempPath, entry.TargetPath);
 
             entry.State = WikiTxnEntryState.Replaced;
             await WriteJsonAtomicAsync(GetTxnPath(wikiRoot), txn);
@@ -1131,18 +1132,15 @@ Prefer updating existing pages over creating duplicates.
             {
                 if (entry.State == WikiTxnEntryState.Replaced)
                 {
-                    if (entry.EntryType == WikiTxnEntryType.Update && File.Exists(entry.BackupPath))
+                    if (File.Exists(entry.BackupPath))
                         File.Replace(entry.BackupPath, entry.TargetPath, null);
-                    else if (entry.EntryType == WikiTxnEntryType.Create && File.Exists(entry.TargetPath))
-                    {
-                        // 外部変更確認: サイズが一致しない場合は隔離
+                    else if (File.Exists(entry.TargetPath))
                         File.Delete(entry.TargetPath);
-                    }
                 }
                 else if (entry.State == WikiTxnEntryState.TempWritten)
                 {
                     try { File.Delete(entry.TempPath); } catch { }
-                    if (entry.EntryType == WikiTxnEntryType.Update && File.Exists(entry.BackupPath))
+                    if (File.Exists(entry.BackupPath))
                         File.Replace(entry.BackupPath, entry.TargetPath, null);
                 }
                 entry.State = WikiTxnEntryState.RolledBack;
