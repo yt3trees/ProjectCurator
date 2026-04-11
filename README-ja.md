@@ -47,22 +47,13 @@ flowchart TD
 
 ![Dashboard screenshot](_assets/Dashboard.png)
 
-## このアプリで何が便利になるか
-
-Curia は、人間とAI両方にとっての「面倒な行き来」を減らします。
-
-- プロジェクトの状態確認: フォルダを開き回らなくても、Dashboardで全体の鮮度とタスクを一望
-- コンテキスト維持: 「今何に取り組んでいるか(`current_focus.md`)」「何をどう決めたか(`decision_log`)」といったプロジェクト全体の記憶を、専用Editorで手軽に更新
-- AIエージェント最適化: アプリで整理されたMarkdown群は、そのままClaude CodeなどのAIエージェントが即座に読み込める「完璧な指示書」として機能
-- (任意)Asana連携: タスクをMarkdownへ同期して、プロジェクト状況を追いやすく管理
-
-「どこを見るべきか迷う」「再開のたびに文脈を思い出すのが大変」といった認知負荷を減らし、人間もAIも迷わず作業に入り込めるようになります。
-
 ## こんな人向け
 
-- 複数プロジェクトを並行して進めている、または複雑な単一プロジェクトを管理している
-- AIエージェント(Claude Code等)に渡すコンテキストを日頃から整理しておきたい
-- Asanaタスクをプロジェクト文脈(Markdown)で管理したい (連携は任意です。タスクツールを使わなくてもコンテキストマネージャーとして単独で機能します)
+- 複数プロジェクトを並行して進めている、または複雑な単一プロジェクトを長期管理している
+- AIエージェント(Claude Code等)に渡すコンテキストを日頃から整備したい
+- プロジェクト状態をDashboardで俯瞰しながら、`current_focus.md` と `decision_log` を中心に文脈を積み上げていきたい
+
+Asana連携は任意です。タスクツールを使わなくてもコンテキストマネージャーとして単独で機能します。
 
 ## 主要機能
 
@@ -124,16 +115,7 @@ Curia は、人間とAI両方にとっての「面倒な行き来」を減らし
 
 ### 5. LLM / AI機能の初期設定(任意)
 
-<details>
-<summary>LLM設定手順を表示</summary>
-
-- `Settings` を開き `LLM API` セクションを見つける
-- プロバイダーを選択: `openai` または `azure_openai`
-- API Key、Model、(Azure の場合は) Endpoint と API Version を入力
-- `Test Connection` をクリックして接続を確認
-- テストが成功したら `Enable AI Features` をオンにして保存
-
-</details>
+OpenAI / Azure OpenAI / Claude Code CLI / Gemini CLI / Codex CLI / GitHub Copilot CLI に対応しています。詳細な設定手順は [AI機能](docs/ai-features-ja.md#setup-ja) を参照してください。
 
 ### 6. 最初のプロジェクトを作成する
 
@@ -156,11 +138,12 @@ Curia は、人間とAI両方にとっての「面倒な行き来」を減らし
 ## ドキュメント
 
 - [日々のワークフロー](docs/daily-workflow-ja.md) - おすすめ運用フロー、主要コンテキストファイル、機能マップ
-- [フォルダ構成](docs/folder-layout-ja.md) - プロジェクトフォルダ構成、ジャンクション、Setupが生成するもの
 - [AI機能](docs/ai-features-ja.md) - LLM設定、What's Next、Decision Log、会議メモ取り込み、Quick Capture
-- [AIエージェント協業](docs/ai-agent-collaboration-ja.md) - Claude Code / Codex CLIとの連携、Agent Hub、スキル配置
+- [Wiki機能](docs/wiki-features-ja.md) - プロジェクトナレッジベースの構築: ソース取り込み、質問応答、Lintによる品質チェック
+- [AIエージェント協業 & Agent Hub](docs/ai-agent-collaboration-ja.md) - Claude Code / Codex CLIとの連携、コンテキストファイルの運用、エージェント定義・ルールのライブラリ管理
 - [画面ガイド](docs/ui-guide-ja.md) - 全ページのスクリーンショットと操作ガイド
 - [Asana連携設定](docs/asana-setup-ja.md) - 認証情報、同期設定、Asana Syncページのリファレンス
+- [フォルダ構成](docs/folder-layout-ja.md) - プロジェクトフォルダ構成、ジャンクション、Setupが生成するもの
 - [設定リファレンス](docs/configuration-ja.md) - 設定ファイル一覧、キーボードショートカット
 
 ## 補足

@@ -59,7 +59,7 @@ flowchart TD
     U -->|"タスク同期(任意)"| AS["🔄 Asana Sync"]
     AS -->|"書き出す"| TASKS["✅ tasks.md"]
     DB -->|"読み取る"| TASKS
-    TASKS -->|"Feed to LLM"| LLM["🤖 LLM (OpenAI / Azure)"]
+    TASKS -->|"Feed to LLM"| LLM["🤖 LLM"]
     DB -->|"What's Next (AI)"| LLM
     LLM -->|"Propose update"| ED
     LLM -->|"Suggest actions"| DB

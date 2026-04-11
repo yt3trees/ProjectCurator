@@ -1,6 +1,6 @@
 # Wiki 機能
 
-[< AI 機能一覧に戻る](ai-features.md)
+[< AI 機能一覧に戻る](ai-features-ja.md)
 
 <a id="wiki"></a>
 ## Wiki
