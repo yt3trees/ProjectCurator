@@ -73,7 +73,7 @@ flowchart LR
     Hub ==>|Automatically generates and updates standard files<br>tailored to each CLI's specific format| Deploy
 ```
 
-![](../_assets/AgentHub.png)
+https://github.com/user-attachments/assets/d97fde00-32ae-4220-90e0-9a25c34de40a
 
 - Master library files are stored under `{Cloud Sync Root}\_config\agent_hub\` (`agents/` and `rules/` as JSON + Markdown).
 - Agent deployment targets:
