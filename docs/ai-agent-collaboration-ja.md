@@ -73,7 +73,7 @@ flowchart LR
     Hub ==>|各CLI（Claude / Copilot / Gemini 等）の<br>専用仕様に合わせて実ファイルを自動で生成・追記| Deploy
 ```
 
-![](../_assets/AgentHub.png)
+https://github.com/user-attachments/assets/d97fde00-32ae-4220-90e0-9a25c34de40a
 
 - マスターライブラリは `{Cloud Sync Root}\_config\agent_hub\` 配下 (`agents/` と `rules/`) に JSON + Markdown で保存されます。
 - Agent の配備先:
