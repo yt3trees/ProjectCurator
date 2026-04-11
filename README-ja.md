@@ -47,6 +47,8 @@ flowchart TD
 
 ![Dashboard screenshot](_assets/Dashboard.png)
 
+https://github.com/user-attachments/assets/092f578e-d4bf-4b08-90dd-7b4d151ab0a7
+
 ## こんな人向け
 
 - 複数プロジェクトを並行して進めている、または複雑な単一プロジェクトを長期管理している
