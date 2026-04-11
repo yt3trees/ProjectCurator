@@ -49,6 +49,8 @@ flowchart TD
 
 ![Dashboard screenshot](_assets/Dashboard.png)
 
+https://github.com/user-attachments/assets/092f578e-d4bf-4b08-90dd-7b4d151ab0a7
+
 ## Who It Is For
 
 - People managing multiple active projects, or one complex long-term project
