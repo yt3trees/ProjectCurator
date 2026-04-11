@@ -46,6 +46,7 @@ flowchart TD
     
     AI -->|Context-aware<br>autonomous work & edits| Workspace
 ```
+
 https://github.com/user-attachments/assets/092f578e-d4bf-4b08-90dd-7b4d151ab0a7
 
 https://github.com/user-attachments/assets/e4eb870c-c551-449f-8ca6-264e4f168ece
