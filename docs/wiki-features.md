@@ -5,7 +5,6 @@
 <a id="wiki"></a>
 ## Wiki
 
-
 The Wiki tab lets the LLM incrementally build and maintain a project-specific knowledge base from your source files.
 Unless otherwise noted, paths below are relative to `wiki/<domain>/`.
 
@@ -17,114 +16,63 @@ Four categories are built in and cannot be removed:
 
 | Category | Location | Contents |
 |---|---|---|
-| Wiki Files | `wiki/<domain>/` root | `index.md` (page list) and `log.md` (operation log). Management files updated by the app during Import/Query/Lint |
+| Wiki Files | `wiki/<domain>/` root | `index.md` (page list) and `log.md` (operation log). Updated automatically during Import/Query/Lint |
 | sources | `pages/sources/` | One summary page per imported source file |
 | entities | `pages/entities/` | Concrete "things" in the project: tables, screens, APIs, reports, user roles, etc. |
 | concepts | `pages/concepts/` | Design philosophy and business rules: approval flows, workflows, technical policies, decision criteria, etc. |
 | analysis | `pages/analysis/` | Q&A pages and comparative analyses saved from the Query tab |
 
-A helpful rule of thumb: "What is it (noun)?" → entities; "How does it work or why is it so (verb/policy)?" → concepts.
+Rule of thumb: "What is it (noun)?" → entities; "How does it work or why is it so (verb/policy)?" → concepts.
 
-Custom categories can be added or removed from the Prompts tab. Category definitions are stored in `.wiki-categories.json` inside the wiki domain folder. The `AGENTS.md` file in the wiki root is automatically updated to reflect the current category list.
+Custom categories can be added or removed from the Prompts tab. Settings are stored in `.wiki-categories.json` inside the wiki domain folder. The `AGENTS.md` file in the wiki root is automatically updated to reflect the current category list.
 
 <img src="../_assets/Wiki-Pages.png" width="80%" alt="Wiki Pages tab" />
 
 ### Import (Add a Source)
 
-Click "+ Import Source" or drag and drop a file onto the Wiki tab. The LLM prepares:
-
-- Saves the source to `wiki/raw/` (immutable copy)
-- Creates a summary page in `pages/sources/`
-- Creates or updates related `pages/entities/` and `pages/concepts/` pages
-- Proposed updates for `index.md` and `log.md`
+Click "+ Import Source" or drag and drop a file onto the Wiki tab.
 
 Supported formats: `.md` / `.txt` / `.pdf` / `.docx`.
-Notes:
-- `.pdf` is ingested with Windows OCR text extraction (up to 20 pages).
-- If the OCR engine is unavailable or no text is recognized, ingestion continues with an extraction-failure note.
+- `.pdf` is ingested with Windows OCR text extraction (up to 20 pages). If OCR is unavailable or no text is recognized, ingestion continues with an extraction-failure note.
 - `.docx` body text extraction is not implemented yet; convert to `.md` / `.txt` first.
 
-Before saving, each proposed page change is shown as a diff:
-- New pages: diff against empty content
-- Updated pages: diff against the current file
+What happens during Import:
 
-You approve each item in sequence. If you skip any item, the import result is not saved for that source file (all-or-nothing) to avoid index/page mismatch.
+1. The source file is saved as an immutable copy under `wiki/raw/`.
+2. The LLM selects existing pages likely to need updates (up to 8).
+3. Using those pages as context, the LLM generates a sources/ summary page and creates or updates related entities/ and concepts/ pages.
+4. `index.md` and `log.md` are updated to reflect the changes.
 
-#### LLM Update Flow During Import
+Before saving, each proposed page change is shown as a diff for your review — new pages are diffed against empty content, updated pages against the current file. You approve items one by one. If you skip any item, nothing is saved for that source (all-or-nothing) to keep the index consistent.
+
+#### Import Flow
 
 ```mermaid
 flowchart TD
-    A["User imports a source document"]
-    B["Save immutable copy under raw/"]
-    C["Read source content"]
-    D["Load wiki-schema.md and index.md"]
-    E["LLM selects update candidate paths"]
-    F["Load full content of selected pages"]
-    G["Build import prompt with selected page contents"]
-    H["Send import request to LLM"]
-    I{"Can response JSON be parsed?"}
-    J["Show per-file diff review"]
-    K{"All items approved?"}
-    L["Write newPages to files"]
-    M["Write updatedPages as full replacements"]
-    N["Update index.md"]
-    O["Append log.md entry"]
-    P["Update .wiki-meta.json stats"]
-    Q["Done"]
-    R["Skip save for this source"]
-    S["Fail with import error"]
+    A["Import a source file"]
+    B["Save immutable copy to raw/"]
+    C["LLM selects pages likely to need updates"]
+    D["LLM generates new and updated pages"]
+    E["Show diff for each proposed change"]
+    F{"All items approved?"}
+    G["Write all changes to disk"]
+    H["Skip — nothing saved for this source"]
 
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    F --> G
-    G --> H
-    H --> I
-    I -->|"Yes"| J
-    J --> K
-    K -->|"Yes"| L
-    L --> M
-    M --> N
-    N --> O
-    O --> P
-    P --> Q
-    K -->|"No"| R
-    I -->|"No"| S
+    A --> B --> C --> D --> E --> F
+    F -->|"Yes"| G
+    F -->|"No / skipped"| H
 ```
 
-#### Import Prompt Structure
+<details>
+<summary>Technical: LLM call details</summary>
 
-Import now uses 2 LLM calls:
-- Call 1: select existing page paths likely to need updates
-- Call 2: generate final import output using full content of those selected pages
+Import uses 2 LLM calls:
+- Call 1 (candidate selection): input is the existing page path list, full `index.md`, and source body; output is `{"updateCandidates": ["pages/...md"]}` (existing paths only, max 8).
+- Call 2 (generation): input is source content, `index.md`, full content of selected pages, and existing tag vocabulary; output is the JSON below.
 
-System prompt:
-- Full text of `wiki-schema.md` (acts as the LLM's operating instructions for the wiki)
-- Output language directive (Japanese if PC locale is Japanese, otherwise English)
-- Response format directive: JSON only (no code fences)
-- Instruction to include YAML frontmatter (`title` / `created` / `updated` / `sources` / `tags`) in each page
-- Instruction to use `[[PageName]]` wikilink format for cross-references
-- Instruction to reuse existing tags and avoid near-duplicate variants
+After parsing, tags are normalized (lowercase/kebab-case, singular/plural matching) and reused from the existing wiki tag vocabulary.
 
-User prompt includes:
-- Full text of the current `index.md` (list of existing pages)
-- Source file name and full body text
-- Full content of selected update-candidate pages (existing pages only, max 8 pages)
-- Existing tag vocabulary collected from current wiki pages
-- Instructions: create a sources/ summary page, update existing pages with full content, create new entity/concept pages, generate the full updated index.md, generate a log.md entry
-
-Call 1 (candidate selection) prompt:
-- Input: existing page path list + full `index.md` + source body
-- Output JSON: `{"updateCandidates": ["pages/...md"]}` (existing pages only, max 8)
-
-After LLM response parsing, tags are normalized to reduce drift:
-- lowercase/kebab-case normalization
-- simple singular/plural key matching
-- reuse of existing wiki tag vocabulary when keys match
-
-LLM response JSON schema:
+LLM response schema:
 
 ```json
 {
@@ -136,54 +84,33 @@ LLM response JSON schema:
 }
 ```
 
-The `diff` field in `updatedPages` returns the full updated content (not a patch).
+Each page includes YAML frontmatter (`title` / `created` / `updated` / `sources` / `tags`) and uses `[[PageName]]` wikilink format for cross-references.
+
+</details>
 
 ### Query (Ask the Wiki)
 
-Answers questions by reading the accumulated Wiki. Unlike RAG, pages are passed directly to the LLM rather than being searched and re-synthesized on every call.
+Ask questions in plain language and the LLM answers using the accumulated wiki pages.
 
-- Candidate pages are always selected semantically before answer generation (max 5 pages).
-- The answer call reads only those selected pages, not all pages.
-- If selection fails, a keyword fallback picks pages whose title/path best match the question.
-
-Use "Save as Wiki Page" to save the answer to `pages/analysis/`.
+- The LLM first selects the most relevant pages (up to 5), then generates an answer based only on those pages — not all wiki content.
+- If page selection fails, a keyword fallback picks pages whose title/path best matches the question.
+- Use "Save as Wiki Page" to save the answer to `pages/analysis/`.
 
 <img src="../_assets/Wiki-Query.png" width="80%" alt="Wiki Query tab" />
 
-#### Query Prompt Structure
+<details>
+<summary>Technical: LLM call details</summary>
 
-Query uses up to 2 `ChatCompletionAsync` calls.
+Query uses up to 2 LLM calls:
+- Call 1 (candidate selection): returns file paths one per line; paths are normalized, deduplicated (case-insensitive), and capped at 5. If no valid paths remain, a local fallback scores pages by token overlap against the question.
+- Call 2 (answer generation): reads full content of selected pages; instructed to answer based only on provided wiki content and list referenced pages in `[[PageName]]` format at the end.
 
-[Call 1: candidate selection] System prompt:
-- Declaration that the model is the wiki search assistant
-- Instruction to return file paths only, one per line
-
-[Call 1: candidate selection] User prompt includes:
-- The question
-- Full text of `index.md`
-
-Selection post-processing in C#:
-- Normalize each returned path (trim markdown markers and list symbols)
-- Keep existing wiki page paths only
-- Deduplicate (case-insensitive) and cap at 5 pages
-- If no valid path remains, run local fallback scoring (token overlap against page title/path)
-
-[Call 2: answer generation] System prompt:
-- Declaration that the model is the wiki answer assistant
-- Instruction to answer based ONLY on the provided wiki content
-- Instruction to list referenced pages in `[[PageName]]` format at the end
-- Output language directive (locale-based)
-- Full text of `wiki-schema.md` (project context)
-
-[Call 2: answer generation] User prompt includes:
-- The question
-- Full text of `index.md`
-- Full contents of selected relevant pages (up to 5)
+</details>
 
 <a id="lint"></a>
 ### Lint
 
-Combines static checks (C#) and LLM analysis to validate Wiki quality.
+Combines static checks and LLM analysis to validate wiki quality.
 
 | Check | Description | Method |
 |---|---|---|
@@ -198,23 +125,15 @@ When AI Features is disabled, only static checks are run.
 
 <img src="../_assets/Wiki-Lint.png" width="80%" alt="Wiki Lint tab" />
 
-#### Lint Prompt Structure
+<details>
+<summary>Technical: LLM call details</summary>
 
-The LLM check is a single `ChatCompletionAsync` call.
+The LLM check is a single call. To reduce token usage, the prompt receives a one-line summary of each page (up to 80 pages) rather than full content. The LLM responds in a strict line-by-line format:
+- `CONTRADICTION: [page1] vs [page2] — [description]`
+- `MISSING: [topic] — mentioned in [page1], [page2]...`
+- `CONTRADICTION: none` / `MISSING: none` when nothing is found
 
-System prompt:
-- Declaration that the model is the wiki quality auditor
-- Scope: Contradiction and Missing checks only
-- Strict response format:
-  - `CONTRADICTION: [page1] vs [page2] — [description]`
-  - `MISSING: [topic] — mentioned in [page1], [page2]...`
-  - Use `CONTRADICTION: none` / `MISSING: none` when nothing is found
-
-User prompt includes:
-- Full text of `index.md`
-- One-line summary of each page (up to 80 pages; summaries rather than full content to reduce token usage)
-
-The LLM response is parsed line by line and dispatched by `CONTRADICTION:` / `MISSING:` prefix.
+</details>
 
 ### Prompts (Prompt Customization)
 
@@ -231,7 +150,6 @@ The default system prompt for each operation is displayed between the two fields
 
 Custom prompt settings are stored in `.wiki-prompts.json` inside the wiki domain folder. Click "Reset to Defaults" to clear all Prefix and Suffix fields (the built-in prompts themselves are not affected).
 
-The wiki-schema.md file can also be edited directly from this tab. Changes take effect on the next Import or Query operation. A dot indicator appears next to the "Save Schema" button when there are unsaved changes.
+The `wiki-schema.md` file can also be edited directly from this tab. Changes take effect on the next Import or Query. A dot indicator appears next to "Save Schema" when there are unsaved changes.
 
-Category management is also accessible from this tab: you can add custom categories or remove non-default ones. The four built-in categories (sources, entities, concepts, analysis) cannot be deleted.
-
+Category management is also accessible from this tab: add custom categories or remove non-default ones. The four built-in categories (sources, entities, concepts, analysis) cannot be deleted.
