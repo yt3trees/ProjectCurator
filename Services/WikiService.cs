@@ -341,9 +341,8 @@ public class WikiService
         {
             await File.WriteAllTextAsync(tmp, content, Encoding.UTF8);
             if (File.Exists(targetPath))
-                File.Replace(tmp, targetPath, null);
-            else
-                File.Move(tmp, targetPath);
+                File.Delete(targetPath);
+            File.Move(tmp, targetPath);
         }
         catch
         {
@@ -1105,9 +1104,8 @@ Prefer updating existing pages over creating duplicates.
             // 本番へ適用
             Directory.CreateDirectory(Path.GetDirectoryName(entry.TargetPath)!);
             if (targetExists)
-                File.Replace(entry.TempPath, entry.TargetPath, null);
-            else
-                File.Move(entry.TempPath, entry.TargetPath);
+                File.Delete(entry.TargetPath);
+            File.Move(entry.TempPath, entry.TargetPath);
 
             entry.State = WikiTxnEntryState.Replaced;
             await WriteJsonAtomicAsync(GetTxnPath(wikiRoot), txn);
@@ -1133,7 +1131,11 @@ Prefer updating existing pages over creating duplicates.
                 if (entry.State == WikiTxnEntryState.Replaced)
                 {
                     if (File.Exists(entry.BackupPath))
-                        File.Replace(entry.BackupPath, entry.TargetPath, null);
+                    {
+                        if (File.Exists(entry.TargetPath))
+                            File.Delete(entry.TargetPath);
+                        File.Move(entry.BackupPath, entry.TargetPath);
+                    }
                     else if (File.Exists(entry.TargetPath))
                         File.Delete(entry.TargetPath);
                 }
@@ -1141,7 +1143,11 @@ Prefer updating existing pages over creating duplicates.
                 {
                     try { File.Delete(entry.TempPath); } catch { }
                     if (File.Exists(entry.BackupPath))
-                        File.Replace(entry.BackupPath, entry.TargetPath, null);
+                    {
+                        if (File.Exists(entry.TargetPath))
+                            File.Delete(entry.TargetPath);
+                        File.Move(entry.BackupPath, entry.TargetPath);
+                    }
                 }
                 entry.State = WikiTxnEntryState.RolledBack;
             }
