@@ -92,6 +92,7 @@ public partial class App : WpfApplication
         services.AddSingleton<WikiIngestService>();
         services.AddSingleton<WikiQueryService>();
         services.AddSingleton<WikiLintService>();
+        services.AddSingleton<ScheduleService>();
 
         // ViewModels
         services.AddSingleton<MainWindowViewModel>();
@@ -105,6 +106,7 @@ public partial class App : WpfApplication
         services.AddSingleton<CommandPaletteViewModel>();
         services.AddSingleton<AgentHubViewModel>();
         services.AddSingleton<WikiViewModel>();
+        services.AddSingleton<WeeklyScheduleViewModel>();
 
         // Pages
         services.AddSingleton<DashboardPage>();
@@ -116,6 +118,7 @@ public partial class App : WpfApplication
         services.AddSingleton<SettingsPage>();
         services.AddSingleton<AgentHubPage>();
         services.AddSingleton<WikiPage>();
+        services.AddSingleton<WeeklySchedulePage>();
 
         // wpf-ui: IPageService for DI-based page resolution
         services.AddSingleton<IPageService, AppPageService>();
