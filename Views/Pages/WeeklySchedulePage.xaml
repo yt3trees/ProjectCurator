@@ -1,0 +1,174 @@
+<UserControl x:Class="Curia.Views.Pages.WeeklySchedulePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:controls="clr-namespace:Curia.Views.Controls"
+             xmlns:vm="clr-namespace:Curia.ViewModels"
+             xmlns:svc="clr-namespace:Curia.Services"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignWidth="1100" d:DesignHeight="700"
+             Loaded="OnLoaded">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- ツールバー -->
+            <RowDefinition Height="44"/>
+            <!-- コンテンツ -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── ツールバー ── -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource AppSurface1}"
+                BorderBrush="{DynamicResource AppSurface2}"
+                BorderThickness="0,0,0,1"
+                Padding="12,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 前週/今週/次週 ナビ -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="&lt; Prev"
+                            Command="{Binding PrevWeekCommand}"
+                            Background="Transparent"
+                            BorderThickness="1"
+                            Padding="8,4"
+                            Margin="0,0,4,0"
+                            FontSize="12"/>
+                    <Button Content="Today"
+                            Command="{Binding TodayCommand}"
+                            Background="{DynamicResource AppBlue}"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Padding="8,4"
+                            Margin="0,0,4,0"
+                            FontSize="12"/>
+                    <Button Content="Next &gt;"
+                            Command="{Binding NextWeekCommand}"
+                            Background="Transparent"
+                            BorderThickness="1"
+                            Padding="8,4"
+                            FontSize="12"/>
+                </StackPanel>
+
+                <!-- 週表示テキスト -->
+                <TextBlock Grid.Column="1"
+                           Text="{Binding WeekRangeText}"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppText}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+
+                <!-- ステータス -->
+                <TextBlock Grid.Column="2"
+                           Text="{Binding StatusText}"
+                           FontSize="11"
+                           Foreground="{DynamicResource AppSubtext0}"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- ── コンテンツ (左ペイン + 右ペイン) ── -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <!-- 左ペイン: 未配置タスク一覧 (固定幅 280px) -->
+                <ColumnDefinition Width="280"/>
+                <!-- セパレータ -->
+                <ColumnDefinition Width="1"/>
+                <!-- 右ペイン: 週グリッド -->
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ── 左ペイン ── -->
+            <Border Grid.Column="0"
+                    Background="{DynamicResource AppSurface1}"
+                    BorderBrush="{DynamicResource AppSurface2}"
+                    BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Unscheduled Tasks"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource AppSubtext0}"
+                               Margin="12,10,12,6"/>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="UnscheduledList"
+                                      ItemsSource="{Binding UnscheduledGroups}"
+                                      Margin="8,0,8,8">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:UnscheduledTaskGroup}">
+                                    <StackPanel Margin="0,4,0,0">
+                                        <!-- プロジェクト見出し -->
+                                        <Border Background="{DynamicResource AppSurface2}"
+                                                CornerRadius="3"
+                                                Padding="6,3"
+                                                Margin="0,0,0,2">
+                                            <TextBlock Text="{Binding ProjectShortName}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource AppText}"/>
+                                        </Border>
+                                        <!-- タスクリスト -->
+                                        <ItemsControl x:Name="TaskItems"
+                                                      ItemsSource="{Binding Tasks}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type svc:TodayQueueTask}">
+                                                    <Border x:Name="TaskItemBorder"
+                                                            Background="Transparent"
+                                                            BorderBrush="{DynamicResource AppSurface2}"
+                                                            BorderThickness="0,0,0,1"
+                                                            Padding="6,5"
+                                                            Cursor="Hand"
+                                                            PreviewMouseMove="OnTaskItemMouseMove">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding DisplayMainTitle}"
+                                                                       FontSize="12"
+                                                                       Foreground="{DynamicResource AppText}"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       TextWrapping="NoWrap"/>
+                                                            <TextBlock Text="{Binding DueLabel}"
+                                                                       FontSize="10"
+                                                                       Foreground="{DynamicResource AppSubtext0}"
+                                                                       Margin="0,1,0,0"/>
+                                                        </StackPanel>
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="Background"
+                                                                                Value="{DynamicResource AppSurface2}"/>
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- セパレータ -->
+            <Rectangle Grid.Column="1"
+                       Fill="{DynamicResource AppSurface2}"/>
+
+            <!-- ── 右ペイン: 週グリッド ── -->
+            <controls:WeekGridControl Grid.Column="2"
+                                      x:Name="WeekGrid" />
+        </Grid>
+    </Grid>
+
+</UserControl>

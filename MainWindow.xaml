@@ -56,6 +56,9 @@
                     <ui:NavigationViewItem Content="Editor"
                         Icon="{ui:SymbolIcon Symbol=DocumentEdit24}"
                         TargetPageType="{x:Type pages:EditorPage}" />
+                    <ui:NavigationViewItem Content="Schedule"
+                        Icon="{ui:SymbolIcon Symbol=CalendarWeekNumbers24}"
+                        TargetPageType="{x:Type pages:WeeklySchedulePage}" />
                     <ui:NavigationViewItem Content="Timeline"
                         Icon="{ui:SymbolIcon Symbol=Timeline24}"
                         TargetPageType="{x:Type pages:TimelinePage}" />
