@@ -50,14 +50,16 @@ public partial class WeekGridControl : WpfUserControl
         {
             if (_vm != null)
             {
-                _vm.TimedBlocks.CollectionChanged -= OnBlocksChanged;
-                _vm.AllDayBlocks.CollectionChanged -= OnBlocksChanged;
+                _vm.TimedBlocks.CollectionChanged   -= OnBlocksChanged;
+                _vm.AllDayBlocks.CollectionChanged  -= OnBlocksChanged;
+                _vm.OutlookEvents.CollectionChanged -= OnOutlookEventsChanged;
             }
             _vm = value;
             if (_vm != null)
             {
-                _vm.TimedBlocks.CollectionChanged += OnBlocksChanged;
-                _vm.AllDayBlocks.CollectionChanged += OnBlocksChanged;
+                _vm.TimedBlocks.CollectionChanged   += OnBlocksChanged;
+                _vm.AllDayBlocks.CollectionChanged  += OnBlocksChanged;
+                _vm.OutlookEvents.CollectionChanged += OnOutlookEventsChanged;
             }
             Refresh();
         }
@@ -128,12 +130,16 @@ public partial class WeekGridControl : WpfUserControl
         _clockTimer = null;
         if (_vm != null)
         {
-            _vm.TimedBlocks.CollectionChanged -= OnBlocksChanged;
-            _vm.AllDayBlocks.CollectionChanged -= OnBlocksChanged;
+            _vm.TimedBlocks.CollectionChanged   -= OnBlocksChanged;
+            _vm.AllDayBlocks.CollectionChanged  -= OnBlocksChanged;
+            _vm.OutlookEvents.CollectionChanged -= OnOutlookEventsChanged;
         }
     }
 
     private void OnBlocksChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => Refresh();
+
+    private void OnOutlookEventsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         => Refresh();
 
     // ─── リフレッシュ ────────────────────────────────────────────────
@@ -148,6 +154,7 @@ public partial class WeekGridControl : WpfUserControl
         DrawAllDayLane();
         DrawTimeGrid();
         RenderTimedBlocks();
+        RenderOutlookTimedEvents();
         RenderCurrentTimeIndicator();
     }
 
@@ -213,12 +220,17 @@ public partial class WeekGridControl : WpfUserControl
     {
         AllDayBgCanvas.Children.Clear();
         AllDayBlockCanvas.Children.Clear();
+        OutlookAllDayCanvas.Children.Clear();
 
         if (_vm == null) return;
 
         var allDayBlocks = _vm.AllDayBlocks.ToList();
+        var outlookAllDay = _vm.OutlookEvents.Where(e => e.IsAllDay).ToList();
+
         var laneCount = AssignAllDayLanes(allDayBlocks);
-        var laneHeight = Math.Max(1, laneCount) * AllDayLaneHeight;
+        var outlookLaneCount = AssignOutlookAllDayLanes(outlookAllDay);
+        var totalLanes = Math.Max(1, laneCount + outlookLaneCount);
+        var laneHeight = totalLanes * AllDayLaneHeight;
 
         AllDayBorder.Height = laneHeight + 2;
 
@@ -274,6 +286,30 @@ public partial class WeekGridControl : WpfUserControl
             Canvas.SetLeft(card, TimeColWidth + startDayIdx * _dayColWidth + 2);
             Canvas.SetTop(card, laneIdx * AllDayLaneHeight + 2);
             AllDayBlockCanvas.Children.Add(card);
+        }
+
+        // Outlook 終日イベント (Curia レーンの下に続けて描画)
+        foreach (var ev in outlookAllDay)
+        {
+            var drawStart = ev.Start.Date < weekStart ? weekStart : ev.Start.Date;
+            var drawEnd   = ev.End.Date > weekEnd ? weekEnd.AddDays(-1) : ev.End.AddDays(-1).Date;
+            if (ev.IsAllDay && ev.End.Date == ev.Start.Date.AddDays(1))
+                drawEnd = ev.Start.Date; // 終日イベントの End は翌日 0:00 のため調整
+
+            drawEnd = drawEnd < drawStart ? drawStart : drawEnd;
+            if (drawStart >= weekEnd) continue;
+
+            var startDayIdx = (drawStart - weekStart).Days;
+            var spanDays = (drawEnd - drawStart).Days + 1;
+            bool continuesLeft  = ev.Start.Date < weekStart;
+            bool continuesRight = ev.End.Date > weekEnd;
+
+            int laneIdx = GetOutlookAllDayLane(ev) + laneCount; // Curia レーンの下に続ける
+            var card = CreateOutlookAllDayCard(ev, spanDays, continuesLeft, continuesRight);
+
+            Canvas.SetLeft(card, TimeColWidth + startDayIdx * _dayColWidth + 2);
+            Canvas.SetTop(card, laneIdx * AllDayLaneHeight + 2);
+            OutlookAllDayCanvas.Children.Add(card);
         }
     }
 
@@ -416,11 +452,146 @@ public partial class WeekGridControl : WpfUserControl
         }
     }
 
+    // ─── Outlook Timed イベント描画 ──────────────────────────────────
+
+    private void RenderOutlookTimedEvents()
+    {
+        OutlookCanvas.Children.Clear();
+        if (_vm == null) return;
+
+        var weekStart = _vm.WeekStart;
+        var timedEvents = _vm.OutlookEvents.Where(e => !e.IsAllDay).ToList();
+
+        foreach (var ev in timedEvents)
+        {
+            var startAt = ev.Start;
+            var endAt   = ev.End;
+
+            // 週範囲チェック
+            if (startAt.Date >= weekStart.AddDays(7) || endAt <= weekStart) continue;
+
+            // 開始が週の前なら月曜 00:00 にクリップ
+            if (startAt < weekStart) startAt = weekStart;
+            // 終了が週を超えるなら日曜 24:00 にクリップ
+            if (endAt > weekStart.AddDays(7)) endAt = weekStart.AddDays(7);
+
+            int dayIdx = (startAt.Date - weekStart.Date).Days;
+            double top = startAt.TimeOfDay.TotalMinutes / SlotMinutes * SlotHeight;
+            double height = Math.Max(SlotHeight, (endAt - startAt).TotalMinutes / SlotMinutes * SlotHeight);
+            double left = TimeColWidth + dayIdx * _dayColWidth + 1;
+            double width = _dayColWidth - 4;
+
+            var card = CreateOutlookTimedCard(ev, width, height);
+            Canvas.SetLeft(card, left);
+            Canvas.SetTop(card, top);
+            OutlookCanvas.Children.Add(card);
+        }
+    }
+
+    private Border CreateOutlookTimedCard(OutlookEvent ev, double width, double height)
+    {
+        // 半透明グレー背景 (読み取り専用を視覚的に表現)
+        var bgColor = Color.FromArgb(0x55, 0x6E, 0x76, 0x81);
+        var borderColor = Color.FromArgb(0x99, 0x6E, 0x76, 0x81);
+
+        var timeText = $"{ev.Start:HH:mm} - {ev.End:HH:mm}";
+
+        var subjectBlock = new TextBlock
+        {
+            Text = ev.Subject,
+            FontSize = 11,
+            FontStyle = FontStyles.Italic,
+            Foreground = GetBrush("AppSubtext0"),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap,
+            Margin = new Thickness(4, 0, 4, 0),
+        };
+
+        var timeBlock = new TextBlock
+        {
+            Text = timeText,
+            FontSize = 10,
+            FontStyle = FontStyles.Italic,
+            Foreground = new SolidColorBrush(Color.FromArgb(0xAA, 0x8B, 0x94, 0x9E)),
+            Margin = new Thickness(4, 0, 4, 0),
+        };
+
+        var badge = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(0x60, 0x6E, 0x76, 0x81)),
+            CornerRadius = new CornerRadius(2),
+            Padding = new Thickness(2, 0, 2, 0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 2, 2, 0),
+            Child = new TextBlock
+            {
+                Text = "OL",
+                FontSize = 9,
+                Foreground = GetBrush("AppSubtext0"),
+            },
+        };
+
+        var content = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+        content.Children.Add(badge);
+
+        var textPanel = new StackPanel();
+        textPanel.Children.Add(subjectBlock);
+        if (height >= 40) textPanel.Children.Add(timeBlock);
+        content.Children.Add(textPanel);
+
+        return new Border
+        {
+            Width = Math.Max(4, width),
+            Height = height,
+            Background = new SolidColorBrush(bgColor),
+            BorderBrush = new SolidColorBrush(borderColor),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(3),
+            ClipToBounds = true,
+            IsHitTestVisible = false,
+            Child = content,
+        };
+    }
+
+    private Border CreateOutlookAllDayCard(OutlookEvent ev, int spanDays,
+        bool continuesLeft, bool continuesRight)
+    {
+        var title = new TextBlock
+        {
+            Text = (continuesLeft ? "◀ " : "") + ev.Subject + (continuesRight ? " ▶" : ""),
+            FontSize = 11,
+            FontStyle = FontStyles.Italic,
+            Foreground = new SolidColorBrush(Color.FromArgb(0xCC, 0x8B, 0x94, 0x9E)),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 4, 0),
+        };
+
+        return new Border
+        {
+            Width = Math.Max(4, spanDays * _dayColWidth - 4),
+            Height = AllDayLaneHeight - 4,
+            Background = new SolidColorBrush(Color.FromArgb(0x44, 0x6E, 0x76, 0x81)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x66, 0x6E, 0x76, 0x81)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(
+                continuesLeft ? 0 : 3,
+                continuesRight ? 0 : 3,
+                continuesRight ? 0 : 3,
+                continuesLeft ? 0 : 3),
+            ClipToBounds = true,
+            IsHitTestVisible = false,
+            Child = title,
+        };
+    }
+
     private void RenderCurrentTimeIndicator()
     {
-        // 既存のインジケータを削除
+        // 既存のインジケータを削除 (Line + Ellipse の両方を対象にする)
         for (int i = TimeBlockCanvas.Children.Count - 1; i >= 0; i--)
-            if (TimeBlockCanvas.Children[i] is Line l && l.Tag is string s && s == "CurrentTime")
+            if (TimeBlockCanvas.Children[i] is FrameworkElement fe && fe.Tag is string s && s == "CurrentTime")
                 TimeBlockCanvas.Children.RemoveAt(i);
 
         if (_vm == null) return;
@@ -789,17 +960,17 @@ public partial class WeekGridControl : WpfUserControl
         AllDayCanvas.ReleaseMouseCapture();
         _isDraggingAllDayRange = false;
         AllDaySelectionCanvas.Children.Clear();
+        e.Handled = true;
+    }
 
-        var pos = e.GetPosition(AllDayCanvas);
-        int curDay = (int)Math.Floor((pos.X - TimeColWidth) / _dayColWidth);
-        curDay = Math.Max(0, Math.Min(6, curDay));
-        int startDay = Math.Min(_allDayDragStartDay, curDay);
-        int endDay   = Math.Max(_allDayDragStartDay, curDay);
-
+    private void OnAllDayRightClick(object sender, MouseButtonEventArgs e)
+    {
         if (_vm == null) return;
-        _pendingAllDayStart = _vm.WeekStart.AddDays(startDay).Date;
-        _pendingAllDayEnd   = _vm.WeekStart.AddDays(endDay).Date;
-
+        var pos = e.GetPosition(AllDayCanvas);
+        int dayIdx = (int)Math.Floor((pos.X - TimeColWidth) / _dayColWidth);
+        dayIdx = Math.Max(0, Math.Min(6, dayIdx));
+        _pendingAllDayStart = _vm.WeekStart.AddDays(dayIdx).Date;
+        _pendingAllDayEnd   = _pendingAllDayStart;
         ShowAllDayTaskPickerPopup(e.GetPosition(this));
         e.Handled = true;
     }
@@ -1016,17 +1187,16 @@ public partial class WeekGridControl : WpfUserControl
         TimeDropCanvas.ReleaseMouseCapture();
         _isDraggingTimeRange = false;
         TimeSelectionCanvas.Children.Clear();
+        e.Handled = true;
+    }
 
+    private void OnTimeRightClick(object sender, MouseButtonEventArgs e)
+    {
+        if (_vm == null) return;
         var pos = e.GetPosition(TimeDropCanvas);
-        var (curDay, curSlot) = PositionToCell(pos);
-
-        int startSlot = Math.Min(_dragStartSlot, curSlot);
-        int endSlot   = Math.Max(_dragStartSlot, curSlot) + 1;
-        int slots = Math.Max(1, endSlot - startSlot);
-
-        _pendingTimedStart = _vm!.WeekStart.AddDays(curDay).AddMinutes(startSlot * SlotMinutes);
-        _pendingTimedSlots = slots;
-
+        var (dayIdx, slotIdx) = PositionToCell(pos);
+        _pendingTimedStart = _vm.WeekStart.AddDays(dayIdx).AddMinutes(slotIdx * SlotMinutes);
+        _pendingTimedSlots = 2; // デフォルト 1 時間
         ShowTaskPickerPopup(e.GetPosition(this));
         e.Handled = true;
     }
@@ -1188,6 +1358,38 @@ public partial class WeekGridControl : WpfUserControl
 
     private static int GetLaneIndex(ScheduleBlock block)
         => _laneIndexMap.TryGetValue(block.Id, out var idx) ? idx : 0;
+
+    // Outlook 終日イベントのレーン割り当て
+    private static readonly Dictionary<string, int> _outlookLaneIndexMap = [];
+
+    private static int AssignOutlookAllDayLanes(List<OutlookEvent> events)
+    {
+        _outlookLaneIndexMap.Clear();
+        var lanes = new List<DateTime>();
+
+        foreach (var ev in events.OrderBy(x => x.Start))
+        {
+            var startDate = ev.Start.Date;
+            var endDate   = ev.IsAllDay ? ev.End.AddDays(-1).Date : ev.End.Date;
+
+            int placed = -1;
+            for (int i = 0; i < lanes.Count; i++)
+            {
+                if (lanes[i] <= startDate)
+                {
+                    placed = i;
+                    break;
+                }
+            }
+            if (placed < 0) { placed = lanes.Count; lanes.Add(DateTime.MinValue); }
+            lanes[placed] = endDate.AddDays(1);
+            _outlookLaneIndexMap[ev.EntryId] = placed;
+        }
+        return lanes.Count;
+    }
+
+    private static int GetOutlookAllDayLane(OutlookEvent ev)
+        => _outlookLaneIndexMap.TryGetValue(ev.EntryId, out var idx) ? idx : 0;
 }
 
 /// <summary>左ペインのタスク項目をドラッグする際のペイロード。</summary>

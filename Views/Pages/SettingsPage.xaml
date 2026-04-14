@@ -670,6 +670,116 @@
                 </StackPanel>
             </Border>
 
+            <!-- ===== Schedule ===== -->
+            <TextBlock Text="Schedule" FontSize="15" FontWeight="SemiBold"
+                       Foreground="{DynamicResource AppText}" Margin="0,20,0,10"/>
+
+            <!-- ICS カレンダー -->
+            <Border Background="{DynamicResource AppSurface0}"
+                    BorderBrush="{DynamicResource AppSurface2}"
+                    BorderThickness="1" CornerRadius="6"
+                    Padding="16,12" Margin="0,0,0,6">
+                <StackPanel>
+                    <TextBlock Text="ICS Calendar URL"
+                               FontSize="12" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AppSubtext0}"
+                               Margin="0,0,0,10"/>
+
+                    <TextBlock FontSize="11"
+                               Foreground="{DynamicResource AppSubtext0}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8">
+                        <Run Text="New Outlook: right-click a calendar → Sharing and permissions → Get ICS link"/>
+                    </TextBlock>
+
+                    <TextBox Text="{Binding IcsCalendarUrl, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,0,6"
+                             Padding="6,4"
+                             FontSize="12"
+                             Background="{DynamicResource AppSurface1}"
+                             Foreground="{DynamicResource AppText}"
+                             BorderBrush="{DynamicResource AppSurface2}"
+                             BorderThickness="1"/>
+
+                    <!-- Test ボタン + ステータス -->
+                    <DockPanel Margin="0,0,0,10">
+                        <Button DockPanel.Dock="Left"
+                                Content="Test URL"
+                                Command="{Binding TestIcsCommand}"
+                                Padding="10,4"
+                                FontSize="12"
+                                Background="Transparent"
+                                BorderThickness="1"/>
+                        <TextBlock Text="{Binding IcsStatus}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource AppSubtext0}"
+                                   VerticalAlignment="Center"
+                                   Margin="10,0,0,0"
+                                   TextWrapping="Wrap"/>
+                    </DockPanel>
+
+                    <DockPanel LastChildFill="False">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="Show ICS Calendar Events"
+                                   Foreground="{DynamicResource AppText}"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <ui:ToggleSwitch DockPanel.Dock="Right"
+                                         IsChecked="{Binding IcsCalendarEnabled, Mode=TwoWay}"/>
+                    </DockPanel>
+                    <TextBlock Text="Events are fetched each time the week changes. Read-only overlay."
+                               FontSize="11"
+                               Foreground="{DynamicResource AppSubtext0}"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Classic Outlook (COM) -->
+            <Border Background="{DynamicResource AppSurface0}"
+                    BorderBrush="{DynamicResource AppSurface2}"
+                    BorderThickness="1" CornerRadius="6"
+                    Padding="16,12" Margin="0,0,0,6">
+                <StackPanel>
+                    <TextBlock Text="Classic Outlook (COM)"
+                               FontSize="12" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AppSubtext0}"
+                               Margin="0,0,0,10"/>
+
+                    <TextBlock FontSize="11"
+                               Foreground="{DynamicResource AppSubtext0}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8">
+                        <Run Text="Requires classic Outlook (desktop). Not available with the new Outlook app."/>
+                    </TextBlock>
+
+                    <TextBlock FontSize="11" Margin="0,0,0,8"
+                               Foreground="{DynamicResource AppSubtext0}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding OutlookAvailable}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                        <Run Text="Classic Outlook not detected on this machine."/>
+                    </TextBlock>
+
+                    <DockPanel LastChildFill="False">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="Show Outlook Calendar Events"
+                                   Foreground="{DynamicResource AppText}"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <ui:ToggleSwitch DockPanel.Dock="Right"
+                                         IsChecked="{Binding OutlookCalendarEnabled, Mode=TwoWay}"
+                                         IsEnabled="{Binding OutlookAvailable}"/>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
             <!-- ===== About ===== -->
             <TextBlock Text="About" FontSize="15" FontWeight="SemiBold"
                        Foreground="{DynamicResource AppText}" Margin="0,20,0,10"/>

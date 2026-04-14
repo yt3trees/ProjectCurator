@@ -16,6 +16,8 @@ public partial class SettingsViewModel : ObservableObject
     private readonly HotkeyService _hotkeyService;
     private readonly TrayService _trayService;
     private readonly LlmClientService _llmClientService;
+    private readonly OutlookCalendarService _outlookCalendarService;
+    private readonly IcsCalendarService _icsCalendarService;
     private bool _loading;
 
     // ホットキー
@@ -154,6 +156,20 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool captureTaskLogEnabled;
 
+    // Schedule / Outlook 連携
+    [ObservableProperty]
+    private bool outlookCalendarEnabled;
+
+    [ObservableProperty]
+    private bool outlookAvailable;
+
+    // Schedule / ICS 連携
+    [ObservableProperty]
+    private bool icsCalendarEnabled;
+
+    [ObservableProperty]
+    private string icsCalendarUrl = "";
+
     // Editor / Wiki フォントサイズ
     [ObservableProperty]
     private int editorFontSize = 14;
@@ -187,12 +203,16 @@ public partial class SettingsViewModel : ObservableObject
         ConfigService configService,
         HotkeyService hotkeyService,
         TrayService trayService,
-        LlmClientService llmClientService)
+        LlmClientService llmClientService,
+        OutlookCalendarService outlookCalendarService,
+        IcsCalendarService icsCalendarService)
     {
         _configService = configService;
         _hotkeyService = hotkeyService;
         _trayService = trayService;
         _llmClientService = llmClientService;
+        _outlookCalendarService = outlookCalendarService;
+        _icsCalendarService = icsCalendarService;
     }
 
     /// <summary>ディスクから設定を読み込む。ページ表示時に呼ぶ。</summary>
@@ -260,7 +280,11 @@ public partial class SettingsViewModel : ObservableObject
             LlmStatus          = "";
             AiEnabled          = settings.AiEnabled;
             AiToggleCanEnable  = settings.AiEnabled; // 既にオンなら再テスト不要
-            CaptureTaskLogEnabled = settings.CaptureTaskLogEnabled;
+            CaptureTaskLogEnabled  = settings.CaptureTaskLogEnabled;
+            OutlookCalendarEnabled = settings.OutlookCalendarEnabled;
+            OutlookAvailable       = _outlookCalendarService.IsOutlookAvailable();
+            IcsCalendarEnabled     = settings.IcsCalendarEnabled;
+            IcsCalendarUrl         = settings.IcsCalendarUrl;
             EditorFontSize         = settings.EditorFontSize;
             MarkdownRenderFontSize = settings.MarkdownRenderFontSize;
             if (TryParseHex(settings.EditorTextColor, out var er, out var eg, out var eb))
@@ -356,7 +380,10 @@ public partial class SettingsViewModel : ObservableObject
         settings.LlmUserProfile = LlmUserProfile;
         settings.LlmLanguage    = LlmLanguage.Trim();
         settings.AiEnabled      = AiEnabled;
-        settings.CaptureTaskLogEnabled = CaptureTaskLogEnabled;
+        settings.CaptureTaskLogEnabled   = CaptureTaskLogEnabled;
+        settings.OutlookCalendarEnabled  = OutlookCalendarEnabled;
+        settings.IcsCalendarEnabled      = IcsCalendarEnabled;
+        settings.IcsCalendarUrl          = IcsCalendarUrl.Trim();
         settings.EditorFontSize          = EditorFontSize;
         settings.MarkdownRenderFontSize  = MarkdownRenderFontSize;
         settings.EditorTextColor         = EditorTextColor.Trim();
@@ -409,6 +436,47 @@ public partial class SettingsViewModel : ObservableObject
         settings.AiEnabled = value;
         _configService.SaveSettings(settings);
         WeakReferenceMessenger.Default.Send(new AiEnabledChangedMessage(value));
+    }
+
+    partial void OnIcsCalendarEnabledChanged(bool value)
+    {
+        if (_loading) return;
+        var settings = _configService.LoadSettings();
+        settings.IcsCalendarEnabled = value;
+        settings.IcsCalendarUrl     = IcsCalendarUrl.Trim();
+        _configService.SaveSettings(settings);
+    }
+
+    [ObservableProperty]
+    private string icsStatus = "";
+
+    [RelayCommand]
+    private async Task TestIcsAsync()
+    {
+        var url = IcsCalendarUrl.Trim();
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            IcsStatus = "Enter a URL first.";
+            return;
+        }
+        // URL を保存してからテスト
+        var settings = _configService.LoadSettings();
+        settings.IcsCalendarUrl = url;
+        _configService.SaveSettings(settings);
+
+        IcsStatus = "Fetching...";
+        try
+        {
+            var weekStart = ViewModels.WeeklyScheduleViewModel.GetMondayOf(DateTime.Today);
+            var events = await _icsCalendarService.GetEventsForWeekAsync(url, weekStart);
+            IcsStatus = events.Count > 0
+                ? $"OK - {events.Count} event(s) this week."
+                : "OK - No events found for this week (URL works).";
+        }
+        catch (Exception ex)
+        {
+            IcsStatus = $"Error: {ex.Message}";
+        }
     }
 
     partial void OnLlmProviderChanged(string value)

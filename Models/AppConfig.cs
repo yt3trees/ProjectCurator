@@ -80,4 +80,13 @@ public class AppSettings
     // Editor / Wiki 文字色 (hex 文字列、空 = テーマデフォルト)
     public string EditorTextColor { get; set; } = "";
     public string MarkdownRenderTextColor { get; set; } = "";
+
+    // Schedule / Outlook 連携
+    public bool OutlookCalendarEnabled { get; set; } = false;
+
+    // Schedule / ICS カレンダー連携
+    public bool IcsCalendarEnabled { get; set; } = false;
+    public string IcsCalendarUrl { get; set; } = "";
+    // ICS イベントの除外ワードリスト (カンマ区切り、完全一致)
+    public string IcsExcludeSubjects { get; set; } = "出社,在宅";
 }

@@ -18,6 +18,9 @@ public partial class WeeklyScheduleViewModel : ObservableObject
     private readonly ScheduleService _scheduleService;
     private readonly TodayQueueService _todayQueueService;
     private readonly ProjectDiscoveryService _discoveryService;
+    private readonly ConfigService _configService;
+    private readonly OutlookCalendarService _outlookCalendarService;
+    private readonly IcsCalendarService _icsCalendarService;
 
     [ObservableProperty]
     private DateTime _weekStart;
@@ -37,6 +40,8 @@ public partial class WeeklyScheduleViewModel : ObservableObject
     public ObservableCollection<UnscheduledTaskGroup> AllTaskGroups { get; } = [];
     public ObservableCollection<ScheduleBlock> TimedBlocks { get; } = [];
     public ObservableCollection<ScheduleBlock> AllDayBlocks { get; } = [];
+    // Outlook カレンダーイベント (読み取り専用オーバーレイ)
+    public ObservableCollection<OutlookEvent> OutlookEvents { get; } = [];
 
     // 他ページへのナビゲーション コールバック
     public Action<Models.ProjectInfo, string>? OnOpenInEditor { get; set; }
@@ -44,11 +49,17 @@ public partial class WeeklyScheduleViewModel : ObservableObject
     public WeeklyScheduleViewModel(
         ScheduleService scheduleService,
         TodayQueueService todayQueueService,
-        ProjectDiscoveryService discoveryService)
+        ProjectDiscoveryService discoveryService,
+        ConfigService configService,
+        OutlookCalendarService outlookCalendarService,
+        IcsCalendarService icsCalendarService)
     {
         _scheduleService = scheduleService;
         _todayQueueService = todayQueueService;
         _discoveryService = discoveryService;
+        _configService = configService;
+        _outlookCalendarService = outlookCalendarService;
+        _icsCalendarService = icsCalendarService;
 
         WeekStart = GetMondayOf(DateTime.Today);
         UpdateWeekRangeText();
@@ -89,6 +100,24 @@ public partial class WeeklyScheduleViewModel : ObservableObject
                 _todayQueueService.GetAllTasksSorted(projects, 10000));
 
             var blocksInWeek = _scheduleService.GetBlocksForWeek(WeekStart);
+
+            // カレンダーイベント取得 (ICS 優先、次いで COM Interop)
+            var settings = _configService.LoadSettings();
+            IReadOnlyList<OutlookEvent> outlookEvents = [];
+            if (settings.IcsCalendarEnabled && !string.IsNullOrWhiteSpace(settings.IcsCalendarUrl))
+            {
+                try { outlookEvents = await _icsCalendarService.GetEventsForWeekAsync(settings.IcsCalendarUrl, WeekStart); }
+                catch { /* 取得失敗はサイレント無視 */ }
+
+                // 除外ワードでフィルタ
+                var excludes = settings.IcsExcludeSubjects
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (excludes.Count > 0)
+                    outlookEvents = outlookEvents.Where(e => !excludes.Contains(e.Subject)).ToList();
+            }
+            else if (settings.OutlookCalendarEnabled)
+                outlookEvents = await _outlookCalendarService.GetEventsForWeekAsync(WeekStart);
 
             // TitleSnapshot をライブタスクで更新
             var identityToTask = allTasks
@@ -135,7 +164,12 @@ public partial class WeeklyScheduleViewModel : ObservableObject
                     if (b.Kind == ScheduleBlockKind.Timed) TimedBlocks.Add(b);
                     else AllDayBlocks.Add(b);
                 }
-                StatusText = $"{blocksInWeek.Count} block(s)";
+
+                OutlookEvents.Clear();
+                foreach (var ev in outlookEvents) OutlookEvents.Add(ev);
+
+                StatusText = $"{blocksInWeek.Count} block(s)" +
+                             (outlookEvents.Count > 0 ? $" + {outlookEvents.Count} Outlook" : "");
             });
         }
         catch (Exception ex)
@@ -244,7 +278,7 @@ public partial class WeeklyScheduleViewModel : ObservableObject
         return $"{task.ProjectShortName}|{task.WorkstreamId ?? ""}|{task.Title}";
     }
 
-    public static DateTime GetMondayOf(DateTime date)
+    internal static DateTime GetMondayOf(DateTime date)
     {
         int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
         return date.Date.AddDays(-diff);

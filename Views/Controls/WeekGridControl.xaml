@@ -35,6 +35,8 @@
                 SizeChanged="OnAllDaySizeChanged">
             <Grid>
                 <Canvas x:Name="AllDayBgCanvas" IsHitTestVisible="False" />
+                <!-- Outlook 終日イベント (読み取り専用、Curia ブロックより下層) -->
+                <Canvas x:Name="OutlookAllDayCanvas" IsHitTestVisible="False" />
                 <Canvas x:Name="AllDayCanvas"
                         AllowDrop="True"
                         Background="Transparent"
@@ -42,7 +44,8 @@
                         Drop="OnAllDayDrop"
                         MouseLeftButtonDown="OnAllDayMouseDown"
                         MouseMove="OnAllDayMouseMove"
-                        MouseLeftButtonUp="OnAllDayMouseUp" />
+                        MouseLeftButtonUp="OnAllDayMouseUp"
+                        MouseRightButtonDown="OnAllDayRightClick" />
                 <Canvas x:Name="AllDayBlockCanvas" />
                 <!-- 範囲選択オーバーレイ (ドラッグ中のみ表示) -->
                 <Canvas x:Name="AllDaySelectionCanvas" IsHitTestVisible="False" />
@@ -59,6 +62,8 @@
                   SizeChanged="OnTimeGridSizeChanged">
                 <!-- 背景: グリッド線 -->
                 <Canvas x:Name="TimeGridBgCanvas" IsHitTestVisible="False" />
+                <!-- Outlook 時刻指定イベント (読み取り専用、Curia ブロックより下層) -->
+                <Canvas x:Name="OutlookCanvas" IsHitTestVisible="False" />
                 <!-- ドロップ + 時間範囲選択 -->
                 <Canvas x:Name="TimeDropCanvas"
                         AllowDrop="True"
@@ -67,6 +72,7 @@
                         MouseLeftButtonDown="OnTimeMouseDown"
                         MouseMove="OnTimeMouseMove"
                         MouseLeftButtonUp="OnTimeMouseUp"
+                        MouseRightButtonDown="OnTimeRightClick"
                         Background="Transparent" />
                 <!-- ブロックカード オーバーレイ -->
                 <Canvas x:Name="TimeBlockCanvas" IsHitTestVisible="True" />

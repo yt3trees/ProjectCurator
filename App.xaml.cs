@@ -98,6 +98,8 @@ public partial class App : WpfApplication
         services.AddSingleton<WikiLintService>();
         services.AddSingleton<ScheduleService>();
         services.AddSingleton<ScheduleNotificationService>();
+        services.AddSingleton<OutlookCalendarService>();
+        services.AddSingleton<IcsCalendarService>();
 
         // ViewModels
         services.AddSingleton<MainWindowViewModel>();
