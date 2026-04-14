@@ -77,6 +77,11 @@ public partial class TimelineViewModel : ObservableObject
     private List<TimelineRawEntry> _cachedRawEntries = [];
     private CancellationTokenSource? _heatmapCts;
 
+    // focus_history プレビューキャッシュ: filePath → (LastWriteTimeUtc, previewText)
+    // ファイルが更新されていなければ再読み込みしない
+    private static readonly Dictionary<string, (DateTime Lwt, string Preview)> _previewCache = [];
+    private static readonly object _previewCacheLock = new();
+
     [ObservableProperty]
     private ObservableCollection<ProjectInfo> projects = [];
 
@@ -742,14 +747,24 @@ public partial class TimelineViewModel : ObservableObject
         }
     }
 
-    /// <summary>focus_history ファイルから「今やってること」セクションの最初の箇条書きを取得。</summary>
+    /// <summary>focus_history ファイルから「今やってること」セクションの最初の箇条書きを取得。
+    /// ファイルの LastWriteTimeUtc が変わっていなければキャッシュ値を返す。</summary>
     private static string GetFocusPreview(string filePath)
     {
         try
         {
+            var lwt = File.GetLastWriteTimeUtc(filePath);
+            lock (_previewCacheLock)
+            {
+                if (_previewCache.TryGetValue(filePath, out var cached) && cached.Lwt == lwt)
+                    return cached.Preview;
+            }
+
             var (content, _) = EncodingDetector.ReadFile(filePath);
             var lines = content.Split('\n');
             bool inSection = false;
+            string result = "";
+
             foreach (var raw in lines)
             {
                 var line = raw.TrimEnd('\r');
@@ -765,23 +780,33 @@ public partial class TimelineViewModel : ObservableObject
                 if (inSection && Regex.IsMatch(line, @"^\s*-\s+\S"))
                 {
                     var preview = Regex.Replace(line, @"^\s*-\s+", "").Trim();
-                    return preview.Length > 80 ? preview[..77] + "..." : preview;
+                    result = preview.Length > 80 ? preview[..77] + "..." : preview;
+                    break;
                 }
             }
 
             // fallback: first non-empty line
-            foreach (var raw in lines)
+            if (result.Length == 0)
             {
-                var trimmed = raw.TrimEnd('\r').Trim();
-                if (trimmed.Length > 0
-                    && !trimmed.StartsWith('#')
-                    && !trimmed.StartsWith("<!--", StringComparison.Ordinal)
-                    && !trimmed.StartsWith("---", StringComparison.Ordinal)
-                    && trimmed != "-")
+                foreach (var raw in lines)
                 {
-                    return trimmed.Length > 80 ? trimmed[..77] + "..." : trimmed;
+                    var trimmed = raw.TrimEnd('\r').Trim();
+                    if (trimmed.Length > 0
+                        && !trimmed.StartsWith('#')
+                        && !trimmed.StartsWith("<!--", StringComparison.Ordinal)
+                        && !trimmed.StartsWith("---", StringComparison.Ordinal)
+                        && trimmed != "-")
+                    {
+                        result = trimmed.Length > 80 ? trimmed[..77] + "..." : trimmed;
+                        break;
+                    }
                 }
             }
+
+            lock (_previewCacheLock)
+                _previewCache[filePath] = (lwt, result);
+
+            return result;
         }
         catch (Exception ex)
         {

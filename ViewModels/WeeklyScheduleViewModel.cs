@@ -47,8 +47,10 @@ public partial class WeeklyScheduleViewModel : ObservableObject
     public Action<Models.ProjectInfo, string>? OnOpenInEditor { get; set; }
 
     // タスクキャッシュ (5分 TTL — 週切り替えではタスクリストは変わらない)
+    // hidden_projects.json が変わった場合もキャッシュを無効化するため hiddenKeys をセットで保持する
     private List<TodayQueueTask>? _cachedAllTasks;
     private DateTime _tasksCachedAt = DateTime.MinValue;
+    private HashSet<string> _cachedHiddenKeys = [];
     private const int TasksCacheTtlSeconds = 300;
 
     public WeeklyScheduleViewModel(
@@ -101,8 +103,13 @@ public partial class WeeklyScheduleViewModel : ObservableObject
         try
         {
             // タスクはキャッシュが有効な間は再取得しない (週切り替えでは変わらないため)
+            // hidden_projects.json が変わった場合は TTL 内でもキャッシュを破棄して再取得する
+            var hiddenKeys = _configService.LoadHiddenProjects().ToHashSet(StringComparer.Ordinal);
+            bool hiddenKeysChanged = !hiddenKeys.SetEquals(_cachedHiddenKeys);
+
             List<TodayQueueTask> allTasks;
             if (_cachedAllTasks != null
+                && !hiddenKeysChanged
                 && (DateTime.Now - _tasksCachedAt).TotalSeconds < TasksCacheTtlSeconds)
             {
                 allTasks = _cachedAllTasks;
@@ -110,10 +117,15 @@ public partial class WeeklyScheduleViewModel : ObservableObject
             else
             {
                 var projects = await _discoveryService.GetProjectInfoListAsync();
+                // 非表示プロジェクトのタスクは読み込まない
+                var visibleProjects = projects
+                    .Where(p => !hiddenKeys.Contains(p.HiddenKey))
+                    .ToList();
                 allTasks = await Task.Run(() =>
-                    _todayQueueService.GetAllTasksSorted(projects, 10000));
-                _cachedAllTasks = allTasks;
-                _tasksCachedAt  = DateTime.Now;
+                    _todayQueueService.GetAllTasksSorted(visibleProjects, 10000));
+                _cachedAllTasks   = allTasks;
+                _tasksCachedAt    = DateTime.Now;
+                _cachedHiddenKeys = hiddenKeys;
             }
 
             var blocksInWeek = _scheduleService.GetBlocksForWeek(WeekStart);
