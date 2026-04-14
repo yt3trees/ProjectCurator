@@ -17,8 +17,15 @@ public class IcsCalendarService
         Timeout = TimeSpan.FromSeconds(30),
     };
 
+    // ICS コンテンツキャッシュ (URL 単位、TTL 10分)
+    private string? _cachedUrl;
+    private string? _cachedContent;
+    private DateTime _cachedAt = DateTime.MinValue;
+    private const int CacheTtlSeconds = 600;
+
     /// <summary>
     /// 指定 URL の ICS を取得し、weekStart の週に重なるイベントを返す。
+    /// 直近 10 分以内に同じ URL を取得済みの場合はキャッシュを利用する。
     /// 失敗時は空リストを返す (例外をスローしない)。
     /// </summary>
     public async Task<IReadOnlyList<OutlookEvent>> GetEventsForWeekAsync(
@@ -26,7 +33,20 @@ public class IcsCalendarService
     {
         try
         {
-            var icsContent = await _http.GetStringAsync(icsUrl);
+            string icsContent;
+            if (_cachedContent != null
+                && _cachedUrl == icsUrl
+                && (DateTime.Now - _cachedAt).TotalSeconds < CacheTtlSeconds)
+            {
+                icsContent = _cachedContent;
+            }
+            else
+            {
+                icsContent = await _http.GetStringAsync(icsUrl);
+                _cachedUrl     = icsUrl;
+                _cachedContent = icsContent;
+                _cachedAt      = DateTime.Now;
+            }
             return ParseWeekEvents(icsContent, weekStart);
         }
         catch (Exception ex)
@@ -34,6 +54,14 @@ public class IcsCalendarService
             System.Diagnostics.Debug.WriteLine($"[IcsCalendarService] {ex.Message}");
             throw; // SettingsViewModel の TestIcs でエラー表示するため伝搬
         }
+    }
+
+    /// <summary>キャッシュを強制破棄する (設定変更時などに呼ぶ)。</summary>
+    public void InvalidateCache()
+    {
+        _cachedUrl     = null;
+        _cachedContent = null;
+        _cachedAt      = DateTime.MinValue;
     }
 
     private static IReadOnlyList<OutlookEvent> ParseWeekEvents(

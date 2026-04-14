@@ -120,6 +120,7 @@ public partial class WeekGridControl : WpfUserControl
         _clockTimer.Tick += (_, _) => RenderCurrentTimeIndicator();
         _clockTimer.Start();
 
+        SetupOutlookTooltips();
         Refresh();
         ScrollToCurrentTime();
     }
@@ -753,6 +754,9 @@ public partial class WeekGridControl : WpfUserControl
 
         card.MouseLeftButtonDown += (s, e) => OnTimedCardMouseDown(card, block, e);
         card.ContextMenu = BuildBlockContextMenu(block);
+        card.ToolTip = BuildBlockToolTip(block);
+        ToolTipService.SetShowDuration(card, 10000);
+        ToolTipService.SetInitialShowDelay(card, 400);
         return card;
     }
 
@@ -794,7 +798,212 @@ public partial class WeekGridControl : WpfUserControl
 
         card.MouseLeftButtonDown += (s, e) => OnAllDayCardMouseDown(card, block, e);
         card.ContextMenu = BuildBlockContextMenu(block);
+        card.ToolTip = BuildBlockToolTip(block);
+        ToolTipService.SetShowDuration(card, 10000);
+        ToolTipService.SetInitialShowDelay(card, 400);
         return card;
+    }
+
+    // ─── ツールチップ ────────────────────────────────────────────────
+
+    // ─── Outlook イベント ツールチップ ──────────────────────────────
+
+    private void SetupOutlookTooltips()
+    {
+        var timedTip = new System.Windows.Controls.ToolTip();
+        TimeDropCanvas.ToolTip = timedTip;
+        ToolTipService.SetShowDuration(TimeDropCanvas, 10000);
+        ToolTipService.SetInitialShowDelay(TimeDropCanvas, 400);
+        TimeDropCanvas.ToolTipOpening += (_, e) =>
+        {
+            var pos = Mouse.GetPosition(TimeDropCanvas);
+            var ev = FindOutlookTimedEventAt(pos);
+            if (ev == null) { e.Handled = true; return; }
+            timedTip.Content = BuildOutlookEventToolTipPanel(ev);
+        };
+
+        var allDayTip = new System.Windows.Controls.ToolTip();
+        AllDayCanvas.ToolTip = allDayTip;
+        ToolTipService.SetShowDuration(AllDayCanvas, 10000);
+        ToolTipService.SetInitialShowDelay(AllDayCanvas, 400);
+        AllDayCanvas.ToolTipOpening += (_, e) =>
+        {
+            var pos = Mouse.GetPosition(AllDayCanvas);
+            var ev = FindOutlookAllDayEventAt(pos);
+            if (ev == null) { e.Handled = true; return; }
+            allDayTip.Content = BuildOutlookEventToolTipPanel(ev);
+        };
+    }
+
+    private OutlookEvent? FindOutlookTimedEventAt(Point pos)
+    {
+        if (_vm == null) return null;
+        var weekStart = _vm.WeekStart;
+
+        foreach (var ev in _vm.OutlookEvents.Where(e => !e.IsAllDay))
+        {
+            var startAt = ev.Start;
+            var endAt   = ev.End;
+            if (startAt.Date >= weekStart.AddDays(7) || endAt <= weekStart) continue;
+            if (startAt < weekStart) startAt = weekStart;
+            if (endAt > weekStart.AddDays(7)) endAt = weekStart.AddDays(7);
+
+            int dayIdx = (startAt.Date - weekStart.Date).Days;
+            double top    = startAt.TimeOfDay.TotalMinutes / SlotMinutes * SlotHeight;
+            double height = Math.Max(SlotHeight, (endAt - startAt).TotalMinutes / SlotMinutes * SlotHeight);
+            double left   = TimeColWidth + dayIdx * _dayColWidth + 1;
+            double width  = _dayColWidth - 4;
+
+            if (pos.X >= left && pos.X <= left + width &&
+                pos.Y >= top  && pos.Y <= top  + height)
+                return ev;
+        }
+        return null;
+    }
+
+    private OutlookEvent? FindOutlookAllDayEventAt(Point pos)
+    {
+        if (_vm == null) return null;
+        var weekStart = _vm.WeekStart;
+
+        int dayIdx = (int)Math.Floor((pos.X - TimeColWidth) / _dayColWidth);
+        if (dayIdx < 0 || dayIdx > 6) return null;
+        var cursorDate = weekStart.AddDays(dayIdx);
+
+        return _vm.OutlookEvents
+            .Where(e => e.IsAllDay &&
+                        e.Start.Date <= cursorDate &&
+                        cursorDate < e.End.Date)
+            .FirstOrDefault();
+    }
+
+    private StackPanel BuildOutlookEventToolTipPanel(OutlookEvent ev)
+    {
+        var panel = new StackPanel { Margin = new Thickness(2) };
+
+        // カレンダー名
+        if (!string.IsNullOrEmpty(ev.CalendarName))
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = ev.CalendarName,
+                FontSize = 10,
+                Foreground = GetBrush("AppSubtext0"),
+            });
+        }
+
+        // 件名
+        panel.Children.Add(new TextBlock
+        {
+            Text = ev.Subject,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = GetBrush("AppText"),
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 260,
+        });
+
+        // 時刻 / 日付
+        string rangeText = ev.IsAllDay
+            ? ev.Start.Date == ev.End.Date.AddDays(-1)
+                ? ev.Start.ToString("M/d")
+                : $"{ev.Start:M/d} - {ev.End.AddDays(-1):M/d}"
+            : $"{ev.Start:HH:mm} - {ev.End:HH:mm}";
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = rangeText,
+            FontSize = 11,
+            Foreground = GetBrush("AppSubtext0"),
+            Margin = new Thickness(0, 2, 0, 0),
+        });
+
+        // 場所
+        if (!string.IsNullOrWhiteSpace(ev.Location))
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = ev.Location,
+                FontSize = 11,
+                Foreground = GetBrush("AppSubtext0"),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 260,
+                Margin = new Thickness(0, 2, 0, 0),
+            });
+        }
+
+        return panel;
+    }
+
+    private System.Windows.Controls.ToolTip BuildBlockToolTip(ScheduleBlock block)
+    {
+        var panel = new StackPanel { Margin = new Thickness(2) };
+
+        // プロジェクト名
+        if (!string.IsNullOrEmpty(block.ProjectShortName))
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = block.ProjectShortName,
+                FontSize = 10,
+                Foreground = GetBrush("AppSubtext0"),
+            });
+        }
+
+        // タスクタイトル
+        panel.Children.Add(new TextBlock
+        {
+            Text = block.TitleSnapshot,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = GetBrush("AppText"),
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 260,
+        });
+
+        // 時刻 / 日付
+        string rangeText = block.Kind == ScheduleBlockKind.Timed
+            ? GetTimedBlockTimeText(block)
+            : block.StartDate.HasValue && block.EndDate.HasValue
+                ? block.StartDate.Value.Date == block.EndDate.Value.Date
+                    ? block.StartDate.Value.ToString("M/d")
+                    : $"{block.StartDate.Value:M/d} - {block.EndDate.Value:M/d}"
+                : "";
+
+        if (!string.IsNullOrEmpty(rangeText))
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = rangeText,
+                FontSize = 11,
+                Foreground = GetBrush("AppSubtext0"),
+                Margin = new Thickness(0, 2, 0, 0),
+            });
+        }
+
+        // メモ
+        if (!string.IsNullOrWhiteSpace(block.Note))
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = block.Note,
+                FontSize = 11,
+                FontStyle = FontStyles.Italic,
+                Foreground = GetBrush("AppSubtext0"),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 260,
+                Margin = new Thickness(0, 4, 0, 0),
+            });
+        }
+
+        return new System.Windows.Controls.ToolTip
+        {
+            Content = panel,
+            Background = GetBrush("AppSurface1"),
+            BorderBrush = GetBrush("AppSurface2"),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(8, 6, 8, 6),
+        };
     }
 
     // ─── コンテキストメニュー ────────────────────────────────────────

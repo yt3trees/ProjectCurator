@@ -46,6 +46,11 @@ public partial class WeeklyScheduleViewModel : ObservableObject
     // 他ページへのナビゲーション コールバック
     public Action<Models.ProjectInfo, string>? OnOpenInEditor { get; set; }
 
+    // タスクキャッシュ (5分 TTL — 週切り替えではタスクリストは変わらない)
+    private List<TodayQueueTask>? _cachedAllTasks;
+    private DateTime _tasksCachedAt = DateTime.MinValue;
+    private const int TasksCacheTtlSeconds = 300;
+
     public WeeklyScheduleViewModel(
         ScheduleService scheduleService,
         TodayQueueService todayQueueService,
@@ -95,9 +100,21 @@ public partial class WeeklyScheduleViewModel : ObservableObject
         StatusText = "Loading...";
         try
         {
-            var projects = await _discoveryService.GetProjectInfoListAsync();
-            var allTasks = await Task.Run(() =>
-                _todayQueueService.GetAllTasksSorted(projects, 10000));
+            // タスクはキャッシュが有効な間は再取得しない (週切り替えでは変わらないため)
+            List<TodayQueueTask> allTasks;
+            if (_cachedAllTasks != null
+                && (DateTime.Now - _tasksCachedAt).TotalSeconds < TasksCacheTtlSeconds)
+            {
+                allTasks = _cachedAllTasks;
+            }
+            else
+            {
+                var projects = await _discoveryService.GetProjectInfoListAsync();
+                allTasks = await Task.Run(() =>
+                    _todayQueueService.GetAllTasksSorted(projects, 10000));
+                _cachedAllTasks = allTasks;
+                _tasksCachedAt  = DateTime.Now;
+            }
 
             var blocksInWeek = _scheduleService.GetBlocksForWeek(WeekStart);
 

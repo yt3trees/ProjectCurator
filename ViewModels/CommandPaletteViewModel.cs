@@ -39,6 +39,8 @@ public partial class CommandPaletteViewModel : ObservableObject
     private CommandItem? selectedCommand;
 
     private List<CommandItem> _allCommands = [];
+    private DateTime _commandsBuiltTime = DateTime.MinValue;
+    private const int RebuildTtlSeconds = 290; // discovery cache TTL より少し短く
 
     public CommandPaletteViewModel(
         ConfigService configService,
@@ -58,11 +60,37 @@ public partial class CommandPaletteViewModel : ObservableObject
         _contentDialogService = contentDialogService;
     }
 
+    /// <summary>
+    /// アプリ起動時にバックグラウンドでコマンド一覧を構築しておく。
+    /// パレット初回起動を即時にするためのウォームアップ用。
+    /// </summary>
+    public async Task PreBuildAsync()
+    {
+        if ((DateTime.Now - _commandsBuiltTime).TotalSeconds < RebuildTtlSeconds)
+            return;
+
+        _allCommands = BuildStaticCommands();
+        await RebuildWithProjectsAsync();
+    }
+
     public void Prepare()
     {
-        BuildCommands();
+        bool isFresh = (DateTime.Now - _commandsBuiltTime).TotalSeconds < RebuildTtlSeconds;
+        if (isFresh)
+        {
+            // キャッシュが新鮮 — 即時表示
+            SearchText = "";
+            UpdateFilter();
+            return;
+        }
+
+        // タブコマンドのみ即時セット → ウィンドウはすぐに開く
+        _allCommands = BuildStaticCommands();
         SearchText = "";
         UpdateFilter();
+
+        // プロジェクトコマンドをバックグラウンドで追加
+        _ = RebuildWithProjectsAsync();
     }
 
     /// <summary>
@@ -79,11 +107,12 @@ public partial class CommandPaletteViewModel : ObservableObject
         UpdateFilter();
     }
 
-    private void BuildCommands()
+    /// <summary>
+    /// タブコマンドのみ構築 (I/O なし・即時)。
+    /// </summary>
+    private List<CommandItem> BuildStaticCommands()
     {
         var commands = new List<CommandItem>();
-
-        // --- Tab switch commands ---
         AddTabCommand(commands, "Dashboard", typeof(DashboardPage));
         AddTabCommand(commands, "Editor", typeof(EditorPage));
         AddTabCommand(commands, "Timeline", typeof(TimelinePage));
@@ -93,13 +122,19 @@ public partial class CommandPaletteViewModel : ObservableObject
         AddTabCommand(commands, "Agent Hub", typeof(AgentHubPage));
         AddTabCommand(commands, "Setup", typeof(SetupPage));
         AddTabCommand(commands, "Settings", typeof(SettingsPage));
+        return commands;
+    }
 
-        // --- Global commands ---
-        var settings = _configService.LoadSettings();
-
+    /// <summary>
+    /// プロジェクト一覧を非同期取得してフルコマンドセットを再構築する。
+    /// 完了後、UIスレッドでフィルタを更新する。
+    /// </summary>
+    private async Task RebuildWithProjectsAsync()
+    {
+        var projects = await _discoveryService.GetProjectInfoListAsync();
+        var commands = BuildStaticCommands();
 
         // --- Project commands ---
-        var projects = _discoveryService.GetProjectInfoList();
         foreach (var proj in projects)
         {
             string displayName = proj.DisplayName;
@@ -211,6 +246,10 @@ public partial class CommandPaletteViewModel : ObservableObject
         }
 
         _allCommands = commands;
+        _commandsBuiltTime = DateTime.Now;
+
+        // パレットが開いている場合にリストを更新する
+        await System.Windows.Application.Current.Dispatcher.InvokeAsync(UpdateFilter);
     }
 
     private void AddTabCommand(List<CommandItem> commands, string label, Type pageType)

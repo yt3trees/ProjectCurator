@@ -321,6 +321,9 @@ public partial class MainWindow : FluentWindow
         // デフォルトページを DashboardPage に設定
         RootNavigation.Navigate(typeof(DashboardPage));
 
+        // コマンドパレットのコマンド一覧をバックグラウンドで事前構築 (初回起動を即時化)
+        _ = _viewModel.CommandPaletteViewModel.PreBuildAsync();
+
         // 起動時: App.xaml.cs で画面外位置に設定済み。
         // OnLoaded で WPF が描画完了後、ウィンドウを画面中央に移動して表示する。
         MoveOnScreen();

@@ -45,7 +45,7 @@
                         MouseLeftButtonDown="OnAllDayMouseDown"
                         MouseMove="OnAllDayMouseMove"
                         MouseLeftButtonUp="OnAllDayMouseUp"
-                        MouseRightButtonDown="OnAllDayRightClick" />
+                        MouseRightButtonUp="OnAllDayRightClick" />
                 <Canvas x:Name="AllDayBlockCanvas" />
                 <!-- 範囲選択オーバーレイ (ドラッグ中のみ表示) -->
                 <Canvas x:Name="AllDaySelectionCanvas" IsHitTestVisible="False" />
@@ -72,7 +72,7 @@
                         MouseLeftButtonDown="OnTimeMouseDown"
                         MouseMove="OnTimeMouseMove"
                         MouseLeftButtonUp="OnTimeMouseUp"
-                        MouseRightButtonDown="OnTimeRightClick"
+                        MouseRightButtonUp="OnTimeRightClick"
                         Background="Transparent" />
                 <!-- ブロックカード オーバーレイ -->
                 <Canvas x:Name="TimeBlockCanvas" IsHitTestVisible="True" />
