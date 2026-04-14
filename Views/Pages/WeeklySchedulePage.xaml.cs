@@ -45,7 +45,14 @@ public partial class WeeklySchedulePage : WpfUserControl, INavigableView<WeeklyS
     {
         if (e.LeftButton != MouseButtonState.Pressed) return;
         if (sender is not FrameworkElement fe) return;
-        if (fe.DataContext is not TodayQueueTask task) return;
+        // DataContext は TaskViewItem (左パネル) または TodayQueueTask (直接バインド) の両方を許容
+        TodayQueueTask? task = fe.DataContext switch
+        {
+            TaskViewItem item => item.Task,
+            TodayQueueTask t  => t,
+            _                 => null,
+        };
+        if (task == null) return;
 
         var current = e.GetPosition(this);
         if (!_taskDragInitiated)

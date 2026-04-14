@@ -33,7 +33,7 @@ namespace Curia.Views.Controls;
 public partial class WeekGridControl : WpfUserControl
 {
     // --- 定数 ---
-    private const double SlotHeight = 20.0;   // 1スロット(30分) の高さ (px)
+    private const double SlotHeight = 24.0;   // 1スロット(30分) の高さ (px)
     private const double SlotMinutes = 30.0;
     private const int    SlotCount = 48;       // 1日のスロット数
     private const double TimeColWidth = 60.0;  // 時刻ラベル列の幅
@@ -290,6 +290,34 @@ public partial class WeekGridControl : WpfUserControl
         var today = DateTime.Today;
         var weekStart = _vm.WeekStart;
 
+        // 定時外 (09:00 前 / 18:00 以降) を暗くするオーバーレイ
+        const int WorkStartSlot = 9 * 2;  // 09:00 = slot 18
+        const int WorkEndSlot   = 18 * 2; // 18:00 = slot 36
+        double offHoursDimWidth = TimeGridContainer.ActualWidth - TimeColWidth;
+        var offHoursBrush = new SolidColorBrush(Color.FromArgb(0x28, 0x00, 0x00, 0x00));
+
+        // 00:00 〜 09:00
+        var preWorkRect = new Rectangle
+        {
+            Width  = offHoursDimWidth,
+            Height = WorkStartSlot * SlotHeight,
+            Fill   = offHoursBrush,
+        };
+        Canvas.SetLeft(preWorkRect, TimeColWidth);
+        Canvas.SetTop(preWorkRect, 0);
+        TimeGridBgCanvas.Children.Add(preWorkRect);
+
+        // 18:00 〜 24:00
+        var postWorkRect = new Rectangle
+        {
+            Width  = offHoursDimWidth,
+            Height = (SlotCount - WorkEndSlot) * SlotHeight,
+            Fill   = offHoursBrush,
+        };
+        Canvas.SetLeft(postWorkRect, TimeColWidth);
+        Canvas.SetTop(postWorkRect, WorkEndSlot * SlotHeight);
+        TimeGridBgCanvas.Children.Add(postWorkRect);
+
         // 今日の列を薄くハイライト
         for (int d = 0; d < 7; d++)
         {
@@ -413,14 +441,14 @@ public partial class WeekGridControl : WpfUserControl
             Y1 = top,
             X2 = left + _dayColWidth,
             Y2 = top,
-            Stroke = new SolidColorBrush(Color.FromRgb(0xE8, 0x11, 0x23)),
+            Stroke = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4)),
             StrokeThickness = 2,
         };
         var dot = new Ellipse
         {
             Tag = "CurrentTime",
             Width = 8, Height = 8,
-            Fill = new SolidColorBrush(Color.FromRgb(0xE8, 0x11, 0x23)),
+            Fill = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4)),
         };
         Canvas.SetLeft(dot, left - 8);
         Canvas.SetTop(dot, top - 4);
@@ -430,9 +458,9 @@ public partial class WeekGridControl : WpfUserControl
 
     private void ScrollToCurrentTime()
     {
-        var now = DateTime.Now.TimeOfDay;
-        // 1時間前にスクロール
-        var targetTop = Math.Max(0, (now.TotalMinutes - 60) / SlotMinutes * SlotHeight);
+        // 7:30 を先頭に表示 (slot 15 = 7.5h * 2)
+        const double startHour = 7.5;
+        var targetTop = startHour * 60 / SlotMinutes * SlotHeight;
         TimeScrollViewer.ScrollToVerticalOffset(targetTop);
     }
 
@@ -810,7 +838,12 @@ public partial class WeekGridControl : WpfUserControl
             BorderThickness = new Thickness(0),
         };
 
-        foreach (var group in _vm.UnscheduledGroups)
+        var scheduledIdentitiesAd = _vm.TimedBlocks
+            .Select(b => b.TaskIdentity)
+            .Concat(_vm.AllDayBlocks.Select(b => b.TaskIdentity))
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var group in _vm.AllTaskGroups)
         {
             listBox.Items.Add(new ListBoxItem
             {
@@ -821,11 +854,14 @@ public partial class WeekGridControl : WpfUserControl
             });
             foreach (var task in group.Tasks)
             {
+                var isScheduled = scheduledIdentitiesAd.Contains(WeeklyScheduleViewModel.BuildIdentity(task));
                 var item = new ListBoxItem
                 {
-                    Content = task.DisplayMainTitle,
+                    Content = isScheduled
+                        ? $"{task.DisplayMainTitle}  [scheduled]"
+                        : task.DisplayMainTitle,
                     Tag = task,
-                    Foreground = GetBrush("AppText"),
+                    Foreground = isScheduled ? GetBrush("AppSubtext0") : GetBrush("AppText"),
                     FontSize = 12,
                 };
                 listBox.Items.Add(item);
@@ -1011,7 +1047,12 @@ public partial class WeekGridControl : WpfUserControl
             BorderThickness = new Thickness(0),
         };
 
-        foreach (var group in _vm.UnscheduledGroups)
+        var scheduledIdentities = _vm.TimedBlocks
+            .Select(b => b.TaskIdentity)
+            .Concat(_vm.AllDayBlocks.Select(b => b.TaskIdentity))
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var group in _vm.AllTaskGroups)
         {
             listBox.Items.Add(new ListBoxItem
             {
@@ -1022,11 +1063,14 @@ public partial class WeekGridControl : WpfUserControl
             });
             foreach (var task in group.Tasks)
             {
+                var isScheduled = scheduledIdentities.Contains(WeeklyScheduleViewModel.BuildIdentity(task));
                 var item = new ListBoxItem
                 {
-                    Content = task.DisplayMainTitle,
+                    Content = isScheduled
+                        ? $"{task.DisplayMainTitle}  [scheduled]"
+                        : task.DisplayMainTitle,
                     Tag = task,
-                    Foreground = GetBrush("AppText"),
+                    Foreground = isScheduled ? GetBrush("AppSubtext0") : GetBrush("AppText"),
                     FontSize = 12,
                 };
                 listBox.Items.Add(item);

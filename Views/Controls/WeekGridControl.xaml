@@ -55,7 +55,7 @@
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <Grid x:Name="TimeGridContainer"
-                  Height="960"
+                  Height="1152"
                   SizeChanged="OnTimeGridSizeChanged">
                 <!-- 背景: グリッド線 -->
                 <Canvas x:Name="TimeGridBgCanvas" IsHitTestVisible="False" />

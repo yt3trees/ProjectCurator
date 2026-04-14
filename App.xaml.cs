@@ -62,6 +62,10 @@ public partial class App : WpfApplication
         mainWindow.Left = -32000;
         mainWindow.Top = -32000;
         mainWindow.Show();
+
+        // スケジュール通知タイマー起動 (TrayService は MainWindow.Show 内で初期化済み)
+        var scheduleNotification = _serviceProvider.GetRequiredService<ScheduleNotificationService>();
+        scheduleNotification.Start();
     }
 
     private static void ConfigureServices(IServiceCollection services)
@@ -93,6 +97,7 @@ public partial class App : WpfApplication
         services.AddSingleton<WikiQueryService>();
         services.AddSingleton<WikiLintService>();
         services.AddSingleton<ScheduleService>();
+        services.AddSingleton<ScheduleNotificationService>();
 
         // ViewModels
         services.AddSingleton<MainWindowViewModel>();

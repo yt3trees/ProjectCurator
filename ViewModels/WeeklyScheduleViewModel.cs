@@ -6,7 +6,12 @@ using Curia.Services;
 
 namespace Curia.ViewModels;
 
+// ピッカーポップアップ用 (スケジュール済みを含む全タスク)
 public record UnscheduledTaskGroup(string ProjectShortName, IReadOnlyList<TodayQueueTask> Tasks);
+
+// 左パネル用 (スケジュール済みフラグ付き)
+public record TaskViewItem(TodayQueueTask Task, bool IsScheduledThisWeek);
+public record TaskViewGroup(string ProjectShortName, IReadOnlyList<TaskViewItem> Items);
 
 public partial class WeeklyScheduleViewModel : ObservableObject
 {
@@ -26,7 +31,10 @@ public partial class WeeklyScheduleViewModel : ObservableObject
     [ObservableProperty]
     private bool _isLoading;
 
-    public ObservableCollection<UnscheduledTaskGroup> UnscheduledGroups { get; } = [];
+    // 左パネル: 全タスク (スケジュール済みは IsScheduledThisWeek=true で薄く表示)
+    public ObservableCollection<TaskViewGroup> TaskListGroups { get; } = [];
+    // ピッカーポップアップ用: 全タスク (フラットな形式)
+    public ObservableCollection<UnscheduledTaskGroup> AllTaskGroups { get; } = [];
     public ObservableCollection<ScheduleBlock> TimedBlocks { get; } = [];
     public ObservableCollection<ScheduleBlock> AllDayBlocks { get; } = [];
 
@@ -96,8 +104,17 @@ public partial class WeeklyScheduleViewModel : ObservableObject
                 .Select(b => b.TaskIdentity)
                 .ToHashSet(StringComparer.Ordinal);
 
-            var groups = allTasks
-                .Where(t => !scheduledIdentities.Contains(BuildIdentity(t)))
+            // 左パネル: 全タスク + スケジュール済みフラグ
+            var taskListGroups = allTasks
+                .GroupBy(t => t.ProjectShortName)
+                .OrderBy(g => g.Key)
+                .Select(g => new TaskViewGroup(g.Key,
+                    g.Select(t => new TaskViewItem(t, scheduledIdentities.Contains(BuildIdentity(t))))
+                     .ToList()))
+                .ToList();
+
+            // ピッカー用: 全タスク (フラット)
+            var allGroups = allTasks
                 .GroupBy(t => t.ProjectShortName)
                 .OrderBy(g => g.Key)
                 .Select(g => new UnscheduledTaskGroup(g.Key, g.ToList()))
@@ -105,8 +122,11 @@ public partial class WeeklyScheduleViewModel : ObservableObject
 
             System.Windows.Application.Current.Dispatcher.Invoke(() =>
             {
-                UnscheduledGroups.Clear();
-                foreach (var g in groups) UnscheduledGroups.Add(g);
+                TaskListGroups.Clear();
+                foreach (var g in taskListGroups) TaskListGroups.Add(g);
+
+                AllTaskGroups.Clear();
+                foreach (var g in allGroups) AllTaskGroups.Add(g);
 
                 TimedBlocks.Clear();
                 AllDayBlocks.Clear();
@@ -144,7 +164,7 @@ public partial class WeeklyScheduleViewModel : ObservableObject
         };
         _scheduleService.AddBlock(block);
         TimedBlocks.Add(block);
-        RemoveFromUnscheduled(task);
+        _ = LoadWeekAsync(); // 左パネルのスケジュール済みフラグを更新
     }
 
     public void AddAllDayBlock(TodayQueueTask task, DateTime startDate, DateTime endDate)
@@ -161,7 +181,7 @@ public partial class WeeklyScheduleViewModel : ObservableObject
         };
         _scheduleService.AddBlock(block);
         AllDayBlocks.Add(block);
-        RemoveFromUnscheduled(task);
+        _ = LoadWeekAsync(); // 左パネルのスケジュール済みフラグを更新
     }
 
     // --- ブロック更新 ---
@@ -212,7 +232,7 @@ public partial class WeeklyScheduleViewModel : ObservableObject
         var allDay = AllDayBlocks.FirstOrDefault(b => b.Id == blockId);
         if (allDay != null) AllDayBlocks.Remove(allDay);
         _scheduleService.RemoveBlock(blockId);
-        _ = LoadWeekAsync(); // 未配置リストを再構築
+        _ = LoadWeekAsync();
     }
 
     // --- ユーティリティ ---
@@ -222,21 +242,6 @@ public partial class WeeklyScheduleViewModel : ObservableObject
         if (!string.IsNullOrEmpty(task.AsanaTaskGid))
             return task.AsanaTaskGid;
         return $"{task.ProjectShortName}|{task.WorkstreamId ?? ""}|{task.Title}";
-    }
-
-    private void RemoveFromUnscheduled(TodayQueueTask task)
-    {
-        var identity = BuildIdentity(task);
-        var group = UnscheduledGroups
-            .FirstOrDefault(g => g.ProjectShortName == task.ProjectShortName);
-        if (group == null) return;
-
-        var newTasks = group.Tasks.Where(t => BuildIdentity(t) != identity).ToList();
-        var idx = UnscheduledGroups.IndexOf(group);
-        if (newTasks.Count == 0)
-            UnscheduledGroups.RemoveAt(idx);
-        else
-            UnscheduledGroups[idx] = new UnscheduledTaskGroup(group.ProjectShortName, newTasks);
     }
 
     public static DateTime GetMondayOf(DateTime date)
