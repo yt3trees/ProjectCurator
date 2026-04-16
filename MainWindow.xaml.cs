@@ -605,6 +605,15 @@ public partial class MainWindow : FluentWindow
     }
 
     /// <summary>
+    /// Add Task ダイアログを開く。コマンドパレットから呼び出す。
+    /// </summary>
+    public async void ShowAddTaskDialog(string? initialProjectName = null)
+    {
+        var dashboardPage = _serviceProvider.GetRequiredService<DashboardPage>();
+        await dashboardPage.ShowAddTaskDialogAsync(initialProjectName);
+    }
+
+    /// <summary>
     /// プロジェクト名でプロジェクトを解決する。
     /// EditorViewModel が未ロードの場合は ProjectDiscoveryService のキャッシュから取得する。
     /// </summary>

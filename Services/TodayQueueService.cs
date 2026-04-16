@@ -408,6 +408,98 @@ public class TodayQueueService
     }
 
     /// <summary>
+    /// Asana API でタスクの期日を更新する。dueAt が空でない場合は due_at、そうでなければ due_on を使用。
+    /// </summary>
+    public async Task<(bool Success, string Message)> UpdateDueDateAsync(
+        string taskGid, string dueOn, string dueAt = "")
+    {
+        if (string.IsNullOrWhiteSpace(taskGid))
+            return (false, "Asana task GID not found.");
+
+        var token = GetAsanaToken();
+        if (string.IsNullOrWhiteSpace(token))
+            return (false, "Asana token not configured.");
+
+        try
+        {
+            var uri  = $"https://app.asana.com/api/1.0/tasks/{taskGid}";
+            object payload;
+            if (!string.IsNullOrWhiteSpace(dueAt))
+                payload = new { data = new { due_at = dueAt } };
+            else if (!string.IsNullOrWhiteSpace(dueOn))
+                payload = new { data = new { due_on = dueOn } };
+            else
+                payload = new { data = new { due_on = (string?)null } };
+
+            var body = JsonSerializer.Serialize(payload);
+            var req  = new HttpRequestMessage(HttpMethod.Put, uri)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            };
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var resp = await _http.SendAsync(req);
+            if (resp.IsSuccessStatusCode)
+                return (true, "Due date updated.");
+
+            var err     = await resp.Content.ReadAsStringAsync();
+            var snippet = err.Length > 200 ? err[..200] : err;
+            return (false, $"Asana API error: {(int)resp.StatusCode} {snippet}");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Asana API error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// tasks.md 内の該当タスク行の (Due: ...) を更新・挿入・削除する。
+    /// dueOn が空なら既存の Due 記述を除去する。
+    /// </summary>
+    public void UpdateDueDateInFile(TodayQueueTask task, string dueOn)
+    {
+        if (string.IsNullOrWhiteSpace(task.AsanaFilePath) || !File.Exists(task.AsanaFilePath)) return;
+        if (string.IsNullOrWhiteSpace(task.AsanaTaskGid)) return;
+
+        try
+        {
+            var (content, encoding) = _fileEncodingService.ReadFile(task.AsanaFilePath);
+            var gid = Regex.Escape(task.AsanaTaskGid);
+            string updated;
+
+            if (string.IsNullOrWhiteSpace(dueOn))
+            {
+                // Due 削除: GID を含む行から (Due: ...) を取り除く
+                var removePattern = @"(?m)^([ \t]*-\s+\[[ x]\].*" + gid + @".*?)\s*\(Due:\s*\d{4}-\d{2}-\d{2}\)(.*)$";
+                updated = Regex.Replace(content, removePattern, "$1$2",
+                    RegexOptions.None, TimeSpan.FromSeconds(5));
+            }
+            else
+            {
+                // 既存の (Due: ...) を置換
+                var replacePattern = @"(?m)^([ \t]*-\s+\[[ x]\].*" + gid + @".*?)\(Due:\s*\d{4}-\d{2}-\d{2}\)(.*)$";
+                updated = Regex.Replace(content, replacePattern, $"$1(Due: {dueOn})$2",
+                    RegexOptions.None, TimeSpan.FromSeconds(5));
+
+                if (updated == content)
+                {
+                    // Due がない行 → [[Asana...]] の直前に挿入
+                    var insertPattern = @"(?m)^([ \t]*-\s+\[[ x]\].*" + gid + @".*?)(\s*\[\[Asana\].*)$";
+                    updated = Regex.Replace(content, insertPattern, $"$1 (Due: {dueOn})$2",
+                        RegexOptions.None, TimeSpan.FromSeconds(5));
+                }
+            }
+
+            if (updated != content)
+                _fileEncodingService.WriteFile(task.AsanaFilePath, updated, encoding);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[TodayQueue] UpdateDueDateInFile error: {ex}");
+        }
+    }
+
+    /// <summary>
     /// tasks.md 内の該当タスク行のチェックボックスを [ ] から [x] に更新する。
     /// </summary>
     public void MarkTaskCompletedInFile(TodayQueueTask task)

@@ -452,6 +452,25 @@ public partial class DashboardViewModel : ObservableObject
         }
     }
 
+    public async Task<(bool Success, string Message)> ChangeDueDateAsync(
+        TodayQueueTask task, string dueOn, string dueAt = "")
+    {
+        TodayQueueStatus = "Today Queue: Updating due date...";
+        var (ok, msg) = await _todayQueueService.UpdateDueDateAsync(task.AsanaTaskGid!, dueOn, dueAt);
+        if (ok)
+        {
+            // tasks.md のファイルも更新してから再読み込み
+            var dateOnly = string.IsNullOrWhiteSpace(dueOn)
+                ? (dueAt.Length >= 10 ? dueAt[..10] : "")
+                : dueOn;
+            await Task.Run(() => _todayQueueService.UpdateDueDateInFile(task, dateOnly));
+            await LoadTodayQueueAsync();
+        }
+        else
+            TodayQueueStatus = $"Today Queue: {msg}";
+        return (ok, msg);
+    }
+
     public async Task SnoozeTaskAsync(TodayQueueTask task)
     {
         await Task.Run(() => _todayQueueService.SnoozeTask(task.SnoozeKey));

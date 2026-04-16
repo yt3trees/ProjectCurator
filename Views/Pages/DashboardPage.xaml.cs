@@ -27,6 +27,9 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     private readonly AsanaSyncService _asanaSyncService;
     private readonly TeamTaskParser _teamTaskParser;
     private readonly AsanaTaskParser _asanaTaskParser;
+    private readonly CaptureService _captureService;
+    private readonly ProjectDiscoveryService _discoveryService;
+    private readonly TrayService _trayService;
 
     public DashboardPage(
         DashboardViewModel viewModel,
@@ -36,7 +39,10 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         DecisionLogService decisionLogService,
         AsanaSyncService asanaSyncService,
         TeamTaskParser teamTaskParser,
-        AsanaTaskParser asanaTaskParser)
+        AsanaTaskParser asanaTaskParser,
+        CaptureService captureService,
+        ProjectDiscoveryService discoveryService,
+        TrayService trayService)
     {
         ViewModel = viewModel;
         _llmClientService = llmClientService;
@@ -46,6 +52,9 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         _asanaSyncService = asanaSyncService;
         _teamTaskParser = teamTaskParser;
         _asanaTaskParser = asanaTaskParser;
+        _captureService = captureService;
+        _discoveryService = discoveryService;
+        _trayService = trayService;
         DataContext = ViewModel;
 
         ViewModel.OnOpenInEditor = project =>
@@ -980,10 +989,475 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
         }
     }
 
-    private void OnAddTaskClick(object sender, RoutedEventArgs e)
+    private async void OnAddTaskClick(object sender, RoutedEventArgs e)
+        => await ShowAddTaskDialogAsync();
+
+    internal async Task ShowAddTaskDialogAsync(string? initialProjectName = null)
     {
-        if (Window.GetWindow(this) is MainWindow mw)
-            mw.ShowCaptureWindowForTask();
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var accent   = appResources.Contains("AppPeach")
+            ? (System.Windows.Media.Brush)appResources["AppPeach"]
+            : text;
+
+        var asanaGlobal = _configService.LoadAsanaGlobalConfig();
+        bool asanaEnabled = !string.IsNullOrWhiteSpace(asanaGlobal.AsanaToken);
+
+        // ── Controls ──────────────────────────────────────────────────────
+        System.Windows.Controls.TextBlock MakeLabel(string t) => new()
+        {
+            Text = t, Foreground = subtext, FontSize = 11,
+            Margin = new Thickness(0, 0, 0, 2)
+        };
+
+        var taskNameBox = new System.Windows.Controls.TextBox
+        {
+            Background = surface1, Foreground = text,
+            BorderBrush = surface2, BorderThickness = new Thickness(1),
+            Padding = new Thickness(6, 4, 6, 4),
+            FontSize = 13, Margin = new Thickness(0, 4, 0, 0)
+        };
+
+        var notesBox = new System.Windows.Controls.TextBox
+        {
+            Background = surface1, Foreground = text,
+            BorderBrush = surface2, BorderThickness = new Thickness(1),
+            Padding = new Thickness(6, 4, 6, 4),
+            FontSize = 12, Margin = new Thickness(0, 4, 0, 0),
+            AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
+            Height = 80, VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+
+        var projectCombo = new System.Windows.Controls.ComboBox
+        {
+            Background = surface1, Foreground = text,
+            BorderBrush = surface2, FontSize = 12,
+            Margin = new Thickness(0, 4, 0, 0), IsEnabled = false
+        };
+
+        var asanaProjectCombo = new System.Windows.Controls.ComboBox
+        {
+            Background = surface1, Foreground = text,
+            BorderBrush = surface2, FontSize = 12,
+            Margin = new Thickness(0, 4, 0, 0), IsEnabled = false
+        };
+        var sectionCombo = new System.Windows.Controls.ComboBox
+        {
+            Background = surface1, Foreground = text,
+            BorderBrush = surface2, FontSize = 12,
+            Margin = new Thickness(0, 4, 0, 0), IsEnabled = false
+        };
+
+        var dueDatePicker = new System.Windows.Controls.DatePicker
+        {
+            Background = surface1, Foreground = text,
+            FontSize = 12, Margin = new Thickness(0, 4, 0, 0),
+            Width = 160
+        };
+        var setTimeCheckBox = new System.Windows.Controls.CheckBox
+        {
+            Content = "Set time",
+            Foreground = subtext, FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 0, 0)
+        };
+        var dueDateRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Children = { dueDatePicker, setTimeCheckBox }
+        };
+
+        System.Windows.Controls.ComboBox BuildTimeCombo(int width) =>
+            new()
+            {
+                Background = surface1, Foreground = text,
+                BorderBrush = surface2, FontSize = 12,
+                Width = width
+            };
+
+        var hourCombo   = BuildTimeCombo(80);
+        var minuteCombo = BuildTimeCombo(80);
+        foreach (var h in Enumerable.Range(0, 24)) hourCombo.Items.Add(h.ToString("00"));
+        foreach (var m in new[] { "00", "15", "30", "45" }) minuteCombo.Items.Add(m);
+        hourCombo.SelectedIndex   = 9;  // default 09:00
+        minuteCombo.SelectedIndex = 0;
+
+        var timePickerRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 4, 0, 0),
+            Visibility = Visibility.Collapsed,
+            Children =
+            {
+                hourCombo,
+                new System.Windows.Controls.TextBlock
+                {
+                    Text = ":", Foreground = text, FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(4, 0, 4, 0)
+                },
+                minuteCombo
+            }
+        };
+
+        setTimeCheckBox.Checked   += (_, _) => timePickerRow.Visibility = Visibility.Visible;
+        setTimeCheckBox.Unchecked += (_, _) => timePickerRow.Visibility = Visibility.Collapsed;
+
+        // ── Quick date buttons ────────────────────────────────────────────
+        static DateTime NextWeekday(DayOfWeek day)
+        {
+            int delta = ((int)day - (int)DateTime.Today.DayOfWeek + 7) % 7;
+            return DateTime.Today.AddDays(delta);
+        }
+        Wpf.Ui.Controls.Button MakeQuickBtn(string label) => new()
+        {
+            Content = label,
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            Padding = new Thickness(8, 0, 8, 0),
+            Height = 22, FontSize = 11,
+            Margin = new Thickness(0, 0, 4, 0),
+            VerticalContentAlignment = VerticalAlignment.Center
+        };
+        var todayBtn    = MakeQuickBtn("Today");
+        var tomorrowBtn = MakeQuickBtn("Tomorrow");
+        var thisFriBtn  = MakeQuickBtn("This Fri");
+        todayBtn.Click    += (_, _) => dueDatePicker.SelectedDate = DateTime.Today;
+        tomorrowBtn.Click += (_, _) => dueDatePicker.SelectedDate = DateTime.Today.AddDays(1);
+        thisFriBtn.Click  += (_, _) => dueDatePicker.SelectedDate = NextWeekday(DayOfWeek.Friday);
+        var quickDateRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 4, 0, 0),
+            Children = { todayBtn, tomorrowBtn, thisFriBtn }
+        };
+
+        var errorText = new System.Windows.Controls.TextBlock
+        {
+            Foreground = accent, FontSize = 11, TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed
+        };
+
+        var contentPanel = new StackPanel { Margin = new Thickness(16, 12, 16, 8) };
+        contentPanel.Children.Add(MakeLabel("Task name"));
+        contentPanel.Children.Add(taskNameBox);
+        contentPanel.Children.Add(new StackPanel
+        {
+            Margin = new Thickness(0, 8, 0, 0),
+            Children = { MakeLabel("Notes (optional)"), notesBox }
+        });
+        contentPanel.Children.Add(new StackPanel
+        {
+            Margin = new Thickness(0, 8, 0, 0),
+            Children = { MakeLabel("Project"), projectCombo }
+        });
+        if (asanaEnabled)
+        {
+            contentPanel.Children.Add(new StackPanel
+            {
+                Margin = new Thickness(0, 8, 0, 0),
+                Children = { MakeLabel("Asana project"), asanaProjectCombo }
+            });
+            contentPanel.Children.Add(new StackPanel
+            {
+                Margin = new Thickness(0, 8, 0, 0),
+                Children = { MakeLabel("Section"), sectionCombo }
+            });
+        }
+        contentPanel.Children.Add(new StackPanel
+        {
+            Margin = new Thickness(0, 8, 0, 0),
+            Children = { MakeLabel("Due date (optional)"), dueDateRow, quickDateRow, timePickerRow }
+        });
+        contentPanel.Children.Add(errorText);
+
+        // ── Title bar ─────────────────────────────────────────────────────
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Add Task", Foreground = text, FontSize = 14,
+            FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(14, 0, 0, 0)
+        };
+        var closeTitleBtn = new System.Windows.Controls.Button
+        {
+            Content = "✕", Width = 34, Height = 26,
+            Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
+        };
+        Grid.SetColumn(titleText, 0);
+        Grid.SetColumn(closeTitleBtn, 1);
+        titleBar.Children.Add(titleText);
+        titleBar.Children.Add(closeTitleBtn);
+
+        // ── Footer ────────────────────────────────────────────────────────
+        var createBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Create",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 100, Height = 32, Margin = new Thickness(0, 0, 8, 0), IsDefault = true
+        };
+        var cancelBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 100, Height = 32, IsCancel = true
+        };
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 0, 16, 12),
+            Children = { createBtn, cancelBtn }
+        };
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0);
+        Grid.SetRow(contentPanel, 1);
+        Grid.SetRow(footer, 2);
+        root.Children.Add(titleBar);
+        root.Children.Add(contentPanel);
+        root.Children.Add(footer);
+
+        var dialogWindow = new Window
+        {
+            Title = "",
+            Owner = Window.GetWindow(this),
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            SizeToContent = SizeToContent.Height,
+            WindowStyle = WindowStyle.None,
+            MinHeight = 0,
+            MinWidth = 420, Width = 420,
+            Background = surface,
+            Foreground = text,
+            BorderBrush = surface2,
+            BorderThickness = new Thickness(1),
+            Content = root
+        };
+
+        titleBar.MouseLeftButtonDown += (_, e) =>
+        {
+            if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed)
+                dialogWindow.DragMove();
+        };
+
+        // ── Project loading ───────────────────────────────────────────────
+        List<AsanaProjectMeta> allAsanaProjects = [];
+
+        _ = Task.Run(async () =>
+        {
+            var projects = await _discoveryService.GetProjectInfoListAsync();
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                projectCombo.Items.Clear();
+                foreach (var p in projects)
+                    projectCombo.Items.Add(p);
+                projectCombo.DisplayMemberPath = "DisplayName";
+                if (!string.IsNullOrEmpty(initialProjectName))
+                {
+                    var match = projects.FirstOrDefault(p =>
+                        p.Name.Equals(initialProjectName, StringComparison.OrdinalIgnoreCase));
+                    projectCombo.SelectedItem = match ?? (projectCombo.Items.Count > 0 ? projects[0] : null);
+                }
+                else if (projectCombo.Items.Count > 0)
+                    projectCombo.SelectedIndex = 0;
+                projectCombo.IsEnabled = true;
+            });
+        });
+
+        // On Curia project change → load Asana projects
+        projectCombo.SelectionChanged += async (_, _) =>
+        {
+            if (!asanaEnabled) return;
+            if (projectCombo.SelectedItem is not ProjectInfo selectedProject) return;
+
+            asanaProjectCombo.IsEnabled = false;
+            asanaProjectCombo.Items.Clear();
+            sectionCombo.IsEnabled = false;
+            sectionCombo.Items.Clear();
+
+            var (gids, _) = _captureService.LoadAsanaProjectGids(selectedProject);
+            if (gids.Count == 0)
+            {
+                asanaProjectCombo.Items.Add("(No Asana project configured)");
+                asanaProjectCombo.SelectedIndex = 0;
+                return;
+            }
+
+            asanaProjectCombo.Items.Add("Loading...");
+            asanaProjectCombo.SelectedIndex = 0;
+
+            var metas = new List<AsanaProjectMeta>();
+            foreach (var gid in gids)
+            {
+                var meta = await _captureService.FetchProjectMetaAsync(gid);
+                if (meta != null) metas.Add(meta);
+            }
+
+            asanaProjectCombo.Items.Clear();
+            allAsanaProjects = metas;
+            foreach (var m in metas)
+                asanaProjectCombo.Items.Add(m);
+            asanaProjectCombo.DisplayMemberPath = "Name";
+            if (asanaProjectCombo.Items.Count > 0)
+                asanaProjectCombo.SelectedIndex = 0;
+            asanaProjectCombo.IsEnabled = metas.Count > 0;
+        };
+
+        // On Asana project change → load sections
+        asanaProjectCombo.SelectionChanged += async (_, _) =>
+        {
+            if (asanaProjectCombo.SelectedItem is not AsanaProjectMeta selectedAsanaProject) return;
+
+            sectionCombo.IsEnabled = false;
+            sectionCombo.Items.Clear();
+
+            var sections = await _captureService.FetchSectionsAsync(selectedAsanaProject.Gid);
+
+            sectionCombo.Items.Add(new AsanaSectionMeta { Gid = "", Name = "(None)" });
+            foreach (var s in sections)
+                sectionCombo.Items.Add(s);
+            sectionCombo.DisplayMemberPath = "Name";
+            sectionCombo.SelectedIndex = 0;
+            sectionCombo.IsEnabled = true;
+        };
+
+        // ── Create handler ────────────────────────────────────────────────
+        createBtn.Click += async (_, _) =>
+        {
+            var taskName = taskNameBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(taskName))
+            {
+                errorText.Text = "Task name is required.";
+                errorText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            createBtn.IsEnabled = false;
+            cancelBtn.IsEnabled = false;
+            errorText.Visibility = Visibility.Collapsed;
+
+            try
+            {
+                CaptureRouteResult result;
+
+                // ── Due date / time 計算 ──────────────────────────────────────
+                var selectedDate = dueDatePicker.SelectedDate;
+                var hasTime = setTimeCheckBox.IsChecked == true;
+                if (hasTime && selectedDate == null)
+                {
+                    errorText.Text = "Select a due date when setting time.";
+                    errorText.Visibility = Visibility.Visible;
+                    createBtn.IsEnabled = true;
+                    cancelBtn.IsEnabled = true;
+                    return;
+                }
+                string dueOn = "", dueAt = "";
+                if (selectedDate.HasValue)
+                {
+                    if (hasTime)
+                    {
+                        var h   = int.Parse((string)hourCombo.SelectedItem!);
+                        var m   = int.Parse((string)minuteCombo.SelectedItem!);
+                        var dto = new DateTimeOffset(
+                            selectedDate.Value.Year, selectedDate.Value.Month, selectedDate.Value.Day,
+                            h, m, 0, DateTimeOffset.Now.Offset);
+                        dueAt = dto.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+                    }
+                    else
+                    {
+                        dueOn = selectedDate.Value.ToString("yyyy-MM-dd");
+                    }
+                }
+
+                if (asanaEnabled && asanaProjectCombo.SelectedItem is AsanaProjectMeta asanaProject
+                    && !string.IsNullOrWhiteSpace(asanaProject.Gid))
+                {
+                    var selectedSection = sectionCombo.SelectedItem as AsanaSectionMeta;
+                    var sectionGid  = selectedSection?.Gid ?? "";
+                    var sectionName = string.IsNullOrEmpty(sectionGid) ? "" : (selectedSection?.Name ?? "");
+
+                    var preview = new AsanaTaskCreatePreview
+                    {
+                        ProjectName = asanaProject.Name,
+                        ProjectGid  = asanaProject.Gid,
+                        SectionName = sectionName,
+                        SectionGid  = sectionGid,
+                        TaskName    = taskName,
+                        Notes       = notesBox.Text.Trim(),
+                        DueOn       = dueOn,
+                        DueAt       = dueAt
+                    };
+
+                    result = await _captureService.CreateAsanaTaskAsync(
+                        preview, $"addtask:{taskName}:{DateTime.Now:yyyyMMddHHmmss}");
+                }
+                else
+                {
+                    // Asana 未設定またはプロジェクト未選択 → ローカルタスク
+                    if (projectCombo.SelectedItem is not ProjectInfo localProject)
+                    {
+                        errorText.Text = "Select a project.";
+                        errorText.Visibility = Visibility.Visible;
+                        createBtn.IsEnabled = true;
+                        cancelBtn.IsEnabled = true;
+                        return;
+                    }
+
+                    var classification = new CaptureClassification
+                    {
+                        Category    = "task",
+                        ProjectName = localProject.Name,
+                        Summary     = taskName,
+                        DueOn       = dueOn
+                    };
+                    result = await _captureService.CreateLocalTaskAsync(classification, taskName);
+                }
+
+                if (result.Success)
+                {
+                    dialogWindow.DialogResult = true;
+                    dialogWindow.Close();
+                    await ViewModel.LoadTodayQueueAsync();
+                    var tipBody = string.IsNullOrWhiteSpace(result.AsanaTaskUrl)
+                        ? taskName
+                        : $"{taskName}\n{result.AsanaTaskUrl}";
+                    _trayService.ShowBalloonTip("Task Created", tipBody);
+                }
+                else
+                {
+                    errorText.Text = result.Message;
+                    errorText.Visibility = Visibility.Visible;
+                    createBtn.IsEnabled = true;
+                    cancelBtn.IsEnabled = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                errorText.Text = ex.Message;
+                errorText.Visibility = Visibility.Visible;
+                createBtn.IsEnabled = true;
+                cancelBtn.IsEnabled = true;
+            }
+        };
+
+        cancelBtn.Click     += (_, _) => { dialogWindow.DialogResult = false; dialogWindow.Close(); };
+        closeTitleBtn.Click += (_, _) => { dialogWindow.DialogResult = false; dialogWindow.Close(); };
+
+        dialogWindow.Loaded += (_, _) => taskNameBox.Focus();
+        dialogWindow.ShowDialog();
     }
 
     private async void OnTodayQueueDoneClick(object sender, RoutedEventArgs e)
@@ -1008,6 +1482,260 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     {
         if (sender is not FrameworkElement { Tag: TodayQueueTask task }) return;
         _ = ViewModel.SnoozeTaskAsync(task);
+    }
+
+    private async void OnTodayQueueChangeDueDateClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.MenuItem { Tag: TodayQueueTask task }) return;
+        if (task.IsLocalOnly)
+        {
+            System.Windows.MessageBox.Show(
+                "Due date update is only available for Asana tasks.",
+                "Not Supported", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        await ShowChangeDueDateDialogAsync(task);
+    }
+
+    private async Task ShowChangeDueDateDialogAsync(TodayQueueTask task)
+    {
+        var appResources = Application.Current.Resources;
+        var surface  = (System.Windows.Media.Brush)appResources["AppSurface0"];
+        var surface1 = (System.Windows.Media.Brush)appResources["AppSurface1"];
+        var surface2 = (System.Windows.Media.Brush)appResources["AppSurface2"];
+        var text     = (System.Windows.Media.Brush)appResources["AppText"];
+        var subtext  = (System.Windows.Media.Brush)appResources["AppSubtext0"];
+        var accent   = appResources.Contains("AppPeach")
+            ? (System.Windows.Media.Brush)appResources["AppPeach"] : text;
+
+        System.Windows.Controls.TextBlock MakeLabel(string t) => new()
+        {
+            Text = t, Foreground = subtext, FontSize = 11, Margin = new Thickness(0, 0, 0, 2)
+        };
+
+        // ── Date / time controls ──────────────────────────────────────────
+        var picker = new System.Windows.Controls.DatePicker
+        {
+            Background = surface1, Foreground = text,
+            FontSize = 12, Width = 160,
+            SelectedDate = task.DueDate?.Date
+        };
+        var setTimeChk = new System.Windows.Controls.CheckBox
+        {
+            Content = "Set time", Foreground = subtext, FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0)
+        };
+        var pickerRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 4, 0, 0),
+            Children = { picker, setTimeChk }
+        };
+
+        static DateTime NextWeekday(DayOfWeek day)
+        {
+            int delta = ((int)day - (int)DateTime.Today.DayOfWeek + 7) % 7;
+            return DateTime.Today.AddDays(delta);
+        }
+        Wpf.Ui.Controls.Button MakeQuickBtn(string label) => new()
+        {
+            Content = label,
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            Padding = new Thickness(8, 0, 8, 0),
+            Height = 22, FontSize = 11, Margin = new Thickness(0, 0, 4, 0),
+            VerticalContentAlignment = VerticalAlignment.Center
+        };
+        var todayBtn    = MakeQuickBtn("Today");
+        var tomorrowBtn = MakeQuickBtn("Tomorrow");
+        var thisFriBtn  = MakeQuickBtn("This Fri");
+        todayBtn.Click    += (_, _) => picker.SelectedDate = DateTime.Today;
+        tomorrowBtn.Click += (_, _) => picker.SelectedDate = DateTime.Today.AddDays(1);
+        thisFriBtn.Click  += (_, _) => picker.SelectedDate = NextWeekday(DayOfWeek.Friday);
+        var quickRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 4, 0, 0),
+            Children = { todayBtn, tomorrowBtn, thisFriBtn }
+        };
+
+        System.Windows.Controls.ComboBox BuildTimeCombo(int width) => new()
+        {
+            Background = surface1, Foreground = text,
+            BorderBrush = surface2, FontSize = 12, Width = width
+        };
+        var hourCombo   = BuildTimeCombo(80);
+        var minuteCombo = BuildTimeCombo(80);
+        foreach (var h in Enumerable.Range(0, 24)) hourCombo.Items.Add(h.ToString("00"));
+        foreach (var m in new[] { "00", "15", "30", "45" }) minuteCombo.Items.Add(m);
+
+        // pre-populate time if task has an exact time
+        if (task.DueDate.HasValue && task.DueDate.Value.TimeOfDay != TimeSpan.Zero)
+        {
+            setTimeChk.IsChecked    = true;
+            hourCombo.SelectedIndex = task.DueDate.Value.Hour;
+            minuteCombo.SelectedIndex = new[] { 0, 15, 30, 45 }
+                .Select((v, i) => (v, i))
+                .OrderBy(x => Math.Abs(x.v - task.DueDate.Value.Minute))
+                .First().i;
+        }
+        else
+        {
+            hourCombo.SelectedIndex   = 9;
+            minuteCombo.SelectedIndex = 0;
+        }
+
+        var timeRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 4, 0, 0),
+            Visibility = setTimeChk.IsChecked == true ? Visibility.Visible : Visibility.Collapsed,
+            Children =
+            {
+                hourCombo,
+                new System.Windows.Controls.TextBlock
+                {
+                    Text = ":", Foreground = text, FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(4, 0, 4, 0)
+                },
+                minuteCombo
+            }
+        };
+        setTimeChk.Checked   += (_, _) => timeRow.Visibility = Visibility.Visible;
+        setTimeChk.Unchecked += (_, _) => timeRow.Visibility = Visibility.Collapsed;
+
+        var errorText = new System.Windows.Controls.TextBlock
+        {
+            Foreground = accent, FontSize = 11, TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed
+        };
+
+        // ── Content panel ─────────────────────────────────────────────────
+        var taskLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = task.DisplayMainTitle, Foreground = text, FontSize = 12,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        var contentPanel = new StackPanel { Margin = new Thickness(16, 12, 16, 8) };
+        contentPanel.Children.Add(taskLabel);
+        contentPanel.Children.Add(MakeLabel("Due date"));
+        contentPanel.Children.Add(pickerRow);
+        contentPanel.Children.Add(quickRow);
+        contentPanel.Children.Add(timeRow);
+        contentPanel.Children.Add(errorText);
+
+        // ── Title bar ─────────────────────────────────────────────────────
+        var titleBar = new Grid { Background = surface1, Height = 38 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var titleText = new System.Windows.Controls.TextBlock
+        {
+            Text = "Change Due Date", Foreground = text, FontSize = 14,
+            FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(14, 0, 0, 0)
+        };
+        var closeTitleBtn = new System.Windows.Controls.Button
+        {
+            Content = "✕", Width = 34, Height = 26,
+            Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0), Foreground = subtext, FontSize = 13
+        };
+        Grid.SetColumn(titleText, 0); Grid.SetColumn(closeTitleBtn, 1);
+        titleBar.Children.Add(titleText); titleBar.Children.Add(closeTitleBtn);
+
+        // ── Footer ────────────────────────────────────────────────────────
+        var saveBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Save",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            MinWidth = 100, Height = 32, Margin = new Thickness(0, 0, 8, 0), IsDefault = true
+        };
+        var cancelBtn = new Wpf.Ui.Controls.Button
+        {
+            Content = "Cancel",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            MinWidth = 100, Height = 32, IsCancel = true
+        };
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(16, 0, 16, 12),
+            Children = { saveBtn, cancelBtn }
+        };
+
+        var root = new Grid { Background = surface };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(titleBar, 0); Grid.SetRow(contentPanel, 1); Grid.SetRow(footer, 2);
+        root.Children.Add(titleBar); root.Children.Add(contentPanel); root.Children.Add(footer);
+
+        var dialogWindow = new Window
+        {
+            Title = "", Owner = Window.GetWindow(this), ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize, SizeToContent = SizeToContent.Height,
+            WindowStyle = WindowStyle.None, MinHeight = 0,
+            MinWidth = 380, Width = 380,
+            Background = surface, Foreground = text,
+            BorderBrush = surface2, BorderThickness = new Thickness(1),
+            Content = root
+        };
+        titleBar.MouseLeftButtonDown += (_, e2) =>
+        {
+            if (e2.ButtonState == System.Windows.Input.MouseButtonState.Pressed)
+                dialogWindow.DragMove();
+        };
+
+        saveBtn.Click += async (_, _) =>
+        {
+            var hasTime = setTimeChk.IsChecked == true;
+            if (hasTime && picker.SelectedDate == null)
+            {
+                errorText.Text = "Select a due date when setting time.";
+                errorText.Visibility = Visibility.Visible;
+                return;
+            }
+            saveBtn.IsEnabled = false; cancelBtn.IsEnabled = false;
+            errorText.Visibility = Visibility.Collapsed;
+
+            string dueOn = "", dueAt = "";
+            if (picker.SelectedDate.HasValue)
+            {
+                if (hasTime)
+                {
+                    var h = int.Parse((string)hourCombo.SelectedItem!);
+                    var m = int.Parse((string)minuteCombo.SelectedItem!);
+                    var dto = new DateTimeOffset(
+                        picker.SelectedDate.Value.Year, picker.SelectedDate.Value.Month,
+                        picker.SelectedDate.Value.Day, h, m, 0, DateTimeOffset.Now.Offset);
+                    dueAt = dto.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+                }
+                else
+                {
+                    dueOn = picker.SelectedDate.Value.ToString("yyyy-MM-dd");
+                }
+            }
+
+            var (ok, msg) = await ViewModel.ChangeDueDateAsync(task, dueOn, dueAt);
+            if (ok)
+            {
+                dialogWindow.DialogResult = true;
+                dialogWindow.Close();
+            }
+            else
+            {
+                errorText.Text = msg;
+                errorText.Visibility = Visibility.Visible;
+                saveBtn.IsEnabled = true; cancelBtn.IsEnabled = true;
+            }
+        };
+        cancelBtn.Click     += (_, _) => { dialogWindow.DialogResult = false; dialogWindow.Close(); };
+        closeTitleBtn.Click += (_, _) => { dialogWindow.DialogResult = false; dialogWindow.Close(); };
+        dialogWindow.ShowDialog();
     }
 
     private void OnUnsnoozeAllClick(object sender, RoutedEventArgs e)

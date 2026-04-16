@@ -122,6 +122,15 @@ public partial class CommandPaletteViewModel : ObservableObject
         AddTabCommand(commands, "Agent Hub", typeof(AgentHubPage));
         AddTabCommand(commands, "Setup", typeof(SetupPage));
         AddTabCommand(commands, "Settings", typeof(SettingsPage));
+
+        commands.Add(new CommandItem
+        {
+            Label    = "Add Task",
+            Category = "task",
+            Display  = "[+]  Add Task",
+            Action   = (w) => w.ShowAddTaskDialog()
+        });
+
         return commands;
     }
 
@@ -243,6 +252,15 @@ public partial class CommandPaletteViewModel : ObservableObject
                     }
                 }
             });
+
+            // + add task ProjectName
+            commands.Add(new CommandItem
+            {
+                Label    = $"add task {localName}",
+                Category = "task",
+                Display  = $"[+]  add task {displayName}",
+                Action   = (w) => w.ShowAddTaskDialog(localName)
+            });
         }
 
         _allCommands = commands;
@@ -286,6 +304,11 @@ public partial class CommandPaletteViewModel : ObservableObject
         else if (rawText.StartsWith("/"))
         {
             categoryFilter = "dir";
+            searchText = rawText.Substring(1).Trim().ToLower();
+        }
+        else if (rawText.StartsWith("+"))
+        {
+            categoryFilter = "task";
             searchText = rawText.Substring(1).Trim().ToLower();
         }
 
