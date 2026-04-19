@@ -156,6 +156,10 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool captureTaskLogEnabled;
 
+    // Silence Alert
+    [ObservableProperty]
+    private bool silenceAlertEnabled;
+
     // Schedule / Outlook 連携
     [ObservableProperty]
     private bool outlookCalendarEnabled;
@@ -280,6 +284,7 @@ public partial class SettingsViewModel : ObservableObject
             LlmStatus          = "";
             AiEnabled          = settings.AiEnabled;
             AiToggleCanEnable  = settings.AiEnabled; // 既にオンなら再テスト不要
+            SilenceAlertEnabled    = settings.SilenceAlertEnabled;
             CaptureTaskLogEnabled  = settings.CaptureTaskLogEnabled;
             OutlookCalendarEnabled = settings.OutlookCalendarEnabled;
             OutlookAvailable       = _outlookCalendarService.IsOutlookAvailable();
@@ -379,8 +384,9 @@ public partial class SettingsViewModel : ObservableObject
         settings.LlmParameters  = ParseLlmParametersText(LlmParametersText);
         settings.LlmUserProfile = LlmUserProfile;
         settings.LlmLanguage    = LlmLanguage.Trim();
-        settings.AiEnabled      = AiEnabled;
-        settings.CaptureTaskLogEnabled   = CaptureTaskLogEnabled;
+        settings.AiEnabled             = AiEnabled;
+        settings.SilenceAlertEnabled   = SilenceAlertEnabled;
+        settings.CaptureTaskLogEnabled = CaptureTaskLogEnabled;
         settings.OutlookCalendarEnabled  = OutlookCalendarEnabled;
         settings.IcsCalendarEnabled      = IcsCalendarEnabled;
         settings.IcsCalendarUrl          = IcsCalendarUrl.Trim();
@@ -436,6 +442,15 @@ public partial class SettingsViewModel : ObservableObject
         settings.AiEnabled = value;
         _configService.SaveSettings(settings);
         WeakReferenceMessenger.Default.Send(new AiEnabledChangedMessage(value));
+    }
+
+    partial void OnSilenceAlertEnabledChanged(bool value)
+    {
+        if (_loading) return;
+        var settings = _configService.LoadSettings();
+        settings.SilenceAlertEnabled = value;
+        _configService.SaveSettings(settings);
+        WeakReferenceMessenger.Default.Send(new SilenceAlertEnabledChangedMessage(value));
     }
 
     partial void OnIcsCalendarEnabledChanged(bool value)

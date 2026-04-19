@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using CommunityToolkit.Mvvm.Messaging;
 using Curia.Models;
 
 namespace Curia.Services;
@@ -33,6 +34,16 @@ public class SilenceAlertService : IDisposable
         var state = LoadState();
         var now = DateTime.Now;
         CurrentAlerts = FilterAlerts(state.Alerts, state, now);
+
+        WeakReferenceMessenger.Default.Register<SilenceAlertEnabledChangedMessage>(this,
+            (_, msg) =>
+            {
+                if (!msg.Enabled)
+                {
+                    CurrentAlerts = [];
+                    AlertsUpdated?.Invoke(CurrentAlerts);
+                }
+            });
     }
 
     public void StartScheduler()
@@ -71,9 +82,9 @@ public class SilenceAlertService : IDisposable
     private async Task RunDetectionAsync()
     {
         var settings = _configService.LoadSettings();
-        if (!settings.AiEnabled)
+        if (!settings.AiEnabled || !settings.SilenceAlertEnabled)
         {
-            Debug.WriteLine("[SilenceAlert] AI disabled, skipping");
+            Debug.WriteLine("[SilenceAlert] AI or SilenceAlert disabled, skipping");
             return;
         }
 
@@ -309,6 +320,7 @@ public class SilenceAlertService : IDisposable
 
     public void Dispose()
     {
+        WeakReferenceMessenger.Default.UnregisterAll(this);
         _timer?.Dispose();
         _timer = null;
     }

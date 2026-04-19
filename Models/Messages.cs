@@ -31,6 +31,14 @@ public class FontSizeChangedMessage(int editorFontSize, int markdownRenderFontSi
 }
 
 /// <summary>
+/// Silence Alert 機能の有効/無効が変わったときのメッセージ。
+/// </summary>
+public class SilenceAlertEnabledChangedMessage(bool enabled)
+{
+    public bool Enabled { get; } = enabled;
+}
+
+/// <summary>
 /// Editor / Wiki の文字色が変わったときのメッセージ。
 /// </summary>
 public class TextColorChangedMessage(string editorTextColor, string markdownRenderTextColor)

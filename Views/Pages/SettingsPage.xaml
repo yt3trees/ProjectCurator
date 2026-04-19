@@ -667,6 +667,21 @@
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
+                    <Separator Margin="0,8"/>
+                    <DockPanel LastChildFill="False">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="Silence Alert"
+                                   Foreground="{DynamicResource AppText}"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <ui:ToggleSwitch DockPanel.Dock="Right"
+                                         IsChecked="{Binding SilenceAlertEnabled, Mode=TwoWay}"
+                                         IsEnabled="{Binding AiEnabled}"/>
+                    </DockPanel>
+                    <TextBlock Text="Detect neglected projects once a day and show a banner on the Dashboard."
+                               Foreground="{DynamicResource AppSubtext0}"
+                               FontSize="11"
+                               Margin="0,2,0,0"/>
                 </StackPanel>
             </Border>
 
