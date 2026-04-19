@@ -41,10 +41,16 @@ flowchart LR
         WL["🔍 Lint<br>矛盾・孤立ページの検出"]
     end
 
+    subgraph CommandPalette ["🔍 横断検索 (Command Palette)"]
+        direction TB
+        AC["❓ Ask Curia<br>? プレフィックスで自然文質問<br>全プロジェクト横断回答"]
+    end
+
     Profile -.-> Dashboard
     Profile -.-> Editor
     Profile -.-> Global
     Profile -.-> Wiki
+    Profile -.-> CommandPalette
 ```
 
 <a id="setup-ja"></a>
@@ -134,6 +140,53 @@ copilot -p "TEXT"
 箇条書きで簡潔に。タスクを詰め込むより過負荷の日をフラグしてほしい。
 current_focus.md の更新は既存のトーンを維持すること。
 ```
+
+<a id="ask-curia-ja"></a>
+## Ask Curia (Command Palette)
+
+<a id="ask-curia-command-palette-ja"></a>
+### Ask Curia
+
+`Ctrl+K` でコマンドパレットを開き、`?` に続けて自然文で質問します。Curia が管理しているすべてのプロジェクトの AI コンテキストファイルを横断検索し、引用付きで回答を返します。
+
+```
+?Alphaプロジェクトで決めたDB方針なんだっけ
+?Bさんに依頼してた件どうなった
+?先月の移行に関する議論で何を決めたっけ
+```
+
+**検索対象ファイル**
+
+| ソース | パス |
+|---|---|
+| Decision Log | `_ai-context/decision_log/**/*.md` |
+| Focus History | `_ai-context/context/focus_history/*.md` |
+| Meeting Notes | `_ai-context/meeting_notes/**/*.md` |
+| Tasks | `_ai-context/obsidian_notes/tasks.md` (タスク単位) |
+
+**処理の仕組み**
+
+クエリは2段階の LLM 処理で行われます。Stage 1 では全プロジェクト最大 300 件のファイルのメタ情報 (タイトル + 先頭 500 文字) をスキャンして最も関連性の高い 8 件を選定します。Stage 2 では選定ファイルのフルテキストを送って引用付きの回答を生成します。
+
+**回答パネルの見方**
+
+- 回答文中のファイルパス引用 (`[focus_history/2026-04-11.md:L4]` など) はファイル名のみに短縮して表示します。
+- 各回答下部の Sources 欄に明示引用されたファイルを一覧表示します。クリックするとそのファイルを Editor で直接開きます。
+- プロジェクトが特定できないファイルはパスをクリップボードにコピーします。
+
+**会話継続 (マルチターン)**
+
+回答受信後、検索ボックスは `?` だけの状態にリセットされ、続けて次の質問を入力できます。過去の質問・回答はスクロール可能な会話パネルに積み重なり、LLM のコンテキストとして引き継がれます。
+
+- パレット外をクリックして閉じても会話は保持されます。再度開くと続きから再開できます。
+- 会話パネルのヘッダーにある **New** をクリックすると会話をリセットして新しいセッションを開始します。
+- `Escape` でパレットを閉じます (会話は保持されます)。
+- クエリ実行中に `Escape` を押すとキャンセルします。
+
+**利用条件**
+
+- `Enable AI Features` がオンであること。
+- プロジェクトが Curia に認識されていること (Dashboard に表示されている状態)。
 
 <a id="global-ja"></a>
 ## Global

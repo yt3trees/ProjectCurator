@@ -41,10 +41,16 @@ flowchart LR
         WL["🔍 Lint<br>Detect contradictions & orphan pages"]
     end
 
+    subgraph CommandPalette ["🔍 Cross-Project Search (Command Palette)"]
+        direction TB
+        AC["❓ Ask Curia<br>? prefix — natural language Q&A<br>across all project data"]
+    end
+
     Profile -.-> Dashboard
     Profile -.-> Editor
     Profile -.-> Global
     Profile -.-> Wiki
+    Profile -.-> CommandPalette
 ```
 
 <a id="setup"></a>
@@ -134,6 +140,53 @@ Role: Engineering manager. I work across 3-4 parallel projects.
 Prefer concise bullet points. Flag overloaded days rather than packing in tasks.
 Language: respond in Japanese unless the document is already in English.
 ```
+
+<a id="ask-curia"></a>
+## Ask Curia (Command Palette)
+
+<a id="ask-curia-command-palette"></a>
+### Ask Curia
+
+Press `Ctrl+K` to open the Command Palette, then type `?` followed by a natural-language question. Curia searches across all AI context files in every managed project and returns an answer with cited sources.
+
+```
+?What database approach did we decide on for the Alpha project?
+?What was Bさん asked to handle?
+?What did we discuss about the migration last month?
+```
+
+**What is searched**
+
+| Source | Location |
+|---|---|
+| Decision Log | `_ai-context/decision_log/**/*.md` |
+| Focus History | `_ai-context/context/focus_history/*.md` |
+| Meeting Notes | `_ai-context/meeting_notes/**/*.md` |
+| Tasks | `_ai-context/obsidian_notes/tasks.md` (per task) |
+
+**How it works**
+
+The query runs in two LLM stages. Stage 1 scans metadata (title + first 500 characters) from up to 300 candidate files across all projects and selects the 8 most relevant. Stage 2 sends the full content of those files and generates a cited answer.
+
+**Answer panel**
+
+- Inline citation references (e.g. `[focus_history/2026-04-11.md:L4]`) are shortened to just the filename for readability.
+- The Sources section at the bottom of each answer lists the explicitly cited files. Click any source to open it directly in the Editor.
+- If the file cannot be matched to a project, the path is copied to the clipboard instead.
+
+**Multi-turn conversation**
+
+After receiving an answer, the search box resets to `?` so you can ask a follow-up question immediately. Previous Q&A turns are shown in a scrollable conversation panel and their content is passed to the LLM as context.
+
+- The conversation persists if you click outside the palette and reopen it.
+- Click **New** in the conversation header to start a fresh session.
+- Press `Escape` to close the palette (conversation is preserved).
+- Press `Escape` while a query is in progress to cancel it.
+
+**Requirements**
+
+- `Enable AI Features` must be on.
+- Projects must be discovered by Curia (visible in Dashboard).
 
 <a id="global"></a>
 ## Global

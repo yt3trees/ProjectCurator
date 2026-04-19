@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Wpf.Ui;
 using Wpf.Ui.Appearance;
 using Curia.Services;
+using Curia.Services.Adapters;
 using Curia.ViewModels;
 using Curia.Views;
 using Curia.Views.Pages;
@@ -70,6 +71,10 @@ public partial class App : WpfApplication
         // スケジュール通知タイマー起動 (TrayService は MainWindow.Show 内で初期化済み)
         var scheduleNotification = _serviceProvider.GetRequiredService<ScheduleNotificationService>();
         scheduleNotification.Start();
+
+        // Ask Curia キャッシュウォームアップ
+        var curiaQuery = _serviceProvider.GetRequiredService<CuriaQueryService>();
+        _ = curiaQuery.WarmCacheAsync();
     }
 
     private static void ConfigureServices(IServiceCollection services)
@@ -100,6 +105,13 @@ public partial class App : WpfApplication
         services.AddSingleton<WikiIngestService>();
         services.AddSingleton<WikiQueryService>();
         services.AddSingleton<WikiLintService>();
+
+        // Curia cross-project query
+        services.AddSingleton<ICuriaSourceAdapter, DecisionLogSourceAdapter>();
+        services.AddSingleton<ICuriaSourceAdapter, FocusHistorySourceAdapter>();
+        services.AddSingleton<ICuriaSourceAdapter, MeetingNotesSourceAdapter>();
+        services.AddSingleton<ICuriaSourceAdapter, TasksSourceAdapter>();
+        services.AddSingleton<CuriaQueryService>();
         services.AddSingleton<ScheduleService>();
         services.AddSingleton<ScheduleNotificationService>();
         services.AddSingleton<SilenceAlertService>();

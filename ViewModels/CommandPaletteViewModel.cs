@@ -5,11 +5,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Curia.Models;
@@ -28,6 +30,7 @@ public partial class CommandPaletteViewModel : ObservableObject
     private readonly TimelineViewModel _timelineViewModel;
     private readonly StandupGeneratorService _standupGeneratorService;
     private readonly IContentDialogService _contentDialogService;
+    private readonly CuriaQueryService _curiaQueryService;
 
     [ObservableProperty]
     private string searchText = "";
@@ -37,6 +40,26 @@ public partial class CommandPaletteViewModel : ObservableObject
 
     [ObservableProperty]
     private CommandItem? selectedCommand;
+
+    [ObservableProperty]
+    private bool isAskMode;
+
+    [ObservableProperty]
+    private bool isAskLoading;
+
+    [ObservableProperty]
+    private CuriaAnswer? lastAnswer;
+
+    [ObservableProperty]
+    private bool isAiEnabled;
+
+    public ObservableCollection<CuriaConversationTurn> ConversationTurns { get; } = [];
+
+    private readonly List<(string role, string content)> _llmHistory = [];
+    private CancellationTokenSource? _askCts;
+
+    /// <summary>引用クリック時にエディタで開く。設定しない場合はクリップボードコピーにフォールバック。</summary>
+    public Action<ProjectInfo, string>? OnOpenInEditor { get; set; }
 
     private List<CommandItem> _allCommands = [];
     private DateTime _commandsBuiltTime = DateTime.MinValue;
@@ -49,7 +72,8 @@ public partial class CommandPaletteViewModel : ObservableObject
         EditorViewModel editorViewModel,
         TimelineViewModel timelineViewModel,
         StandupGeneratorService standupGeneratorService,
-        IContentDialogService contentDialogService)
+        IContentDialogService contentDialogService,
+        CuriaQueryService curiaQueryService)
     {
         _configService = configService;
         _discoveryService = discoveryService;
@@ -58,6 +82,11 @@ public partial class CommandPaletteViewModel : ObservableObject
         _timelineViewModel = timelineViewModel;
         _standupGeneratorService = standupGeneratorService;
         _contentDialogService = contentDialogService;
+        _curiaQueryService = curiaQueryService;
+
+        IsAiEnabled = _configService.LoadSettings().AiEnabled;
+        WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
+            (_, msg) => IsAiEnabled = msg.Enabled);
     }
 
     /// <summary>
@@ -76,21 +105,37 @@ public partial class CommandPaletteViewModel : ObservableObject
     public void Prepare()
     {
         bool isFresh = (DateTime.Now - _commandsBuiltTime).TotalSeconds < RebuildTtlSeconds;
+
+        // 既存の会話がある場合はそのまま Ask モードで再開
+        if (ConversationTurns.Count > 0)
+        {
+            SearchText = "?";
+            IsAskMode = true;
+            return;
+        }
+
         if (isFresh)
         {
-            // キャッシュが新鮮 — 即時表示
             SearchText = "";
             UpdateFilter();
             return;
         }
 
-        // タブコマンドのみ即時セット → ウィンドウはすぐに開く
         _allCommands = BuildStaticCommands();
         SearchText = "";
         UpdateFilter();
 
-        // プロジェクトコマンドをバックグラウンドで追加
         _ = RebuildWithProjectsAsync();
+    }
+
+    public void ResetConversation()
+    {
+        _askCts?.Cancel();
+        ConversationTurns.Clear();
+        _llmHistory.Clear();
+        LastAnswer = null;
+        IsAskMode = false;
+        IsAskLoading = false;
     }
 
     /// <summary>
@@ -104,7 +149,122 @@ public partial class CommandPaletteViewModel : ObservableObject
 
     partial void OnSearchTextChanged(string value)
     {
+        if (!value.StartsWith("?") && IsAskMode)
+        {
+            // Ask モードを抜けたらロード中のリクエストをキャンセル (会話履歴は保持)
+            _askCts?.Cancel();
+            IsAskMode = false;
+            IsAskLoading = false;
+        }
+
+        if (value.StartsWith("?") && IsAiEnabled)
+        {
+            IsAskMode = true;
+            FilteredCommands.Clear();
+            SelectedCommand = null;
+            return;
+        }
+
+        IsAskMode = false;
         UpdateFilter();
+    }
+
+    public async Task AskAsync(string rawQuestion)
+    {
+        var question = rawQuestion.TrimStart('?').Trim();
+        if (string.IsNullOrWhiteSpace(question)) return;
+
+        _askCts?.Cancel();
+        _askCts = new CancellationTokenSource();
+        var ct = _askCts.Token;
+
+        IsAskLoading = true;
+
+        try
+        {
+            // 会話履歴を渡してマルチターン対応
+            var history = _llmHistory.Count > 0
+                ? (IReadOnlyList<(string, string)>)_llmHistory.AsReadOnly()
+                : null;
+
+            var answer = await _curiaQueryService.AskAsync(question, null, history, ct);
+
+            // 会話ターンとして追加
+            ConversationTurns.Add(new CuriaConversationTurn
+            {
+                Question = answer.Question,
+                AnswerText = answer.AnswerText,
+                Citations = answer.Citations,
+            });
+
+            // LLM コンテキスト更新 (ドキュメント無しのQ&Aのみ保持してサイズ抑制)
+            _llmHistory.Add(("user", question));
+            _llmHistory.Add(("assistant", answer.AnswerText));
+
+            LastAnswer = answer;
+
+            // 次の質問入力を促すため検索ボックスを "?" にリセット
+            SearchText = "?";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            var errTurn = new CuriaConversationTurn
+            {
+                Question = question,
+                AnswerText = $"Error: {ex.Message}",
+            };
+            ConversationTurns.Add(errTurn);
+            LastAnswer = new CuriaAnswer
+            {
+                Question = question,
+                AnswerText = errTurn.AnswerText,
+                GeneratedAt = DateTime.Now,
+            };
+        }
+        finally
+        {
+            IsAskLoading = false;
+        }
+    }
+
+    public void CancelAsk()
+    {
+        _askCts?.Cancel();
+        IsAskLoading = false;
+    }
+
+    public async Task OpenCitationAsync(CuriaCitation citation)
+    {
+        var hashIdx = citation.Path.LastIndexOf('#');
+        var filePath = hashIdx >= 0 ? citation.Path[..hashIdx] : citation.Path;
+
+        if (!File.Exists(filePath))
+        {
+            try { System.Windows.Clipboard.SetText(citation.Path); } catch { }
+            return;
+        }
+
+        if (OnOpenInEditor == null)
+        {
+            try { System.Windows.Clipboard.SetText(filePath); } catch { }
+            return;
+        }
+
+        var projects = await _discoveryService.GetProjectInfoListAsync();
+        var project = projects
+            .Where(p => !string.IsNullOrEmpty(p.Path))
+            .OrderByDescending(p => p.Path.Length)
+            .FirstOrDefault(p =>
+                filePath.StartsWith(p.Path, StringComparison.OrdinalIgnoreCase) ||
+                filePath.StartsWith(p.AiContextPath, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrEmpty(p.AiContextContentPath) &&
+                 filePath.StartsWith(p.AiContextContentPath, StringComparison.OrdinalIgnoreCase)));
+
+        if (project != null)
+            OnOpenInEditor(project, filePath);
+        else
+            try { System.Windows.Clipboard.SetText(filePath); } catch { }
     }
 
     /// <summary>
