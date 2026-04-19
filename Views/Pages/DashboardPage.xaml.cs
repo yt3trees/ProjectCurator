@@ -979,6 +979,27 @@ public partial class DashboardPage : WpfUserControl, INavigableView<DashboardVie
     private void OnTodayQueueRefreshClick(object sender, RoutedEventArgs e)
         => _ = ViewModel.LoadTodayQueueAsync();
 
+    private void OnSilenceAlertOpenClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: SilenceAlert alert })
+            ViewModel.OpenSilenceAlertProject(alert);
+    }
+
+    private void OnSilenceAlertSnoozeClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: SilenceAlert alert })
+            ViewModel.SnoozeSilenceAlert(alert);
+    }
+
+    private void OnSilenceAlertDismissClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: SilenceAlert alert })
+            ViewModel.DismissSilenceAlert(alert);
+    }
+
+    private void OnSilenceAlertForceRefreshClick(object sender, RoutedEventArgs e)
+        => _ = ViewModel.ForceRefreshSilenceAlertsAsync();
+
     private void OnTodayQueueOpenAsana(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: TodayQueueTask task } &&

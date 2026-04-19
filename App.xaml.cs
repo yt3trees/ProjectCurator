@@ -51,6 +51,10 @@ public partial class App : WpfApplication
         var standup = _serviceProvider.GetRequiredService<StandupGeneratorService>();
         standup.StartScheduler();
 
+        // Silence Alert スケジューラー起動
+        var silenceAlert = _serviceProvider.GetRequiredService<SilenceAlertService>();
+        silenceAlert.StartScheduler();
+
         // Asana Sync スケジュールタイマー起動
         var asanaSync = _serviceProvider.GetRequiredService<AsanaSyncViewModel>();
         asanaSync.StartScheduler();
@@ -98,6 +102,7 @@ public partial class App : WpfApplication
         services.AddSingleton<WikiLintService>();
         services.AddSingleton<ScheduleService>();
         services.AddSingleton<ScheduleNotificationService>();
+        services.AddSingleton<SilenceAlertService>();
         services.AddSingleton<OutlookCalendarService>();
         services.AddSingleton<IcsCalendarService>();
 

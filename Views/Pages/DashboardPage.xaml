@@ -836,11 +836,78 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
+                <!-- ===== Silence Alert バナー ===== -->
+                <ItemsControl Grid.Row="0"
+                              ItemsSource="{Binding SilenceAlerts}"
+                              Visibility="{Binding HasSilenceAlerts, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:SilenceAlert}">
+                            <Border BorderThickness="3,0,0,0"
+                                    BorderBrush="{Binding Severity, Converter={StaticResource SilenceSeverityToBrushConverter}}"
+                                    Padding="6,3"
+                                    Margin="0,0,0,1"
+                                    Background="{DynamicResource AppSurface1}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="⚠"
+                                               FontSize="11"
+                                               VerticalAlignment="Center"
+                                               Foreground="{Binding Severity, Converter={StaticResource SilenceSeverityToBrushConverter}}"
+                                               Margin="0,0,5,0"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding ProjectDisplayName}"
+                                               FontWeight="SemiBold"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource AppText}"
+                                               Margin="0,0,6,0"/>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding Reason}"
+                                               FontSize="11"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource AppOverlay1}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <ui:Button Grid.Column="3"
+                                               Content="Open"
+                                               Height="22" Padding="6,0" FontSize="11"
+                                               Margin="6,0,0,0"
+                                               Appearance="Secondary"
+                                               Tag="{Binding}"
+                                               Click="OnSilenceAlertOpenClick"/>
+                                    <ui:Button Grid.Column="4"
+                                               Content="Snooze"
+                                               Height="22" Padding="6,0" FontSize="11"
+                                               Margin="4,0,0,0"
+                                               Appearance="Secondary"
+                                               Tag="{Binding}"
+                                               Click="OnSilenceAlertSnoozeClick"/>
+                                    <ui:Button Grid.Column="5"
+                                               Content="×"
+                                               Height="22" Padding="6,0" FontSize="11"
+                                               Margin="4,0,0,0"
+                                               Appearance="Secondary"
+                                               Tag="{Binding}"
+                                               Click="OnSilenceAlertDismissClick"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
                 <!-- ヘッダー -->
-                <Border Grid.Row="0" Background="{DynamicResource AppSurface1}" Padding="8,4">
+                <Border Grid.Row="1" Background="{DynamicResource AppSurface1}" Padding="8,4">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -914,13 +981,20 @@
                         <ui:Button Grid.Column="7" Content="↻"
                                    Height="34" Padding="10,0" FontSize="12"
                                    ToolTip="Refresh Today Queue"
-                                   Click="OnTodayQueueRefreshClick"/>
+                                   Click="OnTodayQueueRefreshClick">
+                            <ui:Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Refresh silence alerts (Force)"
+                                              Click="OnSilenceAlertForceRefreshClick"/>
+                                </ContextMenu>
+                            </ui:Button.ContextMenu>
+                        </ui:Button>
                     </Grid>
                 </Border>
 
                 <!-- タスクリスト -->
                 <!-- Padding右=20: オーバーレイスクロールバーがDoneボタンに被らないようにする -->
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{Binding TodayQueueTasks}" Padding="6,2,20,2">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type svc:TodayQueueTask}">

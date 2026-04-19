@@ -207,3 +207,19 @@ public class SyncLogKindToMarginConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotImplementedException();
 }
+
+/// <summary>SilenceSeverity を左ボーダーの Brush に変換する。high=赤, medium=オレンジ, low=グレー。</summary>
+[ValueConversion(typeof(Models.SilenceSeverity), typeof(MediaBrush))]
+public class SilenceSeverityToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is Models.SilenceSeverity s ? s switch
+        {
+            Models.SilenceSeverity.High   => new SolidColorBrush(MediaColor.FromRgb(0xFF, 0x44, 0x44)),
+            Models.SilenceSeverity.Medium => new SolidColorBrush(MediaColor.FromRgb(0xFF, 0x88, 0x00)),
+            _                             => new SolidColorBrush(MediaColor.FromRgb(0x88, 0x88, 0x88)),
+        } : new SolidColorBrush(MediaColor.FromRgb(0x88, 0x88, 0x88));
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}

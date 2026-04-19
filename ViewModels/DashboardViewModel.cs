@@ -160,6 +160,7 @@ public partial class DashboardViewModel : ObservableObject
     private readonly ConfigService _configService;
     private readonly TodayQueueService _todayQueueService;
     private readonly StateSnapshotService _stateSnapshotService;
+    private readonly SilenceAlertService _silenceAlertService;
     private System.Timers.Timer? _refreshTimer;
     private List<string> _hiddenKeys = [];
     private List<ProjectCardViewModel> _allCards = [];
@@ -218,6 +219,14 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private bool isAiEnabled;
 
+    // ---------- Silence Alerts ----------
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSilenceAlerts))]
+    private ObservableCollection<SilenceAlert> silenceAlerts = [];
+
+    public bool HasSilenceAlerts => SilenceAlerts.Count > 0;
+
     public int AutoRefreshMinutes { get; set; }
     public int TodayQueueLimit { get; set; }
 
@@ -231,12 +240,14 @@ public partial class DashboardViewModel : ObservableObject
         ProjectDiscoveryService discoveryService,
         ConfigService configService,
         TodayQueueService todayQueueService,
-        StateSnapshotService stateSnapshotService)
+        StateSnapshotService stateSnapshotService,
+        SilenceAlertService silenceAlertService)
     {
         _discoveryService = discoveryService;
         _configService = configService;
         _todayQueueService = todayQueueService;
         _stateSnapshotService = stateSnapshotService;
+        _silenceAlertService = silenceAlertService;
         var settings = configService.LoadSettings();
         AutoRefreshMinutes = settings.DashboardAutoRefreshMinutes;
         TodayQueueLimit = settings.DashboardTodayQueueLimit;
@@ -249,7 +260,31 @@ public partial class DashboardViewModel : ObservableObject
         IsAiEnabled = _configService.LoadSettings().AiEnabled;
         WeakReferenceMessenger.Default.Register<AiEnabledChangedMessage>(this,
             (_, msg) => IsAiEnabled = msg.Enabled);
+
+        SilenceAlerts = new ObservableCollection<SilenceAlert>(_silenceAlertService.CurrentAlerts);
+        _silenceAlertService.AlertsUpdated += OnSilenceAlertsUpdated;
     }
+
+    private void OnSilenceAlertsUpdated(List<SilenceAlert> alerts)
+    {
+        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            SilenceAlerts = new ObservableCollection<SilenceAlert>(alerts));
+    }
+
+    public void DismissSilenceAlert(SilenceAlert alert)
+        => _silenceAlertService.Dismiss(alert.ProjectId);
+
+    public void SnoozeSilenceAlert(SilenceAlert alert)
+        => _silenceAlertService.Snooze(alert.ProjectId);
+
+    public void OpenSilenceAlertProject(SilenceAlert alert)
+    {
+        var card = _allCards.FirstOrDefault(c => c.Info.Name == alert.ProjectId);
+        if (card != null) OnOpenInEditor?.Invoke(card.Info);
+    }
+
+    public async Task ForceRefreshSilenceAlertsAsync()
+        => await _silenceAlertService.ForceRefreshAsync();
 
     public List<TodayQueueTask> GetTopTasksForAi(int limit = 30)
         => _cachedAllTasks.Take(limit).ToList();
